@@ -1,0 +1,30 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+expected_domain="androidskills.dev"
+failures=0
+
+if [[ ! -f index.html ]]; then
+  echo "FAIL: GitHub Pages is configured to publish / from main, but index.html is missing."
+  failures=1
+elif ! grep -Eiq '<!doctype html|<html' index.html; then
+  echo "FAIL: index.html exists but does not look like an HTML document."
+  failures=1
+fi
+
+if [[ ! -f CNAME ]]; then
+  echo "FAIL: GitHub Pages has custom domain ${expected_domain}, but CNAME is missing."
+  failures=1
+else
+  cname_value="$(tr -d '\r\n' < CNAME)"
+  if [[ "${cname_value}" != "${expected_domain}" ]]; then
+    echo "FAIL: CNAME must contain exactly '${expected_domain}', got '${cname_value}'."
+    failures=1
+  fi
+fi
+
+if [[ "${failures}" -eq 0 ]]; then
+  echo "PASS: GitHub Pages root files are present."
+fi
+
+exit "${failures}"
