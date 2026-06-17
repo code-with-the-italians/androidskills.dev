@@ -1,5 +1,8 @@
 package dev.androidskills
 
+import dev.androidskills.api.installApiErrorMapping
+import dev.androidskills.api.publicRoutes
+import dev.androidskills.db.Skills
 import dev.androidskills.llm.LlmClient
 import dev.androidskills.llm.StubLlmClient
 import dev.androidskills.storage.FileStore
@@ -13,6 +16,8 @@ import io.ktor.server.response.respond
 import io.ktor.server.routing.get
 import io.ktor.server.routing.routing
 import kotlinx.serialization.Serializable
+import org.jetbrains.exposed.sql.selectAll
+import org.jetbrains.exposed.sql.transactions.transaction
 
 /**
  * Ktor application module (referenced from application.conf). The entrypoint is
@@ -23,9 +28,14 @@ fun Application.module(config: AppConfig = AppConfig.fromEnv()) {
 
     install(ContentNegotiation) { json() }
     install(CallLogging)
+    installApiErrorMapping()
 
     val fileStore: FileStore = LocalFsStore(config.fileStoreDir)
     val llm: LlmClient = StubLlmClient()
+
+    if (config.seedDemo && transaction { Skills.selectAll().count() == 0L }) {
+        dev.androidskills.api.DemoData.seed(fileStore)
+    }
 
     routing {
         get("/api/health") {
@@ -39,6 +49,7 @@ fun Application.module(config: AppConfig = AppConfig.fromEnv()) {
                 ),
             )
         }
+        publicRoutes(fileStore)
     }
 }
 
