@@ -1,0 +1,132 @@
+package dev.androidskills.ingest
+
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertTrue
+
+class SkillManifestParserTest {
+
+    @Test
+    fun `parses scalars block list metadata and body`() {
+        val md = """
+            ---
+            name: Jetpack MVI Scaffold
+            description: A predictable MVI baseline for Compose apps.
+            license: Apache-2.0
+            tags:
+              - android
+              - kotlin
+              - compose
+            metadata:
+              version: 1.2.3
+            ---
+            # Jetpack MVI Scaffold
+
+            ## Usage
+            Drop into `skills/` and wire your ViewModel.
+        """.trimIndent()
+
+        val m = SkillManifestParser.parse(md)
+        assertEquals("Jetpack MVI Scaffold", m.name)
+        assertEquals("A predictable MVI baseline for Compose apps.", m.description)
+        assertEquals("Apache-2.0", m.license)
+        assertEquals(listOf("android", "kotlin", "compose"), m.tags)
+        assertEquals("1.2.3", m.version)
+        assertTrue(m.hadFrontmatter)
+        assertTrue(m.body.startsWith("# Jetpack MVI Scaffold"))
+        assertTrue(m.body.contains("Drop into `skills/`"))
+    }
+
+    @Test
+    fun `parses flow list tags`() {
+        val md = """
+            ---
+            name: Flow Tags
+            description: d
+            license: MIT
+            tags: [android, kotlin, "multi-line"]
+            ---
+            body
+        """.trimIndent()
+        val m = SkillManifestParser.parse(md)
+        assertEquals(listOf("android", "kotlin", "multi-line"), m.tags)
+    }
+
+    @Test
+    fun `handles CRLF and BOM`() {
+        val bom = "\uFEFF"
+        val md = bom + "---\r\nname: X\r\ndescription: d\r\nlicense: MIT\r\n---\r\n# body\r\n"
+        val m = SkillManifestParser.parse(md)
+        assertEquals("X", m.name)
+        assertEquals("# body", m.body.trim())
+    }
+
+    @Test
+    fun `no frontmatter leaves whole content as body`() {
+        val m = SkillManifestParser.parse("# just markdown\nno yaml here")
+        assertEquals("", m.name)
+        assertEquals("", m.description)
+        assertEquals(null, m.license)
+        assertTrue(m.body.contains("just markdown"))
+        assertEquals(false, m.hadFrontmatter)
+    }
+
+    @Test
+    fun `validator flags missing required fields`() {
+        val m = ParsedManifest(name = "", description = "  ", tags = listOf("OK"), license = null, version = null, body = "", hadFrontmatter = true)
+        val fields = ManifestValidator.validate(m).map { it.field }.toSet()
+        assertTrue("name" in fields)
+        assertTrue("description" in fields)
+        assertTrue("license" in fields)
+    }
+
+    @Test
+    fun `validator flags bad tags and semver`() {
+        val m = ParsedManifest(
+            name = "N", description = "d", license = "MIT",
+            tags = listOf("good", "Bad Tag", "x".repeat(50)),
+            version = "not-semver",
+            body = "", hadFrontmatter = true,
+        )
+        val errs = ManifestValidator.validate(m)
+        assertTrue(errs.any { it.field.startsWith("tags[") })
+        assertTrue(errs.any { it.field == "metadata.version" })
+    }
+
+    @Test
+    fun `validator accepts a clean manifest`() {
+        val m = ParsedManifest(
+            name = "N", description = "d", license = "Apache-2.0",
+            tags = listOf("android", "kotlin"), version = "0.1.0-rc.1", body = "", hadFrontmatter = true,
+        )
+        assertEquals(emptyList(), ManifestValidator.validate(m))
+    }
+}
+
+class TokensTest {
+    @Test
+    fun `estimate is ceil bytes over 4`() {
+        // "abcd" = 4 bytes -> 1 token; "abcde" = 5 bytes -> 2 tokens
+        assertEquals(1, Tokens.estimate("abcd"))
+        assertEquals(2, Tokens.estimate("abcde"))
+        assertEquals(0, Tokens.estimate(""))
+    }
+
+    @Test
+    fun `estimate counts utf8 bytes`() {
+        // "€" is 3 UTF-8 bytes -> 1 token
+        assertEquals(1, Tokens.estimate("€"))
+    }
+
+    @Test
+    fun `bands bucket at 1k 10k 100k`() {
+        assertEquals("100s", Tokens.band(0))
+        assertEquals("100s", Tokens.band(999))
+        assertEquals("1k", Tokens.band(1_000))
+        assertEquals("1k", Tokens.band(9_999))
+        assertEquals("10k", Tokens.band(10_000))
+        assertEquals("10k", Tokens.band(99_999))
+        assertEquals("100k", Tokens.band(100_000))
+        assertEquals("100k", Tokens.band(9_999_999))
+    }
+}
