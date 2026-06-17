@@ -1,5 +1,7 @@
 package dev.androidskills
 
+import dev.androidskills.db.Migrations
+import org.jetbrains.exposed.sql.transactions.TransactionManager
 import org.jetbrains.exposed.sql.transactions.transaction
 import org.sqlite.SQLiteConfig
 import org.sqlite.SQLiteDataSource
@@ -13,6 +15,10 @@ import org.jetbrains.exposed.sql.Database as ExposedDatabase
  * These PRAGMAs are applied via [SQLiteConfig] at connect time — SQLite refuses
  * to switch journal modes from inside a transaction, so they cannot be run through
  * an Exposed `transaction { }` block.
+ *
+ * The latest connected database is also installed as Exposed's
+ * `TransactionManager.defaultDatabase` so handlers can call `transaction { }`
+ * without a handle (and tests can re-point it at an isolated temp DB per run).
  */
 object Database {
     private lateinit var db: ExposedDatabase
@@ -29,12 +35,9 @@ object Database {
         ).apply { url = "jdbc:sqlite:${config.dbPath}" }
 
         db = ExposedDatabase.connect(dataSource)
+        TransactionManager.defaultDatabase = db
 
-        transaction(db) {
-            // Walking-skeleton marker; the real schema/migrations land with the read path.
-            exec("CREATE TABLE IF NOT EXISTS schema_meta (key TEXT PRIMARY KEY, value TEXT);")
-            exec("INSERT OR IGNORE INTO schema_meta(key, value) VALUES ('version', '0');")
-        }
+        Migrations.run(db)
     }
 
     fun journalMode(): String = transaction(db) {

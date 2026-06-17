@@ -18,8 +18,7 @@ import kotlinx.serialization.Serializable
  * Ktor application module (referenced from application.conf). The entrypoint is
  * io.ktor.server.netty.EngineMain (see main.kt).
  */
-fun Application.module() {
-    val config = AppConfig.fromEnv()
+fun Application.module(config: AppConfig = AppConfig.fromEnv()) {
     Database.init(config)
 
     install(ContentNegotiation) { json() }
