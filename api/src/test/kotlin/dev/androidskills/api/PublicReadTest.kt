@@ -53,6 +53,33 @@ class PublicReadTest {
     }
 
     @Test
+    fun `stats lastUpdated ignores non-public skills`() {
+        // lastUpdated must reflect only published skills, like indexed/contributors,
+        // so a freshly-touched unlisted/flagged skill can't move the public stat.
+        val before = PublicQueries.stats().lastUpdated
+        // Touch a published skill with a future timestamp, then unlist it.
+        transaction {
+            Skills.update({ Skills.slug eq "retrofit-okhttp-config" }) {
+                it[Skills.updatedAt] = "2099-12-31T23:59:59Z"
+            }
+        }
+        // While still published, the future timestamp wins.
+        assertEquals("2099-12-31T23:59:59Z", PublicQueries.stats().lastUpdated)
+        // Now unlist it — it must no longer surface in lastUpdated.
+        transaction {
+            Skills.update({ Skills.slug eq "retrofit-okhttp-config" }) {
+                it[Skills.status] = "unlisted"
+                it[Skills.updatedAt] = "2100-12-31T23:59:59Z"
+            }
+        }
+        val after = PublicQueries.stats().lastUpdated
+        assertTrue(
+            before == after || (after != null && after < "2100-12-31T23:59:59Z"),
+            "unlisted skill must not set lastUpdated; got $after (before=$before)",
+        )
+    }
+
+    @Test
     fun `categories list counts published skills`() {
         val cats = PublicQueries.categories()
         val total = cats.sumOf { it.count }
