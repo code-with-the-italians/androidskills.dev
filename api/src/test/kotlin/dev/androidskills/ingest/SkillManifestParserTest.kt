@@ -101,6 +101,61 @@ class SkillManifestParserTest {
         )
         assertEquals(emptyList(), ManifestValidator.validate(m))
     }
+
+    @Test
+    fun `parses literal block scalar description`() {
+        val md = """
+            ---
+            name: Block Skill
+            description: |
+              First line of the description.
+              Second line, indented under the indicator.
+            license: MIT
+            ---
+            body
+        """.trimIndent()
+        val m = SkillManifestParser.parse(md)
+        assertTrue(m.description.contains("First line of the description"), "got: ${m.description}")
+        assertTrue(m.description.contains("Second line"))
+        // Must NOT be the literal indicator string "|".
+        assertTrue(m.description != "|")
+        assertEquals(emptyList(), ManifestValidator.validate(m))
+    }
+
+    @Test
+    fun `parses folded block scalar and chomping`() {
+        val md = """
+            ---
+            name: Folded
+            description: >-
+              folded
+              into one line
+            license: MIT
+            ---
+            body
+        """.trimIndent()
+        val m = SkillManifestParser.parse(md)
+        // Folded joins non-empty lines with a space; strip chomps the trailing newline.
+        assertEquals("folded into one line", m.description.trim())
+    }
+
+    @Test
+    fun `block scalar indicator with no content fails validation not silent pipe`() {
+        val md = """
+            ---
+            name: Empty
+            description: |
+            license: MIT
+            ---
+            body
+        """.trimIndent()
+        val m = SkillManifestParser.parse(md)
+        // No indented content under `|` → empty, which validation flags as missing
+        // (never the literal string "|").
+        assertTrue(m.description.isBlank())
+        val errs = ManifestValidator.validate(m).map { it.field }
+        assertTrue("description" in errs)
+    }
 }
 
 class TokensTest {

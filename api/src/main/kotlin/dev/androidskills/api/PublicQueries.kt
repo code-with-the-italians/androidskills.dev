@@ -8,6 +8,7 @@ import dev.androidskills.db.Skills
 import dev.androidskills.db.Submissions
 import dev.androidskills.db.Users
 import dev.androidskills.db.Versions
+import dev.androidskills.ingest.SkillPaths
 import dev.androidskills.storage.FileStore
 import dev.androidskills.util.appJson
 import dev.androidskills.util.newId
@@ -169,7 +170,10 @@ object PublicQueries {
         val size = row[SkillFiles.size]
         val key = row[SkillFiles.r2Key]
         val downloadOnly = isBinary || size > PREVIEW_LIMIT
-        val content = if (!downloadOnly) store.get(key)?.toString(Charsets.UTF_8) else null
+        val content = if (!downloadOnly) {
+            store.get(key)?.toString(Charsets.UTF_8)
+                ?: throw ApiStorageException("File bytes missing for '$slug'/'$path' (key=$key)")
+        } else null
         FileContentResult(slug, path, size, isBinary, content, downloadOnly, key)
     }
 
@@ -195,11 +199,20 @@ object PublicQueries {
             Versions.selectAll().where { Versions.skillId eq skillId }.orderBy(Versions.createdAt, SortOrder.DESC).firstOrNull()
         }) ?: throw ApiNotFoundException("No version available for '$slug'")
 
+        val currentVersion = skill[Skills.version]
+        val isCurrent = verRow[Versions.version] == currentVersion
+        val label = version ?: verRow[Versions.version]
         val zipKey = verRow[Versions.r2ZipKey]
-        val bytes = if (zipKey != null && store.exists(zipKey)) {
-            store.get(zipKey) ?: buildZip(skillId, store)
-        } else {
+        // A version's archive must come from its own r2_zip_key. We only ever
+        // fall back to building from current skill_files for the *current*
+        // version (where current files == that version); a historical version
+        // with a missing/absent archive is a 404, never silently substituted
+        // with today's files named as the old version (spec §5.6).
+        val storedBytes = if (zipKey != null && store.exists(zipKey)) store.get(zipKey) else null
+        val bytes = storedBytes ?: if (isCurrent) {
             buildZip(skillId, store)
+        } else {
+            throw ApiNotFoundException("No downloadable archive for '$slug' version '$label'")
         }
         // Best-effort install counter (single writer; spec §3 keeps this simple).
         Skills.update({ Skills.id eq skillId }) { it[Skills.installs] = skill[Skills.installs] + 1 }
@@ -269,11 +282,19 @@ object PublicQueries {
     // ---- bundles / authors -------------------------------------------------
 
     fun bundles(page: Int, pageSize: Int): Page<BundleSummary> = transaction {
-        val total = Bundles.selectAll().count().toInt()
-        val rows = Bundles.selectAll().orderBy(Bundles.createdAt, SortOrder.DESC)
+        // Public bundle index: only bundles exposing >=1 published skill (spec
+        // §3.5 — non-public skills are not reachable anonymously, so a bundle
+        // that has only unlisted/flagged skills is hidden from the public list).
+        val publicBundleIds = Skills.select(Skills.bundleId)
+            .where { Skills.status eq "published" }.map { it[Skills.bundleId] }.toSet()
+        val total = publicBundleIds.size
+        val rows = if (publicBundleIds.isEmpty()) emptyList()
+        else Bundles.selectAll().where { Bundles.id inList publicBundleIds.toList() }
+            .orderBy(Bundles.createdAt, SortOrder.DESC)
             .limit(pageSize).offset(((page - 1) * pageSize).toLong()).toList()
         val owners = usersByIds(rows.map { it[Bundles.ownerUserId] }.distinct())
-        val counts = Skills.select(Skills.bundleId).where { Skills.bundleId inList rows.map { it[Bundles.id] } }
+        val counts = Skills.select(Skills.bundleId)
+            .where { (Skills.bundleId inList rows.map { it[Bundles.id] }) and (Skills.status eq "published") }
             .toList().groupingBy { it[Skills.bundleId] }.eachCount()
         val items = rows.map { row ->
             BundleSummary(
@@ -288,8 +309,11 @@ object PublicQueries {
     fun bundle(id: String): BundleDetail = transaction {
         val row = Bundles.selectAll().where { Bundles.id eq id }.singleOrNull()
             ?: throw ApiNotFoundException("Bundle '$id' not found")
+        val skillRows = Skills.selectAll()
+            .where { (Skills.bundleId eq id) and (Skills.status eq "published") }
+            .orderBy(Skills.updatedAt, SortOrder.DESC).toList()
+        if (skillRows.isEmpty()) throw ApiNotFoundException("Bundle '$id' not found")
         val owner = usersByIds(listOf(row[Bundles.ownerUserId])).values.first()
-        val skillRows = Skills.selectAll().where { Skills.bundleId eq id }.orderBy(Skills.updatedAt, SortOrder.DESC).toList()
         BundleDetail(
             id = row[Bundles.id], kind = row[Bundles.kind], provenance = row[Bundles.provenance],
             owner = authorRef(owner), sourceRef = row[Bundles.sourceRef], syncedAt = row[Bundles.syncedAt],
@@ -469,8 +493,12 @@ object PublicQueries {
         val baos = ByteArrayOutputStream()
         ZipOutputStream(baos).use { zos ->
             files.forEach { f ->
+                // Zip Slip defence: only normalised relative POSIX paths become
+                // entries. Unsafe stored paths (e.g. `../…`) are skipped rather
+                // than written (ingest will also reject them upstream). (§11.)
+                val safePath = SkillPaths.safeRelativeOrNull(f[SkillFiles.path]) ?: return@forEach
                 val bytes = store.get(f[SkillFiles.r2Key]) ?: return@forEach
-                zos.putNextEntry(ZipEntry(f[SkillFiles.path]))
+                zos.putNextEntry(ZipEntry(safePath))
                 zos.write(bytes)
                 zos.closeEntry()
             }
@@ -511,6 +539,21 @@ object PublicQueries {
 
     fun parsePageSize(raw: String?): Int = (raw?.toIntOrNull() ?: DEFAULT_PAGE_SIZE).coerceIn(1, MAX_PAGE_SIZE)
     fun parsePage(raw: String?): Int = (raw?.toIntOrNull() ?: 1).coerceAtLeast(1)
+
+    /** Strict paging for HTTP query params — malformed values 422 instead of coercing. */
+    fun parsePageStrict(raw: String?): Int {
+        if (raw == null) return 1
+        val n = raw.toIntOrNull() ?: throw ApiValidationException(mapOf("page" to "must be a positive integer"), "Invalid 'page'")
+        if (n < 1) throw ApiValidationException(mapOf("page" to "must be >= 1"), "Invalid 'page'")
+        return n
+    }
+
+    fun parsePageSizeStrict(raw: String?): Int {
+        if (raw == null) return DEFAULT_PAGE_SIZE
+        val n = raw.toIntOrNull() ?: throw ApiValidationException(mapOf("pageSize" to "must be an integer"), "Invalid 'pageSize'")
+        if (n !in 1..MAX_PAGE_SIZE) throw ApiValidationException(mapOf("pageSize" to "must be 1..$MAX_PAGE_SIZE"), "Invalid 'pageSize'")
+        return n
+    }
 }
 
 data class FileContentResult(

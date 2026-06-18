@@ -8,9 +8,13 @@ package dev.androidskills.ingest
  * slug itself is the skill's directory name (handled at ingest time), not a
  * frontmatter field.
  *
- * Parsing is a deliberately small YAML subset (scalars, block/flow lists, one
- * level of nesting for `metadata:`) — enough for the defined frontmatter shape
- * without pulling in a YAML dependency. Unknown fields are ignored.
+ * Parsing is a deliberately small YAML subset (scalars, block & flow lists, one
+ * level of nesting for `metadata:`, and block scalars `|` / `>`) — enough for
+ * the defined frontmatter shape without pulling in a YAML dependency. It never
+ * *silently corrupts* an unsupported form: anything it can't structure is left
+ * as a raw scalar and surfaces as a validation error (spec §10), since a
+ * half-parsed source-of-truth file is worse than a rejected one. Unknown keys
+ * are ignored for forward compatibility.
  */
 data class ParsedManifest(
     val name: String,
@@ -45,7 +49,7 @@ object SkillManifestParser {
 
         var hadFrontmatter = false
         val frontmatter: String
-        if (idx < lines.size && DELIM.matches(lines[idx].trim()) && lines[idx].trim().all { it == '-' }) {
+        if (idx < lines.size && isDelim(lines[idx])) {
             hadFrontmatter = true
             idx++ // opening delimiter
             val start = idx
@@ -69,7 +73,7 @@ object SkillManifestParser {
 
     private fun isDelim(line: String): Boolean {
         val t = line.trim()
-        return t.isNotEmpty() && t.all { it == '-' } && t.length >= 3
+        return t.isNotEmpty() && t.length >= 3 && t.all { it == '-' }
     }
 
     // ---- minimal YAML subset ------------------------------------------------
@@ -83,26 +87,95 @@ object SkillManifestParser {
         while (i < lines.size) {
             val raw = lines[i]
             if (raw.isBlank() || raw.trimStart().startsWith("#")) { i++; continue }
-            if (!raw.startsWith(" ")) { // top-level only
+            if (!raw.startsWith(" ")) { // top-level keys only
                 val colon = raw.indexOf(':')
                 if (colon >= 0) {
                     val key = raw.substring(0, colon).trim()
                     val value = raw.substring(colon + 1).trim()
-                    if (value.isEmpty()) {
-                        val (node, next) = parseBlock(lines, i + 1)
-                        if (node != null) root[key] = node
-                        i = next
-                        continue
-                    } else if (value.startsWith("[") && value.endsWith("]")) {
-                        root[key] = splitFlowList(value.substring(1, value.length - 1))
-                    } else {
-                        root[key] = unquote(value)
+                    when {
+                        isQuoted(value) -> { root[key] = unquote(value); i++ }
+                        isBlockScalarIndicator(value) -> {
+                            val (scalar, next) = parseBlockScalar(lines, i + 1, value)
+                            root[key] = scalar
+                            i = next
+                        }
+                        value.isEmpty() -> {
+                            val (node, next) = parseBlock(lines, i + 1)
+                            if (node != null) root[key] = node
+                            i = next
+                        }
+                        value.startsWith("[") && value.endsWith("]") -> {
+                            root[key] = splitFlowList(value.substring(1, value.length - 1)); i++
+                        }
+                        else -> { root[key] = unquote(value); i++ }
                     }
+                    continue
                 }
             }
             i++
         }
         return root
+    }
+
+    private fun isQuoted(s: String): Boolean =
+        s.length >= 2 && (s.first() == '"' || s.first() == '\'') && s.last() == s.first()
+
+    /** `|`, `|-`, `|+`, `>`, `>-`, `>+`, `|2`, … — a block scalar indicator. */
+    private fun isBlockScalarIndicator(s: String): Boolean =
+        s.isNotEmpty() && (s.first() == '|' || s.first() == '>') &&
+            s.drop(1).all { it in "+-0123456789" }
+
+    /**
+     * Reads the indented block following a `key: |` / `key: >` indicator.
+     * Returns the scalar text and the index of the first line back at the
+     * parent indent. With no indented content, returns "" (so a required field
+     * like `description: |` with nothing under it fails validation rather than
+     * being stored as the literal string "|").
+     */
+    private fun parseBlockScalar(lines: List<String>, start: Int, indicator: String): Pair<String, Int> {
+        val literal = indicator.first() == '|'
+        val chomp = when {
+            indicator.contains('-') -> '-' // strip
+            indicator.contains('+') -> '+' // keep
+            else -> 'c' // clip (default)
+        }
+        val content = mutableListOf<String>()
+        var i = start
+        var blockIndent = -1
+        while (i < lines.size) {
+            val line = lines[i]
+            if (line.isBlank()) { content.add(""); i++; continue } // tentative trailing/blank line
+            val indent = line.takeWhile { it == ' ' }.length
+            if (indent == 0) break // parent level again
+            if (blockIndent < 0) blockIndent = indent
+            if (indent < blockIndent) break
+            content.add(line.substring(blockIndent)) // dedent, keep extra indent as text
+            i++
+        }
+        // Drop trailing blank lines collected past the block (unless `+` keeps them).
+        while (content.isNotEmpty() && content.last().isEmpty() && chomp != '+') {
+            content.removeAt(content.size - 1)
+        }
+        val body = if (literal) {
+            content.joinToString("\n")
+        } else {
+            // Folded: join consecutive non-empty lines with a space; blank line → newline.
+            val sb = StringBuilder()
+            for (l in content) {
+                if (l.isEmpty()) sb.append('\n')
+                else {
+                    if (sb.isNotEmpty() && !sb.endsWith('\n')) sb.append(' ')
+                    sb.append(l)
+                }
+            }
+            sb.toString()
+        }
+        val trailing = when (chomp) {
+            '-' -> ""
+            '+' -> "\n"
+            else -> if (body.isNotEmpty()) "\n" else ""
+        }
+        return (body + trailing) to i
     }
 
     /**

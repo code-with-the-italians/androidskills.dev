@@ -4,6 +4,7 @@ import dev.androidskills.storage.FileStore
 import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
+import io.ktor.http.withCharset
 import io.ktor.server.application.ApplicationCall
 import io.ktor.server.request.receive
 import io.ktor.server.response.respond
@@ -26,11 +27,18 @@ fun Route.publicRoutes(fileStore: FileStore) {
         get("skills/{slug}/files") { call.respond(q.fileTree(call.parameters["slug"]!!)) }
         get("skills/{slug}/files/{path...}") {
             val slug = call.parameters["slug"]!!
-            val path = call.parameters["path"]!!
+            // {path...} is a tailcard: read every captured segment and rejoin so
+            // nested paths like references/guide.md survive the DB path match.
+            val path = call.parameters.getAll("path")?.joinToString("/").orEmpty()
             val raw = call.request.queryParameters["raw"] == "1"
             val res = q.fileContent(slug, path, fileStore)
             if (raw && !res.downloadOnly) {
-                call.respondText(res.content ?: "", contentType = guessTextContentType(res.path))
+                // Raw preview is ALWAYS text/plain (+ nosniff): a published skill
+                // can include an .html file, and serving it as text/html would give
+                // it same-origin script execution — catastrophic once auth/admin
+                // routes share this origin. Source files render fine as text.
+                call.response.headers.append("X-Content-Type-Options", "nosniff")
+                call.respondText(res.content ?: "", contentType = ContentType.Text.Plain.withCharset(Charsets.UTF_8))
             } else {
                 call.respond(
                     FileContentResponse(
@@ -52,13 +60,13 @@ fun Route.publicRoutes(fileStore: FileStore) {
         get("categories") { call.respond(q.categories()) }
         get("trends") { call.respond(q.trends()) }
         get("timeline") {
-            val page = PublicQueries.parsePage(call.request.queryParameters["page"])
-            val size = PublicQueries.parsePageSize(call.request.queryParameters["pageSize"])
+            val page = PublicQueries.parsePageStrict(call.request.queryParameters["page"])
+            val size = PublicQueries.parsePageSizeStrict(call.request.queryParameters["pageSize"])
             call.respond(q.timeline(page, size))
         }
         get("bundles") {
-            val page = PublicQueries.parsePage(call.request.queryParameters["page"])
-            val size = PublicQueries.parsePageSize(call.request.queryParameters["pageSize"])
+            val page = PublicQueries.parsePageStrict(call.request.queryParameters["page"])
+            val size = PublicQueries.parsePageSizeStrict(call.request.queryParameters["pageSize"])
             call.respond(q.bundles(page, size))
         }
         get("bundles/{id}") { call.respond(q.bundle(call.parameters["id"]!!)) }
@@ -75,28 +83,47 @@ fun Route.publicRoutes(fileStore: FileStore) {
 
 private fun parseSearchParams(call: ApplicationCall): SearchParams {
     val qp = call.request.queryParameters
-    fun multi(key: String): List<String> = (qp.getAll(key) ?: emptyList()).ifEmpty { qp.getAll("${key}[]") ?: emptyList() }
-        .filter { it.isNotBlank() }
-    val verified = when ((qp["verified"] ?: "true").lowercase()) {
+    fun multi(key: String): List<String> =
+        (qp.getAll(key) ?: emptyList()).ifEmpty { qp.getAll("${key}[]") ?: emptyList() }
+            .filter { it.isNotBlank() }
+
+    val verified = when (qp["verified"]?.lowercase()) {
+        null, "true", "1", "yes" -> true
         "false", "0", "no" -> false
-        else -> true
+        else -> throw ApiValidationException(
+            mapOf("verified" to "must be one of true|false"), "Invalid 'verified'",
+        )
     }
+
+    val sizeRaw = qp["size"]
+    val size = when {
+        sizeRaw == null -> null
+        sizeRaw in SIZE_FILTERS -> sizeRaw
+        else -> throw ApiValidationException(
+            mapOf("size" to "must be one of <2k|2-5k|5k+"), "Invalid 'size'",
+        )
+    }
+
+    val sortRaw = qp["sort"]
+    val sort = when {
+        sortRaw == null -> "relevance"
+        sortRaw in SORTS -> sortRaw
+        else -> throw ApiValidationException(
+            mapOf("sort" to "must be one of relevance|installs|updated|tokens"), "Invalid 'sort'",
+        )
+    }
+
     return SearchParams(
         q = qp["q"]?.trim()?.takeIf { it.isNotEmpty() },
         cats = multi("cat"),
         tags = multi("tag"),
-        size = qp["size"]?.takeIf { it in setOf("<2k", "2-5k", "5k+") },
+        size = size,
         verified = verified,
-        sort = qp["sort"]?.takeIf { it in setOf("relevance", "installs", "updated", "tokens") } ?: "relevance",
-        page = PublicQueries.parsePage(qp["page"]),
-        pageSize = PublicQueries.parsePageSize(qp["pageSize"]),
+        sort = sort,
+        page = PublicQueries.parsePageStrict(qp["page"]),
+        pageSize = PublicQueries.parsePageSizeStrict(qp["pageSize"]),
     )
 }
 
-private fun guessTextContentType(path: String): ContentType =
-    when (path.substringAfterLast('.', "").lowercase()) {
-        "json" -> ContentType.Application.Json
-        "html", "htm" -> ContentType.Text.Html
-        "css" -> ContentType.Text.CSS
-        else -> ContentType.Text.Plain
-    }
+private val SIZE_FILTERS = setOf("<2k", "2-5k", "5k+")
+private val SORTS = setOf("relevance", "installs", "updated", "tokens")

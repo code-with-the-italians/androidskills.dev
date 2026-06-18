@@ -40,6 +40,9 @@ class ApiValidationException(
 /** 409 — duplicate slug, first-come ownership conflict. */
 class ApiConflictException(message: String, val code: String = "conflict") : RuntimeException(message)
 
+/** 500 — a DB-referenced FileStore object is missing (storage corruption). */
+class ApiStorageException(message: String) : RuntimeException(message)
+
 fun Application.installApiErrorMapping() {
     install(StatusPages) {
         val log = LoggerFactory.getLogger("dev.androidskills.api.Errors")
@@ -54,6 +57,13 @@ fun Application.installApiErrorMapping() {
         }
         exception<ApiConflictException> { call, ex ->
             call.respond(HttpStatusCode.Conflict, ErrorResponse(ErrorBody(ex.code, ex.message ?: "Conflict")))
+        }
+        exception<ApiStorageException> { call, ex ->
+            log.error("Storage consistency error serving ${call.request.local.uri}", ex)
+            call.respond(
+                HttpStatusCode.InternalServerError,
+                ErrorResponse(ErrorBody("storage_error", ex.message ?: "File unavailable")),
+            )
         }
         exception<Throwable> { call, ex ->
             log.error("Unhandled error serving ${call.request.local.uri}", ex)

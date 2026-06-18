@@ -203,4 +203,67 @@ class PublicReadTest {
         val res = PublicQueries.search(all())
         assertFalse(res.items.any { it.slug == "room-migration-helper" })
     }
+
+    @Test
+    fun `historical version with missing archive is 404 not wrong-files`() {
+        // Plant a historical version whose archive object is absent.
+        val slug = "jetpack-compose-mvi"
+        val skillId = transaction { Skills.selectAll().where { Skills.slug eq slug }.single()[Skills.id] }
+        transaction {
+            dev.androidskills.db.Versions.insert {
+                it[dev.androidskills.db.Versions.id] = dev.androidskills.util.newId()
+                it[dev.androidskills.db.Versions.skillId] = skillId
+                it[dev.androidskills.db.Versions.version] = "0.1.0"
+                it[dev.androidskills.db.Versions.sourceRef] = "manifest:0.1.0"
+                it[dev.androidskills.db.Versions.r2ZipKey] = "skills/$skillId/versions/0.1.0.zip" // not in store
+                it[dev.androidskills.db.Versions.createdAt] = "2020-01-01T00:00:00Z" // older than the demo's 1.4.2
+            }
+        }
+        // Requesting the historical version must NOT fall back to current files.
+        assertFailsWith<ApiNotFoundException> {
+            PublicQueries.download(slug, "0.1.0", store)
+        }
+        // The current version still downloads fine (built on demand / from stored zip).
+        val cur = PublicQueries.download(slug, null, store)
+        assertTrue(cur.bytes.isNotEmpty())
+    }
+
+    @Test
+    fun `missing file bytes surface as a storage error not empty 200`() {
+        val slug = "jetpack-compose-mvi"
+        val key = transaction {
+            val row = dev.androidskills.db.SkillFiles.selectAll()
+                .where { dev.androidskills.db.SkillFiles.path eq "references/intent.md" }.single()
+            row[dev.androidskills.db.SkillFiles.r2Key]
+        }
+        // Corrupt storage: delete the object the DB references.
+        val path = dir.resolve("files").resolve(key)
+        java.nio.file.Files.deleteIfExists(path)
+        assertFailsWith<ApiStorageException> {
+            PublicQueries.fileContent(slug, "references/intent.md", store)
+        }
+    }
+
+    @Test
+    fun `bundles only expose published skills`() {
+        // Unlist one of bob's skills (zip bundle has retrofit + baseline-profile).
+        transaction {
+            Skills.update({ Skills.slug eq "retrofit-okhttp-config" }) { it[Skills.status] = "unlisted" }
+        }
+        val list = PublicQueries.bundles(1, 60)
+        list.items.forEach { assertTrue(it.skillCount >= 1) } // no zero-public bundles leaked
+
+        // Find bob's zip bundle and confirm detail hides the unlisted skill.
+        val bobBundle = list.items.first { it.owner.handle == "bob" }
+        val detail = PublicQueries.bundle(bobBundle.id)
+        assertFalse(detail.skills.any { it.slug == "retrofit-okhttp-config" })
+
+        // A bundle whose only skills are non-public is hidden (404).
+        transaction {
+            Skills.update({ Skills.bundleId eq bobBundle.id }) { it[Skills.status] = "unlisted" }
+        }
+        assertFailsWith<ApiNotFoundException> { PublicQueries.bundle(bobBundle.id) }
+        val list2 = PublicQueries.bundles(1, 60)
+        assertFalse(list2.items.any { it.id == bobBundle.id })
+    }
 }
