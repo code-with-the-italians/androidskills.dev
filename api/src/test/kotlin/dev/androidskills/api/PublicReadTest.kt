@@ -5,6 +5,7 @@ import dev.androidskills.TestSupport
 import dev.androidskills.db.Skills
 import dev.androidskills.storage.LocalFsStore
 import org.jetbrains.exposed.sql.and
+import org.jetbrains.exposed.sql.deleteWhere
 import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.transactions.transaction
@@ -258,10 +259,12 @@ class PublicReadTest {
     fun `fallback zip fails loudly on an unsafe stored path`() {
         // When the current version has no stored archive, download() builds one
         // from skill_files. An unsafe path (Zip Slip) must fail loudly, not be
-        // skipped to produce a truncated 200 zip.
+        // skipped to produce a truncated 200 zip — and the failed download must
+        // NOT bump installs (buildZip runs before the install counter).
         val slug = "jetpack-compose-mvi"
         val row = transaction { Skills.selectAll().where { Skills.slug eq slug }.single() }
         val skillId = row[Skills.id]
+        val before = installsOf(slug)
         forceCurrentVersionFallback(skillId, row[Skills.version])
 
         val badKey = "skills/$skillId/files/escape.md"
@@ -277,15 +280,18 @@ class PublicReadTest {
             }
         }
         assertFailsWith<ApiStorageException> { PublicQueries.download(slug, null, store) }
+        assertEquals(before, installsOf(slug), "installs must not change on a failed download")
     }
 
     @Test
     fun `fallback zip fails loudly on missing file bytes`() {
         // A DB-referenced file whose bytes are gone is storage corruption — the
-        // build must fail loudly, not silently omit the entry from the archive.
+        // build must fail loudly, not silently omit the entry from the archive,
+        // and the failed download must not bump installs.
         val slug = "jetpack-compose-mvi"
         val row = transaction { Skills.selectAll().where { Skills.slug eq slug }.single() }
         val skillId = row[Skills.id]
+        val before = installsOf(slug)
         forceCurrentVersionFallback(skillId, row[Skills.version])
 
         transaction {
@@ -300,7 +306,28 @@ class PublicReadTest {
             }
         }
         assertFailsWith<ApiStorageException> { PublicQueries.download(slug, null, store) }
+        assertEquals(before, installsOf(slug), "installs must not change on a failed download")
     }
+
+    @Test
+    fun `fallback zip fails loudly on an empty file set`() {
+        // A skill with no recorded files can't form an archive: buildZip must throw
+        // rather than return an empty 200 zip, and installs must not change.
+        val slug = "jetpack-compose-mvi"
+        val row = transaction { Skills.selectAll().where { Skills.slug eq slug }.single() }
+        val skillId = row[Skills.id]
+        val before = installsOf(slug)
+        forceCurrentVersionFallback(skillId, row[Skills.version])
+        // Wipe every recorded file for the skill (skillId is our own seeded UUID).
+        transaction {
+            exec("DELETE FROM skill_files WHERE skill_id = '$skillId'")
+        }
+        assertFailsWith<ApiStorageException> { PublicQueries.download(slug, null, store) }
+        assertEquals(before, installsOf(slug), "installs must not change on a failed download")
+    }
+
+    private fun installsOf(slug: String): Int =
+        transaction { Skills.selectAll().where { Skills.slug eq slug }.single()[Skills.installs] }
 
     /** Nulls the current version's r2_zip_key so download() falls back to buildZip. */
     private fun forceCurrentVersionFallback(skillId: String, currentVersion: String) = transaction {

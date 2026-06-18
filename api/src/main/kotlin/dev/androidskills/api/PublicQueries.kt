@@ -222,6 +222,9 @@ object PublicQueries {
             throw ApiNotFoundException("No downloadable archive for '$slug' version '$label'")
         }
         // Best-effort install counter (single writer; spec §3 keeps this simple).
+        // Runs after the archive is resolved and inside the same transaction, so a
+        // thrown build/lookup rolls the bump back — a failed download never counts.
+        Skills.update({ Skills.id eq skillId }) { it[Skills.installs] = skill[Skills.installs] + 1 }
         Skills.update({ Skills.id eq skillId }) { it[Skills.installs] = skill[Skills.installs] + 1 }
         DownloadResult(bytes, "${slug}-${verRow[Versions.version]}.zip", "application/zip")
     }
