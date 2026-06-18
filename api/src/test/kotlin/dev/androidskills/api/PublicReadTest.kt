@@ -4,6 +4,7 @@ import dev.androidskills.Database
 import dev.androidskills.TestSupport
 import dev.androidskills.db.Skills
 import dev.androidskills.storage.LocalFsStore
+import org.jetbrains.exposed.sql.and
 import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.transactions.transaction
@@ -226,6 +227,87 @@ class PublicReadTest {
         // The current version still downloads fine (built on demand / from stored zip).
         val cur = PublicQueries.download(slug, null, store)
         assertTrue(cur.bytes.isNotEmpty())
+    }
+
+    @Test
+    fun `default download selects skills version not newest created_at`() {
+        // The public contract: no ?version= downloads the CURRENT version
+        // (skills.version), not "whichever versions row was inserted last".
+        val slug = "jetpack-compose-mvi"
+        val skillId = transaction { Skills.selectAll().where { Skills.slug eq slug }.single()[Skills.id] }
+        // Backfill a historical row dated in the FUTURE — newer than the current
+        // 1.4.2 row, with no stored archive. Selecting by newest created_at (the
+        // old behaviour) would pick this and 404; the contract must still hand
+        // back the current 1.4.2 archive.
+        transaction {
+            dev.androidskills.db.Versions.insert {
+                it[dev.androidskills.db.Versions.id] = dev.androidskills.util.newId()
+                it[dev.androidskills.db.Versions.skillId] = skillId
+                it[dev.androidskills.db.Versions.version] = "0.1.0"
+                it[dev.androidskills.db.Versions.sourceRef] = "manifest:0.1.0"
+                it[dev.androidskills.db.Versions.r2ZipKey] = "skills/$skillId/versions/0.1.0.zip" // not in store
+                it[dev.androidskills.db.Versions.createdAt] = "2099-01-01T00:00:00Z" // NEWER than current
+            }
+        }
+        val dl = PublicQueries.download(slug, null, store)
+        assertTrue(dl.filename.contains("1.4.2"), "expected current 1.4.2, got ${dl.filename}")
+        assertTrue(dl.bytes.isNotEmpty())
+    }
+
+    @Test
+    fun `fallback zip fails loudly on an unsafe stored path`() {
+        // When the current version has no stored archive, download() builds one
+        // from skill_files. An unsafe path (Zip Slip) must fail loudly, not be
+        // skipped to produce a truncated 200 zip.
+        val slug = "jetpack-compose-mvi"
+        val row = transaction { Skills.selectAll().where { Skills.slug eq slug }.single() }
+        val skillId = row[Skills.id]
+        forceCurrentVersionFallback(skillId, row[Skills.version])
+
+        val badKey = "skills/$skillId/files/escape.md"
+        store.put(badKey, "evil".toByteArray())
+        transaction {
+            dev.androidskills.db.SkillFiles.insert {
+                it[dev.androidskills.db.SkillFiles.id] = dev.androidskills.util.newId()
+                it[dev.androidskills.db.SkillFiles.skillId] = skillId
+                it[dev.androidskills.db.SkillFiles.path] = "../escape.md"
+                it[dev.androidskills.db.SkillFiles.size] = 4
+                it[dev.androidskills.db.SkillFiles.isBinary] = false
+                it[dev.androidskills.db.SkillFiles.r2Key] = badKey
+            }
+        }
+        assertFailsWith<ApiStorageException> { PublicQueries.download(slug, null, store) }
+    }
+
+    @Test
+    fun `fallback zip fails loudly on missing file bytes`() {
+        // A DB-referenced file whose bytes are gone is storage corruption — the
+        // build must fail loudly, not silently omit the entry from the archive.
+        val slug = "jetpack-compose-mvi"
+        val row = transaction { Skills.selectAll().where { Skills.slug eq slug }.single() }
+        val skillId = row[Skills.id]
+        forceCurrentVersionFallback(skillId, row[Skills.version])
+
+        transaction {
+            dev.androidskills.db.SkillFiles.insert {
+                it[dev.androidskills.db.SkillFiles.id] = dev.androidskills.util.newId()
+                it[dev.androidskills.db.SkillFiles.skillId] = skillId
+                it[dev.androidskills.db.SkillFiles.path] = "references/ghost.md"
+                it[dev.androidskills.db.SkillFiles.size] = 10
+                it[dev.androidskills.db.SkillFiles.isBinary] = false
+                // r2_key points at an object that was never written to the store.
+                it[dev.androidskills.db.SkillFiles.r2Key] = "skills/$skillId/files/references/ghost.md"
+            }
+        }
+        assertFailsWith<ApiStorageException> { PublicQueries.download(slug, null, store) }
+    }
+
+    /** Nulls the current version's r2_zip_key so download() falls back to buildZip. */
+    private fun forceCurrentVersionFallback(skillId: String, currentVersion: String) = transaction {
+        dev.androidskills.db.Versions.update({
+            (dev.androidskills.db.Versions.skillId eq skillId) and
+                (dev.androidskills.db.Versions.version eq currentVersion)
+        }) { it[dev.androidskills.db.Versions.r2ZipKey] = null }
     }
 
     @Test

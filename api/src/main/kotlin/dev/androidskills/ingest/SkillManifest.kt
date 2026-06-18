@@ -72,8 +72,14 @@ object SkillManifestParser {
     }
 
     private fun isDelim(line: String): Boolean {
-        val t = line.trim()
-        return t.isNotEmpty() && t.length >= 3 && t.all { it == '-' }
+        // A YAML document separator sits at column 0. An indented `---` (e.g. a
+        // line inside a `description: |` block scalar) is *content*, not a
+        // delimiter — matching it here would truncate the frontmatter and drop
+        // every field after it (license, metadata.version, …). Require the line
+        // to start with `---` (3+ dashes) and have only trailing whitespace.
+        if (!line.startsWith("---")) return false
+        val afterDashes = line.dropWhile { it == '-' }
+        return afterDashes.isBlank()
     }
 
     // ---- minimal YAML subset ------------------------------------------------

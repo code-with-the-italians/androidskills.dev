@@ -156,6 +156,34 @@ class SkillManifestParserTest {
         val errs = ManifestValidator.validate(m).map { it.field }
         assertTrue("description" in errs)
     }
+
+    @Test
+    fun `indented dashes inside a block scalar are content not a delimiter`() {
+        // In YAML a document separator sits at column 0; an indented `---` under
+        // `description: |` is scalar text. Treating it as the closing delimiter
+        // would truncate the frontmatter and drop license + metadata.version.
+        val md = """
+            ---
+            name: Dashes Skill
+            description: |
+              Line one.
+              ---
+              Line three after a dashed line.
+            license: Apache-2.0
+            metadata:
+              version: 1.0.0
+            ---
+            # Body
+        """.trimIndent()
+        val m = SkillManifestParser.parse(md)
+        assertTrue(m.hadFrontmatter)
+        assertTrue(m.description.contains("Line one."), "desc=${m.description}")
+        assertTrue(m.description.contains("---"), "the dashes belong to the description")
+        assertTrue(m.description.contains("Line three"))
+        assertEquals("Apache-2.0", m.license, "license was dropped: ${m.license}")
+        assertEquals("1.0.0", m.version, "version was dropped: ${m.version}")
+        assertEquals("# Body", m.body.trim())
+    }
 }
 
 class TokensTest {

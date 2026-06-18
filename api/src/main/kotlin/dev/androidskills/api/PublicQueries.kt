@@ -196,7 +196,14 @@ object PublicQueries {
         val verRow = (if (version != null) {
             Versions.selectAll().where { (Versions.skillId eq skillId) and (Versions.version eq version) }.singleOrNull()
         } else {
-            Versions.selectAll().where { Versions.skillId eq skillId }.orderBy(Versions.createdAt, SortOrder.DESC).firstOrNull()
+            // No version requested → the public contract is "the current version"
+            // (skills.version), NOT "whichever versions row was inserted last".
+            // Selecting by newest created_at would let a later backfilled/re-reviewed
+            // row shadow the real current release (or 404 against the wrong row).
+            val currentVersion = skill[Skills.version]
+            Versions.selectAll().where {
+                (Versions.skillId eq skillId) and (Versions.version eq currentVersion)
+            }.singleOrNull()
         }) ?: throw ApiNotFoundException("No version available for '$slug'")
 
         val currentVersion = skill[Skills.version]
@@ -490,14 +497,21 @@ object PublicQueries {
 
     private fun buildZip(skillId: String, store: FileStore): ByteArray {
         val files = SkillFiles.selectAll().where { SkillFiles.skillId eq skillId }.orderBy(SkillFiles.path).toList()
+        if (files.isEmpty()) {
+            throw ApiStorageException("Cannot build archive for skill '$skillId': no files recorded")
+        }
         val baos = ByteArrayOutputStream()
         ZipOutputStream(baos).use { zos ->
             files.forEach { f ->
-                // Zip Slip defence: only normalised relative POSIX paths become
-                // entries. Unsafe stored paths (e.g. `../…`) are skipped rather
-                // than written (ingest will also reject them upstream). (§11.)
-                val safePath = SkillPaths.safeRelativeOrNull(f[SkillFiles.path]) ?: return@forEach
-                val bytes = store.get(f[SkillFiles.r2Key]) ?: return@forEach
+                // Zip Slip defence: never write an entry that escapes the skill root.
+                // Unlike a quiet skip, an unsafe stored path or missing bytes is a
+                // data-integrity failure — failing loudly (ApiStorageException) means
+                // download() never returns a 200 with a truncated archive and a
+                // bumped install count. (§11; matches the file-preview behaviour.)
+                val safePath = SkillPaths.safeRelativeOrNull(f[SkillFiles.path])
+                    ?: throw ApiStorageException("Unsafe file path stored for skill '$skillId': '${f[SkillFiles.path]}'")
+                val bytes = store.get(f[SkillFiles.r2Key])
+                    ?: throw ApiStorageException("File bytes missing for skill '$skillId': '${f[SkillFiles.path]}' (key=${f[SkillFiles.r2Key]})")
                 zos.putNextEntry(ZipEntry(safePath))
                 zos.write(bytes)
                 zos.closeEntry()
