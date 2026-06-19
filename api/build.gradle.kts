@@ -29,6 +29,13 @@ dependencies {
     implementation(libs.exposed.jdbc)
     implementation(libs.sqlite.jdbc)
 
+    // HTTP client: GitHub OAuth (token exchange + user lookup) in prod.
+    // Tests use an in-process fake OAuthClient, so no network at test time.
+    implementation(ktorLibs.client.core)
+    implementation(ktorLibs.client.cio)
+    implementation(ktorLibs.client.contentNegotiation)
+
     testImplementation(kotlin("test"))
     testImplementation(ktorLibs.server.testHost)
+    testImplementation(ktorLibs.client.mock)
 }

@@ -31,6 +31,12 @@ data class ErrorResponse(val error: ErrorBody)
 /** 404 — unknown slug, unknown route for non-admins, missing resource. */
 class ApiNotFoundException(message: String = "Not found") : RuntimeException(message)
 
+/** 401 — no (valid) session; anonymous where a session is required (spec §7, §9). */
+class ApiUnauthorizedException(message: String = "Authentication required") : RuntimeException(message)
+
+/** 400 — malformed request / CSRF state mismatch. */
+class ApiBadRequestException(message: String = "Bad request") : RuntimeException(message)
+
 /** 422 — per-field validation failure (spec §10). */
 class ApiValidationException(
     val fields: Map<String, String>,
@@ -48,6 +54,12 @@ fun Application.installApiErrorMapping() {
         val log = LoggerFactory.getLogger("dev.androidskills.api.Errors")
         exception<ApiNotFoundException> { call, ex ->
             call.respond(HttpStatusCode.NotFound, ErrorResponse(ErrorBody("not_found", ex.message ?: "Not found")))
+        }
+        exception<ApiUnauthorizedException> { call, ex ->
+            call.respond(HttpStatusCode.Unauthorized, ErrorResponse(ErrorBody("unauthorized", ex.message ?: "Authentication required")))
+        }
+        exception<ApiBadRequestException> { call, ex ->
+            call.respond(HttpStatusCode.BadRequest, ErrorResponse(ErrorBody("bad_request", ex.message ?: "Bad request")))
         }
         exception<ApiValidationException> { call, ex ->
             call.respond(
