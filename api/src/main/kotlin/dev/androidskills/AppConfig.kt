@@ -16,6 +16,8 @@ data class AppConfig(
     val llmBaseUrl: String?,
     val llmApiKey: String?,
     val llmModel: String?,
+    /** When true, a small demo dataset is seeded into an empty DB (local/dev only). */
+    val seedDemo: Boolean = false,
 ) {
     companion object {
         fun fromEnv(): AppConfig {
@@ -28,6 +30,7 @@ data class AppConfig(
                 llmBaseUrl = env("LLM_BASE_URL"),
                 llmApiKey = env("LLM_API_KEY"),
                 llmModel = env("LLM_MODEL"),
+                seedDemo = env("SEED_DEMO")?.equals("1", ignoreCase = true) == true,
             )
         }
     }
