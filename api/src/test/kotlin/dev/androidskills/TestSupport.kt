@@ -13,6 +13,14 @@ object TestSupport {
         llmApiKey = null,
         llmModel = null,
         seedDemo = seedDemo,
+        auth = AuthConfig(
+            oauth = null,
+            publicBaseUrl = "http://localhost:8080",
+            sessionCookieDomain = null,
+            // Localhost HTTP → relax Secure so the test client (and a dev browser) carry the cookie.
+            sessionCookieSecure = false,
+            bootstrapAdminGithubId = null,
+        ),
     )
 
     fun tempDir(): Path = Files.createTempDirectory("asdb-test")
