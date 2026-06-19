@@ -20,3 +20,6 @@ Thumbs.db
 
 # Design handoff bundle (reference only; large binaries)
 .design-handoff/
+
+# Local git worktrees (see using-git-worktree skill)
+.worktrees/
