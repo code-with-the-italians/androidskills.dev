@@ -2,6 +2,8 @@ package dev.androidskills.auth
 
 import dev.androidskills.AppConfig
 import dev.androidskills.api.ApiBadRequestException
+import dev.androidskills.api.ErrorBody
+import dev.androidskills.api.ErrorResponse
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.ApplicationCall
 import io.ktor.server.response.respond
@@ -31,7 +33,7 @@ fun Route.authRoutes(config: AppConfig, oauth: OAuthClient) {
     route("api") {
         get("auth/github/start") {
             if (!oauth.configured) {
-                call.respond(HttpStatusCode.ServiceUnavailable, mapOf("error" to mapOf("code" to "auth_disabled", "message" to "GitHub OAuth is not configured")))
+                call.respond(HttpStatusCode.ServiceUnavailable, ErrorResponse(ErrorBody("auth_disabled", "GitHub OAuth is not configured")))
                 return@get
             }
             val state = newState()
@@ -41,7 +43,7 @@ fun Route.authRoutes(config: AppConfig, oauth: OAuthClient) {
 
         get("auth/github/callback") {
             if (!oauth.configured) {
-                call.respond(HttpStatusCode.ServiceUnavailable, mapOf("error" to mapOf("code" to "auth_disabled", "message" to "GitHub OAuth is not configured")))
+                call.respond(HttpStatusCode.ServiceUnavailable, ErrorResponse(ErrorBody("auth_disabled", "GitHub OAuth is not configured")))
                 return@get
             }
             val code = call.request.queryParameters["code"]

@@ -157,6 +157,37 @@ class AuthRoutesTest {
     }
 
     @Test
+    fun disabledOAuthReturns503TypedEnvelopeOnStartAndCallback() = testApp(oauth = null) { client ->
+        // P3-5 + coverage gap: when OAuth is unconfigured, both routes return the
+        // typed ErrorResponse envelope (code=auth_disabled), not a hand-rolled map.
+        val start = client.get("/api/auth/github/start")
+        assertEquals(HttpStatusCode.ServiceUnavailable, start.status)
+        assertTrue(start.bodyAsText().contains("\"code\":\"auth_disabled\""), start.bodyAsText())
+        val cb = client.get("/api/auth/github/callback?code=x&state=y")
+        assertEquals(HttpStatusCode.ServiceUnavailable, cb.status)
+        assertTrue(cb.bodyAsText().contains("\"error\":"), cb.bodyAsText())
+    }
+
+    @Test
+    fun anonymousLogoutIs401() = testApp(oauth = FakeOAuthClient()) { client ->
+        // Coverage gap: logout with no session → 401, not 500.
+        assertEquals(HttpStatusCode.Unauthorized, client.post("/api/auth/logout").status)
+    }
+
+    @Test
+    fun callbackReturns400OnMissingCodeOrStateCookie() = testApp(oauth = FakeOAuthClient()) { client ->
+        client.get("/api/auth/github/start") // establish state cookie
+        // Missing code.
+        val noCode = client.get("/api/auth/github/callback?state=whatever")
+        assertEquals(HttpStatusCode.BadRequest, noCode.status)
+        // Missing state cookie: the state param can't match a cookie that isn't
+        // stored (HttpCookies jar is empty per-request unless set), so this hits
+        // the missing-state-cookie branch.
+        val noState = client.get("/api/auth/github/callback?code=code-OK&state=absent")
+        assertEquals(HttpStatusCode.BadRequest, noState.status)
+    }
+
+    @Test
     fun suspendedUserIsLoggedOutMidSession() = testApp(oauth = FakeOAuthClient()) { client ->
         // Log Alice in.
         val start = client.get("/api/auth/github/start")

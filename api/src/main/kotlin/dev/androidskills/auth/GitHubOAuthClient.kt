@@ -60,6 +60,12 @@ class GitHubOAuthClient(
         if (resp.error != null || resp.accessToken.isNullOrBlank()) {
             throw OAuthException("GitHub token exchange failed: ${resp.error ?: "no access_token"} (${resp.errorDescription ?: ""})")
         }
+        // P3-1: refuse to proceed if GitHub didn't grant the scope we need to call
+        // GET /user. (A downscoped/empty token would make the next call 401.)
+        val granted = (resp.scope ?: "").split(' ', ',').map { it.trim() }.filter { it.isNotEmpty() }
+        if ("read:user" !in granted) {
+            throw OAuthException("GitHub did not grant the required 'read:user' scope (got: ${resp.scope ?: "none"})")
+        }
         return OAuthTokens(resp.accessToken, resp.tokenType ?: "bearer", resp.scope)
     }
 

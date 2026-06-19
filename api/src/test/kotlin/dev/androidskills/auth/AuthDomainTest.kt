@@ -82,6 +82,28 @@ class AuthDomainTest {
     }
 
     @Test
+    fun `session expiry boundary is future-admitted past-rejected`() {
+        // Coverage gap (P3-6): pin the expiry semantics. A clearly-future expiry is
+        // admitted; a clearly-past one is rejected. (The exact ==now edge isn't
+        // deterministically testable at ms resolution, so we bracket it.)
+        val userId = seedUser()
+        val future = SessionStore.create(userId, 3600)
+        transaction {
+            Sessions.update({ org.jetbrains.exposed.sql.SqlExpressionBuilder.run { Sessions.id eq future } }) {
+                it[Sessions.expiresAt] = Instant.now().plusSeconds(60).toString()
+            }
+        }
+        assertNotNull(SessionStore.lookup(future))
+        val past = SessionStore.create(userId, 3600)
+        transaction {
+            Sessions.update({ org.jetbrains.exposed.sql.SqlExpressionBuilder.run { Sessions.id eq past } }) {
+                it[Sessions.expiresAt] = Instant.now().minusSeconds(1).toString()
+            }
+        }
+        assertNull(SessionStore.lookup(past))
+    }
+
+    @Test
     fun `suspended user is rejected mid-session`() {
         // The DB-backed revocation invariant (spec §7): suspend → session immediately invalid.
         val userId = seedUser()

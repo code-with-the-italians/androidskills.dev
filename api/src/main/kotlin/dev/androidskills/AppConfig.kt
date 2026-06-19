@@ -21,6 +21,13 @@ data class AppConfig(
     val seedDemo: Boolean = false,
     val auth: AuthConfig = AuthConfig.disabled(),
 ) {
+    // P3-2: redact the LLM key (and rely on OAuthConfig.toString) so a logged
+    // AppConfig instance never spills a secret.
+    override fun toString(): String =
+        "AppConfig(version=$version, dbPath=$dbPath, fileStoreDir=$fileStoreDir, " +
+            "llmBaseUrl=$llmBaseUrl, llmApiKey=${if (llmApiKey == null) "null" else "***"}, " +
+            "llmModel=$llmModel, seedDemo=$seedDemo, auth=$auth)"
+
     companion object {
         fun fromEnv(): AppConfig {
             fun env(k: String) = System.getenv(k)?.takeIf { it.isNotBlank() }
@@ -34,9 +41,11 @@ data class AppConfig(
             // Secure cookies by default, but relax for plain-HTTP localhost so a dev
             // browser can actually log in locally (spec §7 wants Secure; the test
             // client and prod-over-HTTPS are unaffected). Overridable via env.
-            val secureDefault = !(publicBaseUrl.startsWith("http://localhost") ||
-                publicBaseUrl.startsWith("http://127.0.0.1") ||
-                publicBaseUrl.startsWith("http://[::1]"))
+            // P3-3: parse the URL host — startsWith("http://localhost") wrongly
+            // treated "http://localhost.evil.com" as localhost (Secure=false).
+            val host = runCatching { java.net.URI(publicBaseUrl).host }.getOrNull()
+            val localHosts = setOf("localhost", "127.0.0.1", "0.0.0.0", "[::1]", "::1")
+            val secureDefault = host == null || host !in localHosts
             return AppConfig(
                 version = env("APP_VERSION") ?: "0.0.1-local",
                 dbPath = dataDir.resolve("androidskills.db"),
@@ -92,4 +101,7 @@ data class AuthConfig(
     }
 }
 
-data class OAuthConfig(val clientId: String, val clientSecret: String)
+data class OAuthConfig(val clientId: String, val clientSecret: String) {
+    // P3-2: never leak the secret if a config instance is logged.
+    override fun toString() = "OAuthConfig(clientId=$clientId, clientSecret=***)"
+}

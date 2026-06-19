@@ -65,4 +65,20 @@ class GitHubOAuthClientTest {
         val ex = assertFailsWith<OAuthException> { gh.exchange("code", "https://app/cb") }
         assertTrue(ex.message!!.contains("bad_verification_code"))
     }
+
+    @Test
+    fun exchangeSucceedsWhenReadUserScopeIsGranted() = kotlinx.coroutines.runBlocking {
+        val gh = newClient(HttpStatusCode.OK, """{"access_token":"tok-OK","token_type":"bearer","scope":"read:user"}""")
+        val tokens = gh.exchange("code", "https://app/cb")
+        assertEquals("tok-OK", tokens.accessToken)
+    }
+
+    @Test
+    fun exchangeRefusesATokenMissingTheReadUserScope() = kotlinx.coroutines.runBlocking {
+        // P3-1: a downscoped/empty token can't call GET /user; refuse it now
+        // rather than letting the next request 401.
+        val gh = newClient(HttpStatusCode.OK, """{"access_token":"tok","token_type":"bearer","scope":""}""")
+        val ex = assertFailsWith<OAuthException> { gh.exchange("code", "https://app/cb") }
+        assertTrue(ex.message!!.contains("read:user"), ex.message!!)
+    }
 }

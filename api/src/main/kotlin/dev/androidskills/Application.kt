@@ -52,6 +52,15 @@ fun Application.module(config: AppConfig = AppConfig.fromEnv(), oauth: OAuthClie
     val llm: LlmClient = StubLlmClient()
     val (resolvedOauth, ghHttp) = resolveOauth(config.auth, oauth)
 
+    // P3-3: surface the resolved cookie posture once at boot — Secure/Domain drive
+    // auth correctness and a mis-set SESSION_COOKIE_DOMAIN is a silent footgun.
+    log.info(
+        "auth: oauth={}, sessionCookie secure={}, domain={}",
+        if (resolvedOauth.configured) "configured" else "disabled",
+        config.auth.sessionCookieSecure,
+        config.auth.sessionCookieDomain ?: "(host-only)",
+    )
+
     if (config.seedDemo && transaction { Skills.selectAll().count() == 0L }) {
         dev.androidskills.api.DemoData.seed(fileStore)
     }
