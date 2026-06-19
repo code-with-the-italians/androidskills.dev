@@ -103,6 +103,59 @@ class SkillManifestParserTest {
     }
 
     @Test
+    fun `scalar tags are rejected not silently dropped`() {
+        // §10: tags must be well-formed if present. `tags: android` is a scalar,
+        // not a list — the parser must flag it rather than return an empty list
+        // (which would silently accept the manifest while discarding its tags).
+        val md = """
+            ---
+            name: Scalar Tags
+            description: d
+            license: MIT
+            tags: android
+            ---
+            body
+        """.trimIndent()
+        val m = SkillManifestParser.parse(md)
+        assertTrue(m.tags.isEmpty(), "scalar tags should not be coerced into a list")
+        val errs = ManifestValidator.validate(m)
+        val tagErr = errs.firstOrNull { it.field == "tags" }
+        assertTrue(tagErr != null, "expected a tags validation error; got $errs")
+        assertTrue(tagErr.reason.contains("list", ignoreCase = true))
+    }
+
+    @Test
+    fun `malformed flow list tags are rejected`() {
+        val md = """
+            ---
+            name: Bad Flow
+            description: d
+            license: MIT
+            tags: [android, kotlin
+            ---
+            body
+        """.trimIndent()
+        val m = SkillManifestParser.parse(md)
+        assertTrue(ManifestValidator.validate(m).any { it.field == "tags" })
+    }
+
+    @Test
+    fun `empty flow list tags are accepted`() {
+        // `tags: []` is a valid (empty) list — not flagged as malformed.
+        val md = """
+            ---
+            name: Empty List
+            description: d
+            license: MIT
+            tags: []
+            ---
+            body
+        """.trimIndent()
+        val m = SkillManifestParser.parse(md)
+        assertEquals(emptyList(), ManifestValidator.validate(m).filter { it.field == "tags" })
+    }
+
+    @Test
     fun `parses literal block scalar description`() {
         val md = """
             ---

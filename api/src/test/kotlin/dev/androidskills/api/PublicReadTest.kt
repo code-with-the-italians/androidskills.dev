@@ -184,6 +184,19 @@ class PublicReadTest {
     }
 
     @Test
+    fun `repeated downloads each increment installs`() {
+        // Each successful download must add exactly 1. Uses the atomic SQL increment
+        // (installs = installs + 1); the prior captured-value form could lose counts
+        // across overlapping transactions. Two sequential downloads → +2.
+        val slug = "coroutine-test-patterns"
+        val before = transaction { Skills.selectAll().where { Skills.slug eq slug }.single()[Skills.installs] }
+        PublicQueries.download(slug, null, store)
+        PublicQueries.download(slug, null, store)
+        val after = transaction { Skills.selectAll().where { Skills.slug eq slug }.single()[Skills.installs] }
+        assertEquals(before + 2, after, "each download must add exactly one install")
+    }
+
+    @Test
     fun `bundles list and detail`() {
         val list = PublicQueries.bundles(1, 60)
         assertEquals(2, list.total)
@@ -199,6 +212,25 @@ class PublicReadTest {
         assertTrue(alice.skillCount >= 1)
         assertTrue(alice.totalInstalls >= 0)
         assertFailsWith<ApiNotFoundException> { PublicQueries.author("nobody") }
+    }
+
+    @Test
+    fun `author with no public skills is hidden`() {
+        // The public author directory exposes only users with >=1 published skill.
+        // bob owns the seed's zip bundle (retrofit-okhttp-config + baseline-profile-gradle,
+        // both published). Unlist every skill in his bundle and bob — a registered
+        // user but no longer a public author — must 404, matching how the bundle
+        // index hides zero-public bundles. alice keeps her published skills.
+        val bobBundleId = transaction {
+            val bob = dev.androidskills.db.Users.selectAll()
+                .where { dev.androidskills.db.Users.handle eq "bob" }.single()[dev.androidskills.db.Users.id]
+            dev.androidskills.db.Bundles.selectAll().where { dev.androidskills.db.Bundles.ownerUserId eq bob }.single()[dev.androidskills.db.Bundles.id]
+        }
+        transaction {
+            Skills.update({ Skills.bundleId eq bobBundleId }) { it[Skills.status] = "unlisted" }
+        }
+        assertFailsWith<ApiNotFoundException> { PublicQueries.author("bob") }
+        assertTrue(PublicQueries.author("alice").skillCount >= 1)
     }
 
     @Test

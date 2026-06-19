@@ -221,10 +221,17 @@ object PublicQueries {
         } else {
             throw ApiNotFoundException("No downloadable archive for '$slug' version '$label'")
         }
-        // Best-effort install counter (single writer; spec §3 keeps this simple).
-        // Runs after the archive is resolved and inside the same transaction, so a
-        // thrown build/lookup rolls the bump back — a failed download never counts.
-        Skills.update({ Skills.id eq skillId }) { it[Skills.installs] = skill[Skills.installs] + 1 }
+        // Best-effort install counter (spec §3 keeps installs approximate).
+        // Atomic SQL increment (installs = installs + 1) rather than writing back
+        // the value captured earlier in this transaction — that avoids a lost
+        // update if two download transactions overlap (one would otherwise
+        // clobber the other's +1 from a stale read). Still best-effort and still
+        // inside this transaction, so a thrown build/lookup rolls the bump back.
+        Skills.update({ Skills.id eq skillId }) {
+            with(org.jetbrains.exposed.sql.SqlExpressionBuilder) {
+                it[Skills.installs] = Skills.installs + 1
+            }
+        }
         DownloadResult(bytes, "${slug}-${verRow[Versions.version]}.zip", "application/zip")
     }
 
@@ -340,6 +347,11 @@ object PublicQueries {
                 .orderBy(Skills.installs, SortOrder.DESC).toList()
         } else emptyList()
         val cards = buildCards(skillRows)
+        // Public author directory: only users with >=1 published skill are "authors".
+        // A registered user whose skills are all drafts/unlisted/flagged is not
+        // publicly exposed here (consistent with the bundle index hiding bundles
+        // with zero public skills). Their own view is /api/me; admins see the roster.
+        if (cards.isEmpty()) throw ApiNotFoundException("Author '$handle' not found")
         AuthorProfile(
             handle = handle, name = user[Users.name], avatarUrl = user[Users.avatarUrl],
             skillCount = cards.size, totalInstalls = skillRows.sumOf { it[Skills.installs] }, skills = cards,

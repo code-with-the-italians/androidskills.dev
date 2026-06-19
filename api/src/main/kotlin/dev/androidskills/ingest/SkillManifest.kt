@@ -26,6 +26,12 @@ data class ParsedManifest(
     val body: String,
     /** True when the input had no `---` frontmatter block at all. */
     val hadFrontmatter: Boolean,
+    /**
+     * Structured-parse problems found while reading the frontmatter (e.g. a
+     * known field in an unsupported form). Surfaced by [ManifestValidator.validate]
+     * so a malformed source-of-truth manifest is rejected, never silently coerced.
+     */
+    val parseErrors: List<FieldError> = emptyList(),
 )
 
 /** A single per-field validation failure (spec §10). */
@@ -66,9 +72,19 @@ object SkillManifestParser {
         val description = map.string("description")?.trim().orEmpty()
         val license = map.string("license")?.trim()?.takeIf { it.isNotEmpty() }
         val tags = map.stringList("tags")
+        // §10: tags must be well-formed if present. A scalar/malformed value
+        // (e.g. `tags: android`, or an unterminated `[a, b`) parses to a non-List
+        // node and stringList() returns empty — without this check the bad field
+        // would be silently dropped. Flag it so the validator rejects the manifest.
+        val parseErrors = buildList {
+            val rawTags = map["tags"]
+            if (rawTags != null && rawTags !is List<*>) {
+                add(FieldError("tags", "must be a list (block sequence or [a, b] flow list)"))
+            }
+        }
         val version = (map["metadata"] as? Map<*, *>)?.string("version")?.trim()?.takeIf { it.isNotEmpty() }
 
-        return ParsedManifest(name, description, tags, license, version, body, hadFrontmatter)
+        return ParsedManifest(name, description, tags, license, version, body, hadFrontmatter, parseErrors)
     }
 
     private fun isDelim(line: String): Boolean {
@@ -248,6 +264,9 @@ object ManifestValidator {
     /** Required: name, description, license. Optional-but-validated: tags, metadata.version. */
     fun validate(m: ParsedManifest): List<FieldError> {
         val errors = mutableListOf<FieldError>()
+        // Parser-level problems first (e.g. a known field in an unsupported form),
+        // so a malformed source-of-truth manifest is rejected wholesale (§10).
+        errors += m.parseErrors
         if (m.name.isBlank()) errors += FieldError("name", "is required")
         if (m.description.isBlank()) errors += FieldError("description", "is required")
         if (m.license.isNullOrBlank()) errors += FieldError("license", "is required")
