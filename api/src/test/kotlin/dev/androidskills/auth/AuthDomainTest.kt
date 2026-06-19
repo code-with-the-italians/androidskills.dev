@@ -74,7 +74,7 @@ class AuthDomainTest {
         val userId = seedUser()
         val token = SessionStore.create(userId, 3600)
         transaction {
-            Sessions.update({ org.jetbrains.exposed.sql.SqlExpressionBuilder.run { Sessions.id eq token } }) {
+            Sessions.update({ Sessions.id eq token }) {
                 it[Sessions.expiresAt] = Instant.now().minusSeconds(60).toString()
             }
         }
@@ -89,14 +89,14 @@ class AuthDomainTest {
         val userId = seedUser()
         val future = SessionStore.create(userId, 3600)
         transaction {
-            Sessions.update({ org.jetbrains.exposed.sql.SqlExpressionBuilder.run { Sessions.id eq future } }) {
+            Sessions.update({ Sessions.id eq future }) {
                 it[Sessions.expiresAt] = Instant.now().plusSeconds(60).toString()
             }
         }
         assertNotNull(SessionStore.lookup(future))
         val past = SessionStore.create(userId, 3600)
         transaction {
-            Sessions.update({ org.jetbrains.exposed.sql.SqlExpressionBuilder.run { Sessions.id eq past } }) {
+            Sessions.update({ Sessions.id eq past }) {
                 it[Sessions.expiresAt] = Instant.now().minusSeconds(1).toString()
             }
         }
@@ -110,7 +110,7 @@ class AuthDomainTest {
         val token = SessionStore.create(userId, 3600)
         assertNotNull(SessionStore.lookup(token))
         transaction {
-            Users.update({ org.jetbrains.exposed.sql.SqlExpressionBuilder.run { Users.id eq userId } }) {
+            Users.update({ Users.id eq userId }) {
                 it[Users.status] = UserStatus.suspended.name
             }
         }
@@ -131,7 +131,7 @@ class AuthDomainTest {
         val live = SessionStore.create(userId, 3600)
         val expired = SessionStore.create(userId, 3600)
         transaction {
-            Sessions.update({ org.jetbrains.exposed.sql.SqlExpressionBuilder.run { Sessions.id eq expired } }) {
+            Sessions.update({ Sessions.id eq expired }) {
                 it[Sessions.expiresAt] = Instant.now().minusSeconds(60).toString()
             }
         }
@@ -174,7 +174,7 @@ class AuthDomainTest {
         assertEquals(Role.admin.name, transaction { Users.selectAll().where { Users.id eq id }.single()[Users.role] })
         // Admin queue demotes root to member.
         transaction {
-            Users.update({ org.jetbrains.exposed.sql.SqlExpressionBuilder.run { Users.id eq id } }) {
+            Users.update({ Users.id eq id }) {
                 it[Users.role] = Role.member.name
             }
         }
@@ -218,7 +218,7 @@ class AuthDomainTest {
         val token = SessionStore.create(userId, 3600)
         assertNotNull(SessionStore.lookup(token))
         transaction {
-            Users.update({ org.jetbrains.exposed.sql.SqlExpressionBuilder.run { Users.id eq userId } }) {
+            Users.update({ Users.id eq userId }) {
                 it[Users.role] = "superuser" // not a valid Role
             }
         }

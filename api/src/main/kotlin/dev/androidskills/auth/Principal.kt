@@ -20,10 +20,7 @@ data class Principal(
     val role: Role,
     val status: UserStatus,
     val createdAt: String,
-) {
-    /** A suspended user is never admitted as a principal (spec §7). */
-    val isActive: Boolean get() = status == UserStatus.active
-}
+)
 
 /**
  * Authorization gates. The split keeps the security-relevant invariant in one
@@ -39,9 +36,6 @@ data class Principal(
  */
 fun Principal.requireAdmin(): Principal =
     if (role == Role.admin) this else throw ApiNotFoundException("Not found")
-
-/** Role ordering: member < contributor < admin (spec §2, §7). */
-fun Role.atLeast(min: Role): Boolean = this.ordinal >= min.ordinal
 
 @Serializable
 data class MeResponse(

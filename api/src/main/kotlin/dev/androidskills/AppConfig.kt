@@ -95,9 +95,6 @@ data class AuthConfig(
             sessionCookieSecure = false,
             bootstrapAdminGithubId = null,
         )
-
-        /** Auth is "configured" only when OAuth creds are present (spec §13). */
-        val AuthConfig.enabled: Boolean get() = oauth != null
     }
 }
 

@@ -3,7 +3,6 @@ package dev.androidskills.auth
 import dev.androidskills.AuthConfig
 import dev.androidskills.api.ApiNotFoundException
 import dev.androidskills.api.ApiUnauthorizedException
-import dev.androidskills.db.Role
 import io.ktor.http.Cookie
 import io.ktor.server.application.ApplicationCall
 import io.ktor.util.AttributeKey
@@ -125,6 +124,3 @@ internal fun newState(): String {
     stateRng.nextBytes(bytes)
     return bytes.joinToString("") { "%02x".format(it) }
 }
-
-/** Role ordering helper exposed for future contributor (`contributor`+) gates. */
-fun roleAtLeast(principal: Principal, min: Role): Boolean = principal.role.atLeast(min)

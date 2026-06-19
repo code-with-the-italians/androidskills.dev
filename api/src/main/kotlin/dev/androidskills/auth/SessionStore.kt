@@ -4,7 +4,6 @@ import dev.androidskills.db.Role
 import dev.androidskills.db.Sessions
 import dev.androidskills.db.UserStatus
 import dev.androidskills.db.Users
-import dev.androidskills.util.newId
 import dev.androidskills.util.nowIso
 import org.jetbrains.exposed.sql.deleteWhere
 import org.jetbrains.exposed.sql.selectAll
@@ -71,6 +70,10 @@ object SessionStore {
     }
 
     fun delete(token: String): Int {
+        // `deleteWhere`'s lambda receives ISqlExpressionBuilder (the interface),
+        // which does NOT expose `eq`; only the SqlExpressionBuilder object does,
+        // so we build the Op in that scope. (update()'s predicate, by contrast,
+        // receives SqlExpressionBuilder directly and needs no wrapper.)
         val op = org.jetbrains.exposed.sql.SqlExpressionBuilder.run { Sessions.id eq token }
         return transaction { Sessions.deleteWhere { op } }
     }
