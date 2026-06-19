@@ -237,6 +237,55 @@ class SkillManifestParserTest {
         assertEquals("1.0.0", m.version, "version was dropped: ${m.version}")
         assertEquals("# Body", m.body.trim())
     }
+
+    @Test
+    fun `metadata flow map is rejected not silently dropped`() {
+        // An inline flow map `metadata: { version: 1.2.3 }` is an unsupported form
+        // here; the version must not vanish silently. Flag metadata so the
+        // source-of-truth manifest is rejected (§10).
+        val md = """
+            ---
+            name: Flow Meta
+            description: d
+            license: MIT
+            metadata: { version: 1.2.3 }
+            ---
+            body
+        """.trimIndent()
+        val m = SkillManifestParser.parse(md)
+        assertTrue(m.version == null, "flow-map version should not be silently parsed")
+        assertTrue(ManifestValidator.validate(m).any { it.field == "metadata" })
+    }
+
+    @Test
+    fun `block metadata mapping is still accepted`() {
+        val md = """
+            ---
+            name: Block Meta
+            description: d
+            license: MIT
+            metadata:
+              version: 1.2.3
+            ---
+            body
+        """.trimIndent()
+        val m = SkillManifestParser.parse(md)
+        assertEquals("1.2.3", m.version)
+        assertEquals(emptyList(), ManifestValidator.validate(m))
+    }
+
+    @Test
+    fun `semver rejects invalid prerelease identifiers`() {
+        fun versionErrors(v: String) = ManifestValidator.validate(
+            ParsedManifest("n", "d", emptyList(), "MIT", v, "", hadFrontmatter = true),
+        ).filter { it.field == "metadata.version" }
+        // Accepted (strict SemVer).
+        listOf("1.2.3", "1.2.3-alpha", "1.2.3-rc.1", "1.2.3-0", "0.1.0-rc.1", "1.0.0+build.5", "1.2.3-rc.1+exp.sha.5114f85")
+            .forEach { v -> assertEquals(emptyList(), versionErrors(v), "expected valid: $v") }
+        // Rejected.
+        listOf("1.2.3-alpha..1", "1.2.3-01", "1.2.3-", "1.2.3-..", "1.2.3-rc..1")
+            .forEach { v -> assertTrue(versionErrors(v).isNotEmpty(), "expected invalid: $v") }
+    }
 }
 
 class TokensTest {

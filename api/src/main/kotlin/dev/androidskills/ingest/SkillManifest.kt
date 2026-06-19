@@ -81,6 +81,14 @@ object SkillManifestParser {
             if (rawTags != null && rawTags !is List<*>) {
                 add(FieldError("tags", "must be a list (block sequence or [a, b] flow list)"))
             }
+            // §10: metadata.version must be well-formed if present. A `metadata:`
+            // value that isn't a mapping (e.g. a flow map `metadata: { version: 1.2.3 }`,
+            // which this minimal parser reads as a scalar string) would silently
+            // drop the version. Flag it instead, so the manifest is rejected.
+            val rawMetadata = map["metadata"]
+            if (rawMetadata != null && rawMetadata !is Map<*, *>) {
+                add(FieldError("metadata", "must be a block mapping; inline flow maps are unsupported"))
+            }
         }
         val version = (map["metadata"] as? Map<*, *>)?.string("version")?.trim()?.takeIf { it.isNotEmpty() }
 
@@ -257,8 +265,15 @@ object SkillManifestParser {
 
 object ManifestValidator {
     private val SLUG_OR_TAG = Regex("""^[a-z0-9][a-z0-9._+-]{0,39}$""")
+    // Strict SemVer per semver.org: prerelease identifiers are dot-separated, each
+    // either numeric with no leading zero (`0|[1-9]\d*`) or alphanumeric containing
+    // a non-digit. This rejects invalid forms the loose regex let through, e.g.
+    // `1.2.3-alpha..1` (empty identifier) and `1.2.3-01` (leading-zero numeric).
+    // Build identifiers are `[0-9A-Za-z-]+` (leading zeros allowed by the spec).
     private val SEMVER = Regex(
-        """^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$""",
+        """^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)""" +
+            """(?:-(?:0|[1-9]\d*|[0-9]*[A-Za-z-][0-9A-Za-z-]*)(?:\.(?:0|[1-9]\d*|[0-9]*[A-Za-z-][0-9A-Za-z-]*))*)?""" +
+            """(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$""",
     )
 
     /** Required: name, description, license. Optional-but-validated: tags, metadata.version. */

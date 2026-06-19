@@ -70,6 +70,7 @@ object PublicQueries {
     const val PREVIEW_LIMIT = 256 * 1024
     private const val DEFAULT_PAGE_SIZE = 24
     private const val MAX_PAGE_SIZE = 60
+    private const val MAX_PAGE = 10_000
     private const val MAX_TAG_FACETS = 20
 
     // ---- stats / taxonomy --------------------------------------------------
@@ -217,7 +218,7 @@ object PublicQueries {
         // with today's files named as the old version (spec §5.6).
         val storedBytes = if (zipKey != null && store.exists(zipKey)) store.get(zipKey) else null
         val bytes = storedBytes ?: if (isCurrent) {
-            buildZip(skillId, store)
+            buildZip(skillId, skill[Skills.readmeMd], store)
         } else {
             throw ApiNotFoundException("No downloadable archive for '$slug' version '$label'")
         }
@@ -509,13 +510,24 @@ object PublicQueries {
     private fun authorRef(owner: ResultRow?): AuthorRef = if (owner == null) AuthorRef("unknown") else
         AuthorRef(owner[Users.handle], owner[Users.name], owner[Users.avatarUrl])
 
-    private fun buildZip(skillId: String, store: FileStore): ByteArray {
+    private fun buildZip(skillId: String, readmeMd: String?, store: FileStore): ByteArray {
         val files = SkillFiles.selectAll().where { SkillFiles.skillId eq skillId }.orderBy(SkillFiles.path).toList()
         if (files.isEmpty()) {
             throw ApiStorageException("Cannot build archive for skill '$skillId': no files recorded")
         }
+        // The downloadable bundle must contain the SKILL.md manifest (§5/§11),
+        // not only the mirrored files. readme_md holds the parsed body (the
+        // manifest frontmatter is reconstructed at full ingest, step 4), so the
+        // fallback zip writes it as SKILL.md to keep the bundle complete. Skip if
+        // a SKILL.md file row already exists to avoid a duplicate-entry zip crash.
+        val hasSkillMdFile = files.any { it[SkillFiles.path] == "SKILL.md" }
         val baos = ByteArrayOutputStream()
         ZipOutputStream(baos).use { zos ->
+            if (!hasSkillMdFile && !readmeMd.isNullOrBlank()) {
+                zos.putNextEntry(ZipEntry("SKILL.md"))
+                zos.write(readmeMd.toByteArray(Charsets.UTF_8))
+                zos.closeEntry()
+            }
             files.forEach { f ->
                 // Zip Slip defence: never write an entry that escapes the skill root.
                 // Unlike a quiet skip, an unsafe stored path or missing bytes is a
@@ -573,6 +585,10 @@ object PublicQueries {
         if (raw == null) return 1
         val n = raw.toIntOrNull() ?: throw ApiValidationException(mapOf("page" to "must be a positive integer"), "Invalid 'page'")
         if (n < 1) throw ApiValidationException(mapOf("page" to "must be >= 1"), "Invalid 'page'")
+        // Bound deep pagination: a huge page (e.g. Int.MAX_VALUE) is never a real
+        // request and its offset ((page-1)*pageSize) risks Int overflow / a needless
+        // large OFFSET scan. Reject beyond a sane ceiling.
+        if (n > MAX_PAGE) throw ApiValidationException(mapOf("page" to "must be <= $MAX_PAGE (deep pagination is not supported)"), "Invalid 'page'")
         return n
     }
 

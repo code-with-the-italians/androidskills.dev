@@ -397,6 +397,34 @@ class PublicReadTest {
     }
 
     @Test
+    fun `fallback zip includes the SKILL manifest so the bundle is complete`() {
+        // Cursor review: buildZip streamed only skill_files, omitting the manifest.
+        // A downloadable bundle must contain SKILL.md (§5/§11). Force the fallback
+        // path and assert the zip has a SKILL.md entry carrying the readme body.
+        val slug = "jetpack-compose-mvi"
+        val row = transaction { Skills.selectAll().where { Skills.slug eq slug }.single() }
+        forceCurrentVersionFallback(row[Skills.id], row[Skills.version])
+
+        val dl = PublicQueries.download(slug, null, store)
+        val entries = java.util.zip.ZipInputStream(dl.bytes.inputStream()).use { zis ->
+            generateSequence { zis.nextEntry }.map { it.name }.toList()
+        }
+        assertTrue("SKILL.md" in entries, "zip missing SKILL.md; entries=$entries")
+        assertTrue(entries.containsAll(listOf("references/intent.md", "examples/CounterScreen.kt")))
+    }
+
+    @Test
+    fun `parsePageStrict rejects deep pagination beyond the ceiling`() {
+        assertEquals(1, PublicQueries.parsePageStrict(null))
+        assertEquals(1, PublicQueries.parsePageStrict("1"))
+        assertEquals(10_000, PublicQueries.parsePageStrict("10000"))
+        assertFailsWith<ApiValidationException> { PublicQueries.parsePageStrict("10001") }
+        assertFailsWith<ApiValidationException> { PublicQueries.parsePageStrict("2147483647") }
+        assertFailsWith<ApiValidationException> { PublicQueries.parsePageStrict("0") }
+        assertFailsWith<ApiValidationException> { PublicQueries.parsePageStrict("abc") }
+    }
+
+    @Test
     fun `missing file bytes surface as a storage error not empty 200`() {
         val slug = "jetpack-compose-mvi"
         val key = transaction {
