@@ -19,9 +19,13 @@ data class GitHubUser(
 )
 
 /**
- * Upserts a user from a GitHub identity (spec §7 callback). Insert → `member`
- * by default; an existing user keeps its role unless the [bootstrapAdminGithubId]
- * cold-start override promotes them. Returns the user id.
+ * Upserts a user from a GitHub identity (spec §7 callback). A new user is
+ * inserted as `member` by default; [bootstrapAdminGithubId] is a **seed-only
+ * escape hatch** that promotes a *new* user to `admin` on first insert. It is
+ * intentionally INSERT-only: an existing user keeps whatever role the admin
+ * queue (step 7, spec §3 rule 9) last gave them, so a bootstrap account that
+ * was later demoted/suspended is **not** re-promoted on re-login. Unset it once
+ * the first admin exists. Returns the user id.
  *
  * Handles are unique in `users`; GitHub handles are globally unique at a point in
  * time but can be recycled, so a collision with a *different* github_id is
@@ -33,12 +37,12 @@ object UsersRepo {
         val existing = Users.selectAll().where { Users.githubId eq user.githubId }.singleOrNull()
         if (existing != null) {
             val id = existing[Users.id]
-            val bootstrap = bootstrapAdminGithubId != null && user.githubId == bootstrapAdminGithubId
             Users.update({ Users.id eq id }) {
                 it[Users.handle] = uniqueHandle(user.handle, user.githubId, excludeId = id)
                 it[Users.name] = user.name
                 it[Users.avatarUrl] = user.avatarUrl
-                if (bootstrap) it[Users.role] = Role.admin.name
+                // NOTE: role is NOT touched here — a bootstrap/demoted/suspended
+                // user keeps their current role on re-login (P1-1).
                 it[Users.updatedAt] = now
             }
             id

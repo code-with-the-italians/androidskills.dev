@@ -125,6 +125,27 @@ class AuthDomainTest {
     }
 
     @Test
+    fun `bootstrap admin is not re-promoted after being demoted (INSERT-only)`() {
+        // P1-1: the bootstrap id must promote only on FIRST insert. Once the
+        // admin queue (step 7) demotes the bootstrap account, a re-login must
+        // NOT re-promote it just because BOOTSTRAP_ADMIN_GITHUB_ID is still set
+        // (it's a Kamal secret nobody rotates).
+        val id = UsersRepo.upsertFromGitHub(GitHubUser(99, "root", "Root", null), bootstrapAdminGithubId = 99L)
+        assertEquals(Role.admin.name, transaction { Users.selectAll().where { Users.id eq id }.single()[Users.role] })
+        // Admin queue demotes root to member.
+        transaction {
+            Users.update({ org.jetbrains.exposed.sql.SqlExpressionBuilder.run { Users.id eq id } }) {
+                it[Users.role] = Role.member.name
+            }
+        }
+        // Re-login (same bootstrap id still set) → stays member, NOT re-promoted.
+        val id2 = UsersRepo.upsertFromGitHub(GitHubUser(99, "root", "Root", null), bootstrapAdminGithubId = 99L)
+        assertEquals(id, id2)
+        assertEquals(Role.member.name, transaction { Users.selectAll().where { Users.id eq id2 }.single()[Users.role] },
+            "a demoted bootstrap user must not be re-promoted on re-login")
+    }
+
+    @Test
     fun `handle collision with a different github id is disambiguated not failed`() {
         UsersRepo.upsertFromGitHub(GitHubUser(1, "recycled", "A", null), null)
         // A second, different github id claims the same handle → must not crash the login.

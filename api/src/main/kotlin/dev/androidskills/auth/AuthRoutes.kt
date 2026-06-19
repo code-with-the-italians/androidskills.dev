@@ -47,30 +47,37 @@ fun Route.authRoutes(config: AppConfig, oauth: OAuthClient) {
             val code = call.request.queryParameters["code"]
             val stateParam = call.request.queryParameters["state"]
             val stateCookie = call.request.cookies[STATE_COOKIE]
-            // CSRF: the state echoed by GitHub must match the cookie we set on start.
-            if (code.isNullOrBlank() || stateParam.isNullOrBlank() || stateCookie.isNullOrBlank()) {
-                throw ApiBadRequestException("Missing OAuth code/state")
-            }
-            if (!constantTimeEquals(stateParam, stateCookie)) {
-                throw ApiBadRequestException("OAuth state mismatch")
-            }
-            val userId = try {
-                val tokens = oauth.exchange(code, redirectUri)
-                val ghUser = oauth.userInfo(tokens.accessToken)
-                UsersRepo.upsertFromGitHub(ghUser, auth.bootstrapAdminGithubId)
-            } catch (e: OAuthException) {
-                // A normal OAuth failure (bad/expired code, GitHub error, revoked)
-                // is a client/auth error, not a server outage. Map to a controlled
-                // 400 with a stable code and clear the state cookie; log the detail.
-                logger.warn("GitHub OAuth callback failed: {}", e.message)
+            try {
+                // CSRF: the state echoed by GitHub must match the cookie we set on start.
+                if (code.isNullOrBlank() || stateParam.isNullOrBlank() || stateCookie.isNullOrBlank()) {
+                    throw ApiBadRequestException("Missing OAuth code/state")
+                }
+                if (!constantTimeEquals(stateParam, stateCookie)) {
+                    throw ApiBadRequestException("OAuth state mismatch")
+                }
+                val userId = try {
+                    val tokens = oauth.exchange(code, redirectUri)
+                    val ghUser = oauth.userInfo(tokens.accessToken)
+                    UsersRepo.upsertFromGitHub(ghUser, auth.bootstrapAdminGithubId)
+                } catch (e: OAuthException) {
+                    // GitHubOAuthClient translates every auth/network failure into
+                    // OAuthException, so a bad/expired code, a revoked token, or a
+                    // transient GitHub outage is a controlled 400 — never an opaque
+                    // 500. (DB/server errors still propagate as genuine 5xx.)
+                    logger.warn("GitHub OAuth callback failed: {}", e.message)
+                    throw ApiBadRequestException("GitHub sign-in failed. Please try again.")
+                }
+                val session = SessionStore.create(userId, SESSION_MAX_AGE_SECONDS)
+                setSessionCookie(call, session, auth)
+                // Redirect to the site root; the SPA/Astro picks up the session cookie.
+                call.respondRedirect(auth.publicBaseUrl)
+            } finally {
+                // The state cookie is single-use: clear it on EVERY outcome — success,
+                // auth failure (400), validation failure (400), or an unexpected 5xx —
+                // so a stale CSRF cookie can never be replayed. CancellationException
+                // still rethrows after the cookie is cleared. (P1-2 + P3-4.)
                 clearStateCookie(call, auth)
-                throw ApiBadRequestException("GitHub sign-in failed. Please try again.")
             }
-            val session = SessionStore.create(userId, SESSION_MAX_AGE_SECONDS)
-            clearStateCookie(call, auth)
-            setSessionCookie(call, session, auth)
-            // Redirect to the site root; the SPA/Astro picks up the session cookie.
-            call.respondRedirect(auth.publicBaseUrl)
         }
 
         post("auth/logout") {

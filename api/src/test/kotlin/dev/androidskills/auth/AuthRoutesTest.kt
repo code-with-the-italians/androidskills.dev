@@ -123,10 +123,13 @@ class AuthRoutesTest {
         assertEquals(HttpStatusCode.BadRequest, res.status)
         val body = res.bodyAsText()
         assertTrue(body.contains("\"code\":\"bad_request\""), body)
-        // No session cookie was set on failure (and the state cookie was cleared).
+        // No session cookie was set on failure …
         val setCookies = res.headers.getAll("Set-Cookie") ?: emptyList()
         assertTrue(setCookies.none { it.startsWith("$SESSION_COOKIE=") && !it.contains("Max-Age=0") },
             "no session cookie should be set on OAuth failure: $setCookies")
+        // … and the single-use state cookie WAS cleared (P1-2: no stale CSRF cookie left behind).
+        assertTrue(setCookies.any { it.startsWith("$STATE_COOKIE=") && it.contains("Max-Age=0") },
+            "state cookie must be cleared on OAuth failure: $setCookies")
     }
 
     @Test

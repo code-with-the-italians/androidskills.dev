@@ -50,11 +50,13 @@ class GitHubOAuthClient(
             "code" to code,
             "redirect_uri" to redirectUri,
         ).formUrlEncode()
-        val resp: AccessTokenResponse = http.post("https://github.com/login/oauth/access_token") {
-            header("Accept", "application/json")
-            contentType(ContentType.Application.FormUrlEncoded)
-            setBody(form)
-        }.body()
+        val resp: AccessTokenResponse = oauth {
+            http.post("https://github.com/login/oauth/access_token") {
+                header("Accept", "application/json")
+                contentType(ContentType.Application.FormUrlEncoded)
+                setBody(form)
+            }.body()
+        }
         if (resp.error != null || resp.accessToken.isNullOrBlank()) {
             throw OAuthException("GitHub token exchange failed: ${resp.error ?: "no access_token"} (${resp.errorDescription ?: ""})")
         }
@@ -62,10 +64,12 @@ class GitHubOAuthClient(
     }
 
     override suspend fun userInfo(accessToken: String): GitHubUser {
-        val resp: GitHubUserResponse = http.get("https://api.github.com/user") {
-            header("Accept", "application/vnd.github+json")
-            header("Authorization", "Bearer $accessToken")
-        }.body()
+        val resp: GitHubUserResponse = oauth {
+            http.get("https://api.github.com/user") {
+                header("Accept", "application/vnd.github+json")
+                header("Authorization", "Bearer $accessToken")
+            }.body()
+        }
         if (resp.id <= 0L || resp.login.isBlank()) {
             throw OAuthException("GitHub user lookup returned no identity")
         }
@@ -86,6 +90,23 @@ class GitHubOAuthClient(
             expectSuccess = true
         }
     }
+}
+
+/**
+ * Wraps a GitHub HTTP call so the client's contract is uniform: any failure a
+ * caller could see (non-2xx via `expectSuccess`, DNS/connect/timeout, or a body
+ * parse error) becomes an [OAuthException]. Cancellation is preserved. This lets
+ * the route catch one typed exception for all auth/network failures instead of
+ * leaking `ResponseException`/`IOException` to the global 500 handler (P1-2).
+ */
+private suspend inline fun <T> oauth(crossinline block: suspend () -> T): T = try {
+    block()
+} catch (e: kotlinx.coroutines.CancellationException) {
+    throw e
+} catch (e: OAuthException) {
+    throw e
+} catch (e: Exception) {
+    throw OAuthException("GitHub request failed: ${e.message ?: e.javaClass.simpleName}")
 }
 
 @Serializable
