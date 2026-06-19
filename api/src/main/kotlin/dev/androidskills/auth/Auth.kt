@@ -82,9 +82,15 @@ private fun sessionCookie(
     extensions = mapOf("SameSite" to "Lax"),
 )
 
-/** 32 random bytes as lower-case hex = the OAuth `state` (CSRF token). */
+private val stateRng = java.security.SecureRandom()
+
+/** 32 random bytes as lower-case hex = the OAuth `state` (CSRF token).
+ *  Mirrors `SessionStore`'s token generation: [java.security.SecureRandom.nextBytes]
+ *  is the intended API for emitting opaque secrets; `getSeed`/`generateSeed`
+ *  produce *seed material* for seeding other RNGs, not session-style tokens. */
 internal fun newState(): String {
-    val bytes = java.security.SecureRandom.getSeed(32)
+    val bytes = ByteArray(32)
+    stateRng.nextBytes(bytes)
     return bytes.joinToString("") { "%02x".format(it) }
 }
 

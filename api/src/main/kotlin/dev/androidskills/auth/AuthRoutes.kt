@@ -10,6 +10,7 @@ import io.ktor.server.routing.Route
 import io.ktor.server.routing.get
 import io.ktor.server.routing.post
 import io.ktor.server.routing.route
+import org.slf4j.LoggerFactory
 
 /**
  * Auth routes (spec §9 Auth):
@@ -21,6 +22,8 @@ import io.ktor.server.routing.route
  * When OAuth is unconfigured (spec §13), the start/callback endpoints report
  * auth unavailable (503) rather than crashing; `/api/me` is simply always 401.
  */
+private val logger = LoggerFactory.getLogger("dev.androidskills.auth.AuthRoutes")
+
 fun Route.authRoutes(config: AppConfig, oauth: OAuthClient) {
     val auth = config.auth
     val redirectUri = "${auth.publicBaseUrl.trimEnd('/')}/api/auth/github/callback"
@@ -51,9 +54,18 @@ fun Route.authRoutes(config: AppConfig, oauth: OAuthClient) {
             if (!constantTimeEquals(stateParam, stateCookie)) {
                 throw ApiBadRequestException("OAuth state mismatch")
             }
-            val tokens = oauth.exchange(code, redirectUri)
-            val ghUser = oauth.userInfo(tokens.accessToken)
-            val userId = UsersRepo.upsertFromGitHub(ghUser, auth.bootstrapAdminGithubId)
+            val userId = try {
+                val tokens = oauth.exchange(code, redirectUri)
+                val ghUser = oauth.userInfo(tokens.accessToken)
+                UsersRepo.upsertFromGitHub(ghUser, auth.bootstrapAdminGithubId)
+            } catch (e: OAuthException) {
+                // A normal OAuth failure (bad/expired code, GitHub error, revoked)
+                // is a client/auth error, not a server outage. Map to a controlled
+                // 400 with a stable code and clear the state cookie; log the detail.
+                logger.warn("GitHub OAuth callback failed: {}", e.message)
+                clearStateCookie(call, auth)
+                throw ApiBadRequestException("GitHub sign-in failed. Please try again.")
+            }
             val session = SessionStore.create(userId, SESSION_MAX_AGE_SECONDS)
             clearStateCookie(call, auth)
             setSessionCookie(call, session, auth)

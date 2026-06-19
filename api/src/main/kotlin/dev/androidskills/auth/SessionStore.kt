@@ -53,7 +53,11 @@ object SessionStore {
         val status = runCatching { UserStatus.parse(user[Users.status]) }.getOrNull()
             ?: return@transaction null
         if (status != UserStatus.active) return@transaction null
-        val role = runCatching { Role.parse(user[Users.role]) }.getOrNull() ?: Role.member
+        // A corrupted role is treated the same as a corrupted status: reject the
+        // session rather than silently degrading to `member` (an unexpected role
+        // value means the row shouldn't be trusted to authorize anything).
+        val role = runCatching { Role.parse(user[Users.role]) }.getOrNull()
+            ?: return@transaction null
         Principal(
             sessionId = token,
             userId = user[Users.id],

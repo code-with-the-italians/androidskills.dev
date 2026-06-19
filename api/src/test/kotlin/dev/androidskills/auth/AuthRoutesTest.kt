@@ -113,6 +113,23 @@ class AuthRoutesTest {
     }
 
     @Test
+    fun callbackReturns400Not500WhenOAuthFails() = testApp(oauth = FakeOAuthClient()) { client ->
+        // A normal OAuth failure (bad/expired/revoked code → OAuthException from
+        // exchange/userInfo) is a client/auth error, NOT a server outage: must be a
+        // controlled 400, not the generic 500 from the global Throwable handler.
+        val start = client.get("/api/auth/github/start")
+        val state = cookieValue(start.headers.getAll("Set-Cookie"), STATE_COOKIE)!!
+        val res = client.get("/api/auth/github/callback?code=bad-or-revoked-code&state=$state")
+        assertEquals(HttpStatusCode.BadRequest, res.status)
+        val body = res.bodyAsText()
+        assertTrue(body.contains("\"code\":\"bad_request\""), body)
+        // No session cookie was set on failure (and the state cookie was cleared).
+        val setCookies = res.headers.getAll("Set-Cookie") ?: emptyList()
+        assertTrue(setCookies.none { it.startsWith("$SESSION_COOKIE=") && !it.contains("Max-Age=0") },
+            "no session cookie should be set on OAuth failure: $setCookies")
+    }
+
+    @Test
     fun suspendedUserIsLoggedOutMidSession() = testApp(oauth = FakeOAuthClient()) { client ->
         // Log Alice in.
         val start = client.get("/api/auth/github/start")

@@ -133,4 +133,41 @@ class AuthDomainTest {
         assertNotEquals("recycled", handle)
         assertTrue(handle.startsWith("recycled-"), "expected a disambiguated handle, got $handle")
     }
+
+    @Test
+    fun `uniqueHandle never crashes even when raw and suffixed forms are taken`() {
+        // Both "taken" and "taken-3" are held by other users. The disambiguation
+        // ladder must walk past them (…-2, …-4, …) instead of throwing and 500-ing
+        // the login. (Bugbot finding: `first` on a 2-element sequence threw.)
+        seedUser(githubId = 1, handle = "taken")
+        seedUser(githubId = 2, handle = "taken-3")
+        val id = UsersRepo.upsertFromGitHub(GitHubUser(3, "taken", "C", null), null)
+        val handle = transaction { Users.selectAll().where { Users.id eq id }.single()[Users.handle] }
+        // New user (githubId 3) must still log in: not "taken", not "taken-3".
+        assertTrue(handle.startsWith("taken-3") || handle.startsWith("taken-"), "got $handle")
+        assertNotEquals("taken", handle)
+        assertNotEquals("taken-3", handle)
+    }
+
+    @Test
+    fun `session lookup rejects a corrupted role value`() {
+        // Asymmetric with status: a corrupted role used to fall back to `member`,
+        // handing a valid session to a row that shouldn't be trusted. Reject it.
+        val userId = seedUser()
+        val token = SessionStore.create(userId, 3600)
+        assertNotNull(SessionStore.lookup(token))
+        transaction {
+            Users.update({ org.jetbrains.exposed.sql.SqlExpressionBuilder.run { Users.id eq userId } }) {
+                it[Users.role] = "superuser" // not a valid Role
+            }
+        }
+        assertNull(SessionStore.lookup(token), "a corrupted role must not yield a member session")
+    }
+
+    @Test
+    fun `newState is 64 hex chars and each is unique`() {
+        val a = newState(); val b = newState(); val c = newState()
+        assertTrue(a.matches(Regex("^[0-9a-f]{64}$")), "got $a")
+        assertEquals(setOf(a, b, c).size, 3, "state must not repeat")
+    }
 }

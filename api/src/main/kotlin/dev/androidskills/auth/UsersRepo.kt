@@ -60,9 +60,22 @@ object UsersRepo {
         }
     }
 
-    /** Resolves a `handle` that doesn't collide with another user. */
+    /**
+     * Resolves a `handle` that doesn't collide with another user. Tries the raw
+     * login, then `{login}-{githubId}`, then an incrementing suffix, and finally
+     * a uuid-suffixed fallback — never throws, so a handle collision can't crash
+     * a login. (GitHub handles recycle; collisions across distinct github ids
+     * are rare but possible.)
+     */
     private fun uniqueHandle(handle: String, githubId: Long, excludeId: String?): String {
-        val candidates = generateSequence(handle) { "$handle-$githubId" }.take(2)
+        val base = "$handle-$githubId"
+        // Candidate ladder: raw → {login}-{githubId} → …-2 → …-3 (bounded), then a uuid fallback.
+        val candidates = sequence {
+            yield(handle)
+            yield(base)
+            for (i in 2..10) yield("$base-$i")
+            yield("$base-${dev.androidskills.util.newId().take(8)}")
+        }
         return candidates.first { h ->
             Users.selectAll().where { Users.handle eq h }.none { it[Users.id] != excludeId }
         }
