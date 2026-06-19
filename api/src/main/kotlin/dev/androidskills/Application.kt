@@ -16,11 +16,19 @@ import io.ktor.serialization.kotlinx.json.json
 import io.ktor.server.application.Application
 import io.ktor.server.application.ApplicationStopped
 import io.ktor.server.application.install
+import io.ktor.server.application.log
 import io.ktor.server.plugins.calllogging.CallLogging
 import io.ktor.server.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.server.response.respond
 import io.ktor.server.routing.get
 import io.ktor.server.routing.routing
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
 import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.transactions.transaction
@@ -51,6 +59,12 @@ fun Application.module(config: AppConfig = AppConfig.fromEnv(), oauth: OAuthClie
     // Close the GitHub HTTP client on shutdown (clients are long-lived; one per app).
     if (ghHttp != null) monitor.subscribe(ApplicationStopped) { ghHttp.close() }
 
+    // Sweep expired sessions so the table (and its Litestream replica) doesn't
+    // grow unbounded — lookups already ignore expired rows, but they're never
+    // deleted otherwise (P2-1). A startup sweep + hourly run on a self-cancelling
+    // scope; cancelled on ApplicationStopped.
+    startSessionPurge(this)
+
     routing {
         get("/api/health") {
             call.respond(
@@ -75,6 +89,24 @@ private fun resolveOauth(auth: AuthConfig, injected: OAuthClient?): Pair<OAuthCl
     val http = GitHubOAuthClient.httpClient()
     return GitHubOAuthClient(c.clientId, c.clientSecret, http) to http
 }
+
+private fun startSessionPurge(app: Application) {
+    val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+    val job = scope.launch {
+        runCatching { dev.androidskills.auth.SessionStore.purgeExpired() } // startup sweep
+        while (isActive) {
+            delay(SESSION_PURGE_INTERVAL_MS)
+            runCatching { dev.androidskills.auth.SessionStore.purgeExpired() }
+                .onFailure { app.log.warn("Session purge failed", it) }
+        }
+    }
+    app.monitor.subscribe(ApplicationStopped) {
+        job.cancel()
+        scope.cancel()
+    }
+}
+
+private const val SESSION_PURGE_INTERVAL_MS = 60L * 60 * 1000 // 1 hour
 
 @Serializable
 data class HealthResponse(

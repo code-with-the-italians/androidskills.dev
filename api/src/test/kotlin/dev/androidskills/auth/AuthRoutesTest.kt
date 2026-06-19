@@ -133,6 +133,30 @@ class AuthRoutesTest {
     }
 
     @Test
+    fun stateCookieIsHostOnlyAndNamedByScheme() {
+        // P2-3: the CSRF state cookie must be host-only (no Domain) so a sibling
+        // subdomain / MITM can't plant it for login-CSRF, and __Host- prefixed
+        // over HTTPS (browser-enforced host-only + Secure + Path=/). Unit-level.
+        val insecure = TestSupport.newConfig(TestSupport.tempDir()).auth
+        val secure = insecure.copy(sessionCookieSecure = true)
+        assertEquals("as_oauth_state", stateCookieName(insecure))
+        assertEquals("__Host-as_oauth_state", stateCookieName(secure))
+    }
+
+    @Test
+    fun startSetsHostOnlyStateCookie() = testApp(oauth = FakeOAuthClient()) { client ->
+        val start = client.get("/api/auth/github/start")
+        val setCookies = start.headers.getAll("Set-Cookie") ?: emptyList()
+        val stateCookie = setCookies.first { it.startsWith("${STATE_COOKIE}=") }
+        assertTrue(stateCookie.contains("HttpOnly"), stateCookie)
+        assertTrue(stateCookie.contains("Path=/"), stateCookie)
+        assertTrue(stateCookie.contains("SameSite=Lax"), stateCookie)
+        // P2-3: the state cookie must NEVER carry a Domain (host-only).
+        assertTrue(!stateCookie.contains("Domain=", ignoreCase = true),
+            "state cookie must be host-only: $stateCookie")
+    }
+
+    @Test
     fun suspendedUserIsLoggedOutMidSession() = testApp(oauth = FakeOAuthClient()) { client ->
         // Log Alice in.
         val start = client.get("/api/auth/github/start")

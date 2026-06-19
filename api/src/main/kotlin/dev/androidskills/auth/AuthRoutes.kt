@@ -46,7 +46,7 @@ fun Route.authRoutes(config: AppConfig, oauth: OAuthClient) {
             }
             val code = call.request.queryParameters["code"]
             val stateParam = call.request.queryParameters["state"]
-            val stateCookie = call.request.cookies[STATE_COOKIE]
+            val stateCookie = call.request.cookies[stateCookieName(auth)]
             try {
                 // CSRF: the state echoed by GitHub must match the cookie we set on start.
                 if (code.isNullOrBlank() || stateParam.isNullOrBlank() || stateCookie.isNullOrBlank()) {

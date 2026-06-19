@@ -58,15 +58,26 @@ internal fun clearSessionCookie(call: ApplicationCall, cfg: AuthConfig) {
     call.response.cookies.append(sessionCookie(SESSION_COOKIE, "", cfg, 0, io.ktor.util.date.GMTDate(0)))
 }
 
+/**
+ * The OAuth `state` cookie name. Over HTTPS we use the `__Host-` prefix, which
+ * the cookie jar treats as host-only + Secure + Path=/ + NO Domain — pinning
+ * the CSRF token to this exact host so a sibling-subdomain foothold or MITM
+ * can't plant it (login-CSRF, P2-3). Over plain-HTTP dev we drop the prefix
+ * (a `__Host-` cookie requires Secure and wouldn't be stored/sent) but still
+ * keep the cookie host-only (no Domain).
+ */
+internal fun stateCookieName(cfg: AuthConfig): String =
+    if (cfg.sessionCookieSecure) "__Host-as_oauth_state" else STATE_COOKIE
+
 internal fun setStateCookie(call: ApplicationCall, state: String, cfg: AuthConfig) {
-    call.response.cookies.append(sessionCookie(STATE_COOKIE, state, cfg, STATE_TTL_SECONDS.toInt(), null))
+    call.response.cookies.append(stateCookie(stateCookieName(cfg), state, cfg, STATE_TTL_SECONDS.toInt(), null))
 }
 
 internal fun clearStateCookie(call: ApplicationCall, cfg: AuthConfig) {
-    call.response.cookies.append(sessionCookie(STATE_COOKIE, "", cfg, 0, io.ktor.util.date.GMTDate(0)))
+    call.response.cookies.append(stateCookie(stateCookieName(cfg), "", cfg, 0, io.ktor.util.date.GMTDate(0)))
 }
 
-/** Builds a cookie with the spec's security flags: httpOnly + Secure + SameSite=Lax. */
+/** Session cookie: httpOnly + Secure + SameSite=Lax; keeps [AuthConfig.sessionCookieDomain] when set. */
 private fun sessionCookie(
     name: String, value: String, cfg: AuthConfig, maxAge: Int, expires: io.ktor.util.date.GMTDate?,
 ): Cookie = Cookie(
@@ -76,6 +87,27 @@ private fun sessionCookie(
     maxAge = maxAge,
     expires = expires,
     domain = cfg.sessionCookieDomain,
+    path = "/",
+    secure = cfg.sessionCookieSecure,
+    httpOnly = true,
+    extensions = mapOf("SameSite" to "Lax"),
+)
+
+/**
+ * State cookie: ALWAYS host-only — Domain is never set, so it can't be widened
+ * to a parent/sibling domain (P2-3 login-CSRF). Secure mirrors the session
+ * cookie; the `__Host-` prefix (when Secure) makes the host-only contract
+ * browser-enforced.
+ */
+private fun stateCookie(
+    name: String, value: String, cfg: AuthConfig, maxAge: Int, expires: io.ktor.util.date.GMTDate?,
+): Cookie = Cookie(
+    name = name,
+    value = value,
+    encoding = io.ktor.http.CookieEncoding.URI_ENCODING,
+    maxAge = maxAge,
+    expires = expires,
+    domain = null, // host-only always — never Domain on the CSRF state cookie
     path = "/",
     secure = cfg.sessionCookieSecure,
     httpOnly = true,

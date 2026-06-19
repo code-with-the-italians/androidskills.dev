@@ -32,7 +32,35 @@ data class GitHubUser(
  * resolved by suffixing `-{githubId}` rather than failing the login.
  */
 object UsersRepo {
-    fun upsertFromGitHub(user: GitHubUser, bootstrapAdminGithubId: Long?): String = transaction {
+    /**
+     * Upsert with a bounded retry for the one realistic race: two concurrent
+     * logins resolving the same recycled handle both pass check-then-insert and
+     * the second violates `uq_users_handle`. On that specific error we retry —
+     * the next [uniqueHandle] call sees the winner's row. (P2-2b.)
+     */
+    fun upsertFromGitHub(user: GitHubUser, bootstrapAdminGithubId: Long?): String {
+        var attempt = 0
+        while (true) {
+            try {
+                return upsertOnce(user, bootstrapAdminGithubId)
+            } catch (e: org.jetbrains.exposed.exceptions.ExposedSQLException) {
+                if (++attempt > MAX_HANDLE_RETRIES || !isUniqueHandleViolation(e)) throw e
+            }
+        }
+    }
+
+    private const val MAX_HANDLE_RETRIES = 3
+
+    private fun isUniqueHandleViolation(e: org.jetbrains.exposed.exceptions.ExposedSQLException): Boolean {
+        val text = buildString {
+            append(e.message); append(' ')
+            var c: Throwable? = e.cause
+            while (c != null) { append(c.message); append(' '); c = c.cause }
+        }
+        return text.contains("users.handle", ignoreCase = true)
+    }
+
+    private fun upsertOnce(user: GitHubUser, bootstrapAdminGithubId: Long?): String = transaction {
         val now = nowIso()
         val existing = Users.selectAll().where { Users.githubId eq user.githubId }.singleOrNull()
         if (existing != null) {
@@ -65,23 +93,26 @@ object UsersRepo {
     }
 
     /**
-     * Resolves a `handle` that doesn't collide with another user. Tries the raw
-     * login, then `{login}-{githubId}`, then an incrementing suffix, and finally
-     * a uuid-suffixed fallback — never throws, so a handle collision can't crash
-     * a login. (GitHub handles recycle; collisions across distinct github ids
-     * are rare but possible.)
+     * Resolves a `handle` that doesn't collide with another user. Walks a short
+     * ladder (raw → {login}-{githubId} → …-2..10), then falls back to a full-UUID
+     * suffix — which is **terminal and effectively unique**, so this never throws
+     * (the prior `first{}` over a finite ladder could). [P2-2a.]
+     *
+     * The check-then-insert is inherently a TOCTOU race under concurrency; the
+     * retry in [upsertFromGitHub] handles the losing side.
      */
     private fun uniqueHandle(handle: String, githubId: Long, excludeId: String?): String {
         val base = "$handle-$githubId"
-        // Candidate ladder: raw → {login}-{githubId} → …-2 → …-3 (bounded), then a uuid fallback.
         val candidates = sequence {
             yield(handle)
             yield(base)
             for (i in 2..10) yield("$base-$i")
-            yield("$base-${dev.androidskills.util.newId().take(8)}")
         }
-        return candidates.first { h ->
-            Users.selectAll().where { Users.handle eq h }.none { it[Users.id] != excludeId }
-        }
+        return candidates.firstOrNull { h -> !handleTaken(h, excludeId) }
+            ?: "$base-${newId()}" // full UUID: collision-proof, terminal
     }
+
+    /** True if some *other* user already owns [handle] (excludeId is the self row). */
+    private fun handleTaken(handle: String, excludeId: String?): Boolean =
+        Users.selectAll().where { Users.handle eq handle }.any { it[Users.id] != excludeId }
 }

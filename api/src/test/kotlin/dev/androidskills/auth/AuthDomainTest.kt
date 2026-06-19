@@ -7,9 +7,14 @@ import dev.androidskills.db.Sessions
 import dev.androidskills.db.UserStatus
 import dev.androidskills.db.Users
 import dev.androidskills.util.nowIso
+import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.transactions.transaction
 import org.jetbrains.exposed.sql.update
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.coroutineScope
 import java.time.Instant
 import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
@@ -32,6 +37,19 @@ class AuthDomainTest {
 
     private fun seedUser(githubId: Long = 1L, handle: String = "alice"): String =
         UsersRepo.upsertFromGitHub(GitHubUser(githubId, handle, "Alice", "https://av/$handle.png"), bootstrapAdminGithubId = null)
+
+    /** Plants a user row with an EXACT handle (bypassing uniqueHandle) to stage collisions. */
+    private fun plantUser(handle: String, githubId: Long): String = transaction {
+        val id = dev.androidskills.util.newId()
+        val now = dev.androidskills.util.nowIso()
+        Users.insert {
+            it[Users.id] = id; it[Users.githubId] = githubId; it[Users.handle] = handle
+            it[Users.name] = "planted"; it[Users.role] = Role.member.name
+            it[Users.status] = UserStatus.active.name
+            it[Users.createdAt] = now; it[Users.updatedAt] = now
+        }
+        id
+    }
 
     @Test
     fun `session create then lookup returns a member principal`() {
@@ -190,5 +208,45 @@ class AuthDomainTest {
         val a = newState(); val b = newState(); val c = newState()
         assertTrue(a.matches(Regex("^[0-9a-f]{64}$")), "got $a")
         assertEquals(setOf(a, b, c).size, 3, "state must not repeat")
+    }
+
+    @Test
+    fun `uniqueHandle falls back to a full uuid when the whole ladder is taken`() {
+        // Exhaust every candidate on the ladder for githubId=3 (handle "taken"):
+        // "taken", "taken-3", "taken-3-2".."taken-3-10" = 11 handles, all held by
+        // other users. firstOrNull must then be null and the full-UUID fallback is
+        // used — never a NoSuchElementException → 500 mid-login. (P2-2a.)
+        plantUser("taken", 10)
+        plantUser("taken-3", 11)
+        for (i in 2..10) plantUser("taken-3-$i", 20L + i)
+        val id = UsersRepo.upsertFromGitHub(GitHubUser(3, "taken", "C", null), null)
+        val handle = transaction { Users.selectAll().where { Users.id eq id }.single()[Users.handle] }
+        assertTrue(handle.startsWith("taken-3-"), "got $handle")
+        assertNotEquals("taken-3", handle)
+        // The uuid fallback is longer than any ladder rung.
+        assertTrue(handle.length > "taken-3-10".length, "expected uuid suffix, got $handle")
+    }
+
+    @Test
+    fun `concurrent logins with the same handle all succeed with distinct handles`() {
+        // P2-2b: the check-then-insert race under concurrency. Three identities
+        // claim "shared" at once; one wins the raw handle, the others trip
+        // uq_users_handle and must retry into {handle}-{githubId}. None should 500.
+        val handles = kotlinx.coroutines.runBlocking {
+            val gids = listOf(100L, 101L, 102L)
+            kotlinx.coroutines.coroutineScope {
+                gids.map { gid ->
+                    async(Dispatchers.IO) {
+                        UsersRepo.upsertFromGitHub(GitHubUser(gid, "shared", "S", null), null) to gid
+                    }
+                }.awaitAll()
+            }
+        }
+        assertEquals(3, handles.size)
+        val byHandle = transaction { Users.selectAll().where { Users.githubId inList listOf(100L, 101L, 102L) }
+            .associate { it[Users.githubId] to it[Users.handle] } }
+        assertEquals(3, byHandle.size, "all three logins must create a user")
+        assertEquals(3, byHandle.values.distinct().size, "handles must be distinct: $byHandle")
+        assertTrue(byHandle.values.all { it.startsWith("shared") }, "$byHandle")
     }
 }
