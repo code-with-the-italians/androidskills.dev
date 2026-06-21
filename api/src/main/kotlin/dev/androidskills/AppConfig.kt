@@ -77,8 +77,10 @@ data class AppConfig(
  * @param sessionCookieDomain Optional cookie `Domain`; null = host-only.
  * @param sessionCookieSecure Adds the `Secure` flag. Relaxed for localhost dev.
  * @param bootstrapAdminGithubId Optional GitHub numeric id promoted to `admin`
- *   on upsert — the explicit first-admin bootstrap (spec leaves admin promotion
- *   to the admin queue in step 7; this is the cold-start affordance). Assumption.
+ *   on **first insert only** (a seed-only cold-start escape hatch; an existing
+ *   user keeps their current role on re-login). Spec leaves admin promotion to
+ *   the admin queue (step 7); this is just the bootstrap affordance. Unset once
+ *   the first admin exists. Assumption.
  */
 data class AuthConfig(
     val oauth: OAuthConfig?,

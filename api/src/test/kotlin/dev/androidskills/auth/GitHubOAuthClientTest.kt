@@ -74,11 +74,20 @@ class GitHubOAuthClientTest {
     }
 
     @Test
-    fun exchangeRefusesATokenMissingTheReadUserScope() = kotlinx.coroutines.runBlocking {
-        // P3-1: a downscoped/empty token can't call GET /user; refuse it now
-        // rather than letting the next request 401.
-        val gh = newClient(HttpStatusCode.OK, """{"access_token":"tok","token_type":"bearer","scope":""}""")
+    fun exchangeRefusesAPresentScopeMissingReadUser() = kotlinx.coroutines.runBlocking {
+        // P3-1: a token downscoped to something else (not read:user) is refused.
+        val gh = newClient(HttpStatusCode.OK, """{"access_token":"tok","token_type":"bearer","scope":"gist"}""")
         val ex = assertFailsWith<OAuthException> { gh.exchange("code", "https://app/cb") }
         assertTrue(ex.message!!.contains("read:user"), ex.message!!)
+    }
+
+    @Test
+    fun exchangeAcceptsAnEmptyScopeForGithubAppCompatibility() = kotlinx.coroutines.runBlocking {
+        // NEW-1: GitHub App user-to-server tokens are SCOPELESS (empty `scope`).
+        // Hard-failing here would reject every login once the real App is wired
+        // (step 4). Empty/absent scope must be accepted; GET /user 401 is the guard.
+        val gh = newClient(HttpStatusCode.OK, """{"access_token":"tok","token_type":"bearer","scope":""}""")
+        val tokens = gh.exchange("code", "https://app/cb")
+        assertEquals("tok", tokens.accessToken)
     }
 }

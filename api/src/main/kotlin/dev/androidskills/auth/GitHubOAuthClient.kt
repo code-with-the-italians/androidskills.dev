@@ -59,11 +59,15 @@ class GitHubOAuthClient(
         if (resp.error != null || resp.accessToken.isNullOrBlank()) {
             throw OAuthException("GitHub token exchange failed: ${resp.error ?: "no access_token"} (${resp.errorDescription ?: ""})")
         }
-        // P3-1: refuse to proceed if GitHub didn't grant the scope we need to call
-        // GET /user. (A downscoped/empty token would make the next call 401.)
+        // P3-1: scope sanity check — but ONLY when GitHub returns a non-empty
+        // scope. GitHub App user-to-server tokens (spec §8, step 4) are SCOPELESS:
+        // the token response carries an empty `scope`. Hard-failing on empty would
+        // reject every login the moment we wire the real App. So: an empty/absent
+        // scope is allowed (the subsequent GET /user 401 → OAuthException is the
+        // real guard); a *present-but-missing read:user* scope is rejected.
         val granted = (resp.scope ?: "").split(' ', ',').map { it.trim() }.filter { it.isNotEmpty() }
-        if ("read:user" !in granted) {
-            throw OAuthException("GitHub did not grant the required 'read:user' scope (got: ${resp.scope ?: "none"})")
+        if (granted.isNotEmpty() && "read:user" !in granted) {
+            throw OAuthException("GitHub did not grant the required 'read:user' scope (got: ${resp.scope})")
         }
         return OAuthTokens(resp.accessToken, resp.tokenType ?: "bearer", resp.scope)
     }

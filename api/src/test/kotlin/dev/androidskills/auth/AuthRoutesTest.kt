@@ -89,6 +89,11 @@ class AuthRoutesTest {
         val cb = client.get("/api/auth/github/callback?code=code-OK&state=$state")
         assertEquals(HttpStatusCode.Found, cb.status)
         assertEquals("http://localhost:8080", cb.headers["Location"])
+        // NEW-2: the success-path Set-Cookie for the single-use state cookie must
+        // actually emit (proves the clear isn't a no-op after respondRedirect).
+        val cbCookies = cb.headers.getAll("Set-Cookie") ?: emptyList()
+        assertTrue(cbCookies.any { it.startsWith("$STATE_COOKIE=") && it.contains("Max-Age=0") },
+            "success path must clear the state cookie: $cbCookies")
 
         // 3. /api/me now resolves Alice (session cookie carried by HttpCookies).
         val me = client.get("/api/me")

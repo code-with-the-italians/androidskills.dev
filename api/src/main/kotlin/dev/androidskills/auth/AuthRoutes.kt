@@ -71,13 +71,17 @@ fun Route.authRoutes(config: AppConfig, oauth: OAuthClient) {
                 }
                 val session = SessionStore.create(userId, SESSION_MAX_AGE_SECONDS)
                 setSessionCookie(call, session, auth)
+                // Clear the single-use state cookie BEFORE the redirect is committed —
+                // appending Set-Cookie after respondRedirect is engine-dependent and
+                // may be dropped on a real engine (NEW-2). (The finally below covers
+                // the throw paths; success clears here, before responding.)
+                clearStateCookie(call, auth)
                 // Redirect to the site root; the SPA/Astro picks up the session cookie.
                 call.respondRedirect(auth.publicBaseUrl)
             } finally {
-                // The state cookie is single-use: clear it on EVERY outcome — success,
-                // auth failure (400), validation failure (400), or an unexpected 5xx —
-                // so a stale CSRF cookie can never be replayed. CancellationException
-                // still rethrows after the cookie is cleared. (P1-2 + P3-4.)
+                // Throws (validation 400, auth-failure 400, or an unexpected 5xx):
+                // StatusPages responds AFTER this, so the Set-Cookie lands. The
+                // success path cleared the cookie itself, above (before its redirect).
                 clearStateCookie(call, auth)
             }
         }
