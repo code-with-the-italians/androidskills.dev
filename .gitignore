@@ -23,3 +23,6 @@ Thumbs.db
 
 # Local git worktrees (see using-git-worktree skill)
 .worktrees/
+
+# Local planning notes (agent-authored, not for commit)
+.plans/
