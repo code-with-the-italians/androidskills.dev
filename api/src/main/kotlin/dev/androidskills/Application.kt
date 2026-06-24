@@ -9,6 +9,7 @@ import dev.androidskills.auth.OAuthClient
 import dev.androidskills.auth.authRoutes
 import dev.androidskills.db.Skills
 import dev.androidskills.github.GitHubAppClient
+import dev.androidskills.gh.webhookRoutes
 import dev.androidskills.llm.LlmClient
 import dev.androidskills.llm.StubLlmClient
 import dev.androidskills.storage.FileStore
@@ -97,6 +98,7 @@ fun Application.module(config: AppConfig = AppConfig.fromEnv(), oauth: OAuthClie
         publicRoutes(fileStore)
         authRoutes(config, resolvedOauth)
         contributorRoutes(resolvedGithubApp)
+        webhookRoutes(resolvedGithubApp)
     }
 }
 
