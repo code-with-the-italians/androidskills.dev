@@ -4,6 +4,7 @@ import dev.androidskills.AppConfig
 import dev.androidskills.api.ApiBadRequestException
 import dev.androidskills.api.ErrorBody
 import dev.androidskills.api.ErrorResponse
+import dev.androidskills.util.constantTimeEquals
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.ApplicationCall
 import io.ktor.server.response.respond
@@ -100,10 +101,3 @@ fun Route.authRoutes(config: AppConfig, oauth: OAuthClient) {
     }
 }
 
-/** Constant-time string compare to avoid timing leaks on the state check. */
-private fun constantTimeEquals(a: String, b: String): Boolean {
-    if (a.length != b.length) return false
-    var diff = 0
-    for (i in a.indices) diff = diff or (a[i].code xor b[i].code)
-    return diff == 0
-}

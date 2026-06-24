@@ -20,13 +20,15 @@ data class AppConfig(
     /** When true, a small demo dataset is seeded into an empty DB (local/dev only). */
     val seedDemo: Boolean = false,
     val auth: AuthConfig = AuthConfig.disabled(),
+    /** GitHub App (installation tokens, repo scan, webhooks). null → disabled (spec §13). */
+    val githubApp: GithubAppConfig = GithubAppConfig.disabled(),
 ) {
-    // P3-2: redact the LLM key (and rely on OAuthConfig.toString) so a logged
-    // AppConfig instance never spills a secret.
+    // P3-2: redact the LLM key (and rely on OAuthConfig/GithubAppConfig.toString) so
+    // a logged AppConfig instance never spills a secret.
     override fun toString(): String =
         "AppConfig(version=$version, dbPath=$dbPath, fileStoreDir=$fileStoreDir, " +
             "llmBaseUrl=$llmBaseUrl, llmApiKey=${if (llmApiKey == null) "null" else "***"}, " +
-            "llmModel=$llmModel, seedDemo=$seedDemo, auth=$auth)"
+            "llmModel=$llmModel, seedDemo=$seedDemo, auth=$auth, githubApp=$githubApp)"
 
     companion object {
         fun fromEnv(): AppConfig {
@@ -63,6 +65,7 @@ data class AppConfig(
                     } ?: secureDefault,
                     bootstrapAdminGithubId = env("BOOTSTRAP_ADMIN_GITHUB_ID")?.toLongOrNull(),
                 ),
+                githubApp = GithubAppConfig.fromEnv(),
             )
         }
     }
@@ -103,4 +106,50 @@ data class AuthConfig(
 data class OAuthConfig(val clientId: String, val clientSecret: String) {
     // P3-2: never leak the secret if a config instance is logged.
     override fun toString() = "OAuthConfig(clientId=$clientId, clientSecret=***)"
+}
+
+/**
+ * GitHub App configuration (spec §8, §13). [GithubAppConfig.disabled] when the
+ * App id / private key / webhook secret are unset → the GitHub-App features
+ * (repo list, scan, webhooks) report disabled, mirroring the §13 "unset →
+ * disabled" pattern used for auth.
+ *
+ * **Single-App invariant (doc-only, no heuristic — review Q1):** this App and
+ * the OAuth client in [AuthConfig] must describe the SAME GitHub App: login
+ * (OAuth-App user flow) and installation tokens (this config) share one App
+ * identity. The env names differ for historical reasons; do not assume two
+ * apps. Renaming `GITHUB_OAUTH_CLIENT_*` → `GITHUB_APP_CLIENT_*` is deferred
+ * (would churn step-3 config/docs for no functional gain).
+ *
+ * @param appId Numeric App id (`GITHUB_APP_ID`).
+ * @param privateKeyPem PEM private key (`GITHUB_APP_PRIVATE_KEY`). Accepts PKCS#1
+ *  (`-----BEGIN RSA PRIVATE KEY-----`, what GitHub exports) or PKCS#8; the
+ *  loader normalises PKCS#1 → PKCS#8 so the exported key works as-is.
+ * @param webhookSecret HMAC key for `/gh/webhooks` signature verification.
+ */
+data class GithubAppConfig(
+    val appId: Long?,
+    val privateKeyPem: String?,
+    val webhookSecret: String?,
+) {
+    /** Configured only when all three are present (partial config is treated as disabled). */
+    val configured: Boolean get() = appId != null && privateKeyPem != null && webhookSecret != null
+
+    // P3-2: never leak the PEM or the webhook secret in a logged config instance.
+    override fun toString(): String =
+        "GithubAppConfig(appId=$appId, privateKeyPem=${if (privateKeyPem == null) "null" else "***"}, " +
+            "webhookSecret=${if (webhookSecret == null) "null" else "***"}, configured=$configured)"
+
+    companion object {
+        fun disabled() = GithubAppConfig(appId = null, privateKeyPem = null, webhookSecret = null)
+
+        fun fromEnv(): GithubAppConfig {
+            fun env(k: String) = System.getenv(k)?.takeIf { it.isNotBlank() }
+            return GithubAppConfig(
+                appId = env("GITHUB_APP_ID")?.toLongOrNull(),
+                privateKeyPem = env("GITHUB_APP_PRIVATE_KEY"),
+                webhookSecret = env("GITHUB_WEBHOOK_SECRET"),
+            )
+        }
+    }
 }
