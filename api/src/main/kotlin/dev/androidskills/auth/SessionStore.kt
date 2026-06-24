@@ -60,6 +60,7 @@ object SessionStore {
         Principal(
             sessionId = token,
             userId = user[Users.id],
+            githubId = user[Users.githubId],
             handle = user[Users.handle],
             name = user[Users.name],
             avatarUrl = user[Users.avatarUrl],

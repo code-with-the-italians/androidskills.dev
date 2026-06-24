@@ -2,11 +2,13 @@ package dev.androidskills
 
 import dev.androidskills.api.installApiErrorMapping
 import dev.androidskills.api.publicRoutes
+import dev.androidskills.api.contributorRoutes
 import dev.androidskills.auth.DisabledOAuthClient
 import dev.androidskills.auth.GitHubOAuthClient
 import dev.androidskills.auth.OAuthClient
 import dev.androidskills.auth.authRoutes
 import dev.androidskills.db.Skills
+import dev.androidskills.github.GitHubAppClient
 import dev.androidskills.llm.LlmClient
 import dev.androidskills.llm.StubLlmClient
 import dev.androidskills.storage.FileStore
@@ -41,7 +43,7 @@ import org.jetbrains.exposed.sql.transactions.transaction
  *   real [GitHubOAuthClient] is built from env creds, or [DisabledOAuthClient]
  *   when creds are absent (spec §13: "unset → auth disabled").
  */
-fun Application.module(config: AppConfig = AppConfig.fromEnv(), oauth: OAuthClient? = null) {
+fun Application.module(config: AppConfig = AppConfig.fromEnv(), oauth: OAuthClient? = null, githubApp: GitHubAppClient? = null) {
     Database.init(config)
 
     install(ContentNegotiation) { json() }
@@ -51,6 +53,11 @@ fun Application.module(config: AppConfig = AppConfig.fromEnv(), oauth: OAuthClie
     val fileStore: FileStore = LocalFsStore(config.fileStoreDir)
     val llm: LlmClient = StubLlmClient()
     val (resolvedOauth, ghHttp) = resolveOauth(config.auth, oauth)
+    val resolvedGithubApp = githubApp ?: if (config.githubApp.configured) {
+        // The real impl lands in a later commit (it needs the HTTP client + JWT).
+        // For now, a Disabled client keeps the routes honest when creds are absent.
+        dev.androidskills.github.DisabledGitHubAppClient()
+    } else dev.androidskills.github.DisabledGitHubAppClient()
 
     // P3-3: surface the resolved cookie posture once at boot — Secure/Domain drive
     // auth correctness and a mis-set SESSION_COOKIE_DOMAIN is a silent footgun.
@@ -89,6 +96,7 @@ fun Application.module(config: AppConfig = AppConfig.fromEnv(), oauth: OAuthClie
         }
         publicRoutes(fileStore)
         authRoutes(config, resolvedOauth)
+        contributorRoutes(resolvedGithubApp)
     }
 }
 

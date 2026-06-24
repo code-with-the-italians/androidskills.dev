@@ -49,6 +49,9 @@ class ApiConflictException(message: String, val code: String = "conflict") : Run
 /** 500 — a DB-referenced FileStore object is missing (storage corruption). */
 class ApiStorageException(message: String) : RuntimeException(message)
 
+/** 502 — an upstream service (GitHub, LLM) failed. */
+class ApiBadGatewayException(message: String, val code: String = "bad_gateway") : RuntimeException(message)
+
 fun Application.installApiErrorMapping() {
     install(StatusPages) {
         val log = LoggerFactory.getLogger("dev.androidskills.api.Errors")
@@ -76,6 +79,9 @@ fun Application.installApiErrorMapping() {
                 HttpStatusCode.InternalServerError,
                 ErrorResponse(ErrorBody("storage_error", ex.message ?: "File unavailable")),
             )
+        }
+        exception<ApiBadGatewayException> { call, ex ->
+            call.respond(HttpStatusCode.BadGateway, ErrorResponse(ErrorBody(ex.code, ex.message ?: "Bad gateway")))
         }
         exception<Throwable> { call, ex ->
             log.error("Unhandled error serving ${call.request.local.uri}", ex)
