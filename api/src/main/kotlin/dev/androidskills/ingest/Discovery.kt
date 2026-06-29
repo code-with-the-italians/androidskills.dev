@@ -80,7 +80,10 @@ object Discovery {
                 try {
                     if (e.isDirectory) continue
                     if (raw.size >= MAX_ENTRIES) {
-                        throw ApiValidationException(mapOf("archive" to "too many entries (max $MAX_ENTRIES)"), "archive_too_large")
+                        throw ApiValidationException(
+                            mapOf("archive" to "too many entries (max $MAX_ENTRIES)"),
+                            code = "archive_too_large",
+                        )
                     }
                     val safe = SkillPaths.safeRelativeOrNull(normalize(e.name, source))
                         ?: continue // Zip Slip / unsafe path — skip, never write
@@ -91,7 +94,10 @@ object Discovery {
                     while (n >= 0) {
                         inflated += n
                         if (inflated > MAX_INFLATED_BYTES) {
-                            throw ApiValidationException(mapOf("archive" to "inflated size exceeds ${MAX_INFLATED_BYTES / (1024 * 1024)} MB"), "archive_too_large")
+                            throw ApiValidationException(
+                                mapOf("archive" to "inflated size exceeds ${MAX_INFLATED_BYTES / (1024 * 1024)} MB"),
+                                code = "archive_too_large",
+                            )
                         }
                         out.write(buf, 0, n)
                         n = zis.read(buf)

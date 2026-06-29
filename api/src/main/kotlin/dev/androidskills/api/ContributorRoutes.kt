@@ -72,13 +72,21 @@ private suspend fun scan(call: ApplicationCall, gh: GitHubAppClient) {
         catch (e: GitHubAppException) { throw ApiBadGatewayException("GitHub ref lookup failed: ${e.message}", "github_ref_failed") }
     val zipball = try { gh.downloadZipball(installationId, owner, repo, head) }
         catch (e: GitHubAppException) { throw ApiBadGatewayException("GitHub archive download failed: ${e.message}", "github_archive_failed") }
+    // Compressed-body cap (Q4, plan §3 step 1 — the caller bounds this so a giant
+    // zipball can't sit fully in memory before Discovery's inflated guard runs).
+    if (zipball.size > MAX_COMPRESSED_ZIPBALL) {
+        throw ApiValidationException(
+            mapOf("archive" to "zipball exceeds ${MAX_COMPRESSED_ZIPBALL / (1024 * 1024)} MB compressed"),
+            code = "archive_too_large",
+        )
+    }
 
     val result = Discovery.discover(ArchiveSource.RepoZipball(zipball, head))
     val response = when (result) {
         is ScanResult.Found -> ScanResponse(slug = "$owner/$repo", commitSha = head, skills = result.skills.map { it.toDto() })
         ScanResult.NoSkillsDir -> throw ApiValidationException(
             mapOf("repo" to "no top-level 'skills/' directory found; SKILL.md must live under skills/"),
-            "no_skills_dir",
+            code = "no_skills_dir",
         )
     }
     call.respond(response)
@@ -96,6 +104,9 @@ private suspend fun scan(call: ApplicationCall, gh: GitHubAppClient) {
 @Serializable data class ScanResponse(val slug: String, val commitSha: String, val skills: List<DetectedSkillDto>)
 
 private fun dev.androidskills.github.RepoRef.toDto() = RepoDto(owner, name, fullName, defaultBranch)
+
+/** Compressed-zipball cap; the inflated cap is inside Discovery (Q4). */
+private const val MAX_COMPRESSED_ZIPBALL = 50 * 1024 * 1024
 private fun DetectedSkill.toDto() = DetectedSkillDto(
     slug, name, description, license, tags, version, versionSource,
     tokenUpfront, tokenOndemand, tokenBand,

@@ -127,7 +127,21 @@ class ContributorRoutesTest {
     )) { client, cookie ->
         val res = client.post("/api/me/repos/alice/toolkit/scan") { header("Cookie", "as_session=$cookie") }
         assertEquals(HttpStatusCode.UnprocessableEntity, res.status)
-        assertTrue(res.bodyAsText().contains("no_skills_dir"))
+        val body = res.bodyAsText()
+        // The code lands in error.code (Bugbot finding #1), not just the message.
+        assertTrue(body.contains("\"code\":\"no_skills_dir\""), "expected code=no_skills_dir in envelope; got $body")
+    }
+
+    @Test
+    fun scanRejectsOversizedZipball() = runWith(FakeApp(
+        installations = listOf(Installation(1, accountId = 42, accountLogin = "alice", accountType = "User")),
+        heads = mapOf("alice/toolkit" to "sha1"),
+        zipballs = mapOf("alice/toolkit@sha1" to ByteArray(51 * 1024 * 1024)), // > 50 MB compressed cap
+    )) { client, cookie ->
+        val res = client.post("/api/me/repos/alice/toolkit/scan") { header("Cookie", "as_session=$cookie") }
+        assertEquals(HttpStatusCode.UnprocessableEntity, res.status)
+        val body = res.bodyAsText()
+        assertTrue(body.contains("archive_too_large"), "expected archive_too_large; got $body")
     }
 
     @Test

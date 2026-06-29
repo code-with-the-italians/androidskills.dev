@@ -5,6 +5,7 @@ import dev.androidskills.TestSupport
 import dev.androidskills.db.Bundles
 import dev.androidskills.db.Jobs
 import dev.androidskills.github.GitHubAppClient
+import dev.androidskills.github.GitHubAppException
 import dev.androidskills.github.GithubWebhookEvent
 import dev.androidskills.module
 import io.ktor.client.request.header
@@ -33,14 +34,25 @@ class WebhookRoutesTest {
     @BeforeTest fun setup() = Database.init(TestSupport.newConfig(dir))
     @AfterTest fun teardown() { dir.toFile().deleteRecursively() }
 
-    /** App client whose verifyAndParseEvent returns a scripted event (or null = bad sig). */
-    private class FakeApp(val event: GithubWebhookEvent?) : GitHubAppClient {
+    /**
+     * App client whose verifyAndParseEvent scripts one of:
+     *  - returns event (a known event),
+     *  - returns null (verified but unhandled event type, e.g. `ping`),
+     *  - throws GitHubAppException (bad signature / unconfigured).
+     */
+    private class FakeApp(
+        val event: GithubWebhookEvent? = null,
+        val failSignature: Boolean = false,
+    ) : GitHubAppClient {
         override val configured = true
         override suspend fun installations() = emptyList<dev.androidskills.github.Installation>()
         override suspend fun listRepos(installationId: Long) = emptyList<dev.androidskills.github.RepoRef>()
         override suspend fun defaultBranchHead(installationId: Long, owner: String, repo: String) = ""
         override suspend fun downloadZipball(installationId: Long, owner: String, repo: String, ref: String) = ByteArray(0)
-        override suspend fun verifyAndParseEvent(body: ByteArray, signature: String): GithubWebhookEvent? = event
+        override suspend fun verifyAndParseEvent(body: ByteArray, signature: String): GithubWebhookEvent? {
+            if (failSignature) throw GitHubAppException("bad signature")
+            return event
+        }
     }
 
     private fun seedBundle(provenance: String, ownerHandle: String = "alice"): String {
@@ -64,7 +76,7 @@ class WebhookRoutesTest {
 
     @Test
     fun badSignatureReturns401() = testApplication {
-        application { module(TestSupport.newConfig(dir), githubApp = FakeApp(event = null)) }
+        application { module(TestSupport.newConfig(dir), githubApp = FakeApp(failSignature = true)) }
         val res = client.post("/gh/webhooks") {
             header("X-Hub-Signature-256", "sha256=bad")
             header("Content-Type", ContentType.Application.Json.toString())
@@ -75,9 +87,19 @@ class WebhookRoutesTest {
     }
 
     @Test
+    fun verifiedUnhandledEventReturns202() = testApplication {
+        // A valid `ping` (or any event we don't act on) → 202, NOT 401 — the signature
+        // was valid; GitHub's delivery panel should show success.
+        application { module(TestSupport.newConfig(dir), githubApp = FakeApp(event = null)) }
+        val res = client.post("/gh/webhooks") { setBody("{}") }
+        assertEquals(HttpStatusCode.Accepted, res.status)
+        assertNull(transaction { Jobs.selectAll().where { Jobs.type eq "resync" }.singleOrNull() })
+    }
+
+    @Test
     fun unconfiguredAppReturns401() = testApplication {
-        // DisabledGitHubAppClient.verifyAndParseEvent returns null → 401 (indistinguishable
-        // from a bad sig; a misconfigured secret surfaces in GitHub's delivery panel).
+        // DisabledGitHubAppClient.verifyAndParseEvent throws GitHubAppException → 401 so a
+        // misconfigured secret surfaces in GitHub's delivery panel.
         application { module(TestSupport.newConfig(dir), githubApp = dev.androidskills.github.DisabledGitHubAppClient()) }
         val res = client.post("/gh/webhooks") { setBody("{}") }
         assertEquals(HttpStatusCode.Unauthorized, res.status)

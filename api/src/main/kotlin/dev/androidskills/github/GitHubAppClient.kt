@@ -38,9 +38,17 @@ interface GitHubAppClient {
 
     /**
      * Verifies the `X-Hub-Signature-256` HMAC over [body] with the configured
-     * webhook secret (constant-time), then parses the event. Returns null on
-     * signature mismatch / unparseable payload / event types we don't handle.
+     * webhook secret (constant-time), then parses the event.
+     *
+     * Returns the event for types step 4 acts on (`push`, `installation`*, …);
+     * returns **null for a verified payload of an unhandled type** (e.g. `ping`) —
+     * the caller acknowledges it (202), since the signature was valid.
+     *
+     * **Throws [GitHubAppException] on a bad/missing signature** — that's distinct
+     * from an unhandled type, and the caller returns 401 so a misconfigured secret
+     * surfaces in GitHub's delivery panel.
      */
+    @Throws(GitHubAppException::class)
     suspend fun verifyAndParseEvent(body: ByteArray, signature: String): GithubWebhookEvent?
 }
 
@@ -77,6 +85,7 @@ class DisabledGitHubAppClient : GitHubAppClient {
     override suspend fun listRepos(installationId: Long): List<RepoRef> = throw disabled()
     override suspend fun defaultBranchHead(installationId: Long, owner: String, repo: String): String = throw disabled()
     override suspend fun downloadZipball(installationId: Long, owner: String, repo: String, ref: String): ByteArray = throw disabled()
-    override suspend fun verifyAndParseEvent(body: ByteArray, signature: String): GithubWebhookEvent? = null
+    // An unconfigured App can't verify anything — treat as a signature failure (401).
+    override suspend fun verifyAndParseEvent(body: ByteArray, signature: String): GithubWebhookEvent? = throw disabled()
     private fun disabled() = GitHubAppException("GitHub App is not configured")
 }

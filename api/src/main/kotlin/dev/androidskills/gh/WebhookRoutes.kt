@@ -3,6 +3,7 @@ package dev.androidskills.gh
 import dev.androidskills.db.Bundles
 import dev.androidskills.db.Jobs
 import dev.androidskills.github.GitHubAppClient
+import dev.androidskills.github.GitHubAppException
 import dev.androidskills.github.GithubWebhookEvent
 import dev.androidskills.util.appJson
 import dev.androidskills.util.newId
@@ -49,12 +50,17 @@ private suspend fun handle(call: ApplicationCall, gh: GitHubAppClient) {
     val body = call.receiveStream().readBytes() // raw bytes — HMAC over exactly what GitHub sent
     val signature = call.request.headers["X-Hub-Signature-256"].orEmpty()
 
-    val event = gh.verifyAndParseEvent(body, signature) // null on bad sig / unhandled event
-    if (event == null) {
-        // Bad/missing signature OR an event type we don't act on. GitHub's convention
-        // is 401 on signature mismatch; we return 401 for any verify failure so a
-        // misconfigured secret surfaces in GitHub's delivery panel.
+    val event = try {
+        gh.verifyAndParseEvent(body, signature)
+    } catch (e: GitHubAppException) {
+        // Bad/missing signature (or unconfigured secret). GitHub's convention is 401 so a
+        // misconfigured secret surfaces in the delivery panel; the URL isn't secret (gotcha D).
         call.respond(HttpStatusCode.Unauthorized, mapOf("error" to mapOf("code" to "invalid_signature", "message" to "Invalid or missing signature")))
+        return
+    }
+    // null = verified payload of an event type we don't act on (e.g. `ping`). Acknowledge it.
+    if (event == null) {
+        call.respond(HttpStatusCode.Accepted, mapOf("ok" to true))
         return
     }
 
