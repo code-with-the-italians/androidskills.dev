@@ -80,6 +80,7 @@ fun Application.module(config: AppConfig = AppConfig.fromEnv(), oauth: OAuthClie
     // deleted otherwise (P2-1). A startup sweep + hourly run on a self-cancelling
     // scope; cancelled on ApplicationStopped.
     startSessionPurge(this)
+    dev.androidskills.jobs.startJobWorker(this, llm, fileStore, resolvedGithubApp)
 
     routing {
         get("/api/health") {
