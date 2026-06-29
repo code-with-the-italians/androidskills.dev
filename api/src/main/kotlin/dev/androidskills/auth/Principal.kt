@@ -14,6 +14,7 @@ import kotlinx.serialization.Serializable
 data class Principal(
     val sessionId: String,
     val userId: String,
+    val githubId: Long,
     val handle: String,
     val name: String?,
     val avatarUrl: String?,
