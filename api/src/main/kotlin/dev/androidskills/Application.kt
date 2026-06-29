@@ -1,5 +1,6 @@
 package dev.androidskills
 
+import dev.androidskills.GithubAppConfig
 import dev.androidskills.api.installApiErrorMapping
 import dev.androidskills.api.publicRoutes
 import dev.androidskills.api.contributorRoutes
@@ -54,11 +55,7 @@ fun Application.module(config: AppConfig = AppConfig.fromEnv(), oauth: OAuthClie
     val fileStore: FileStore = LocalFsStore(config.fileStoreDir)
     val llm: LlmClient = StubLlmClient()
     val (resolvedOauth, ghHttp) = resolveOauth(config.auth, oauth)
-    val resolvedGithubApp = githubApp ?: if (config.githubApp.configured) {
-        // The real impl lands in a later commit (it needs the HTTP client + JWT).
-        // For now, a Disabled client keeps the routes honest when creds are absent.
-        dev.androidskills.github.DisabledGitHubAppClient()
-    } else dev.androidskills.github.DisabledGitHubAppClient()
+    val (resolvedGithubApp, ghAppHttp) = resolveGithubApp(config.githubApp, githubApp)
 
     // P3-3: surface the resolved cookie posture once at boot — Secure/Domain drive
     // auth correctness and a mis-set SESSION_COOKIE_DOMAIN is a silent footgun.
@@ -75,6 +72,7 @@ fun Application.module(config: AppConfig = AppConfig.fromEnv(), oauth: OAuthClie
 
     // Close the GitHub HTTP client on shutdown (clients are long-lived; one per app).
     if (ghHttp != null) monitor.subscribe(ApplicationStopped) { ghHttp.close() }
+    if (ghAppHttp != null) monitor.subscribe(ApplicationStopped) { ghAppHttp.close() }
 
     // Sweep expired sessions so the table (and its Litestream replica) doesn't
     // grow unbounded — lookups already ignore expired rows, but they're never
@@ -100,6 +98,19 @@ fun Application.module(config: AppConfig = AppConfig.fromEnv(), oauth: OAuthClie
         contributorRoutes(resolvedGithubApp)
         webhookRoutes(resolvedGithubApp)
     }
+}
+
+private fun resolveGithubApp(cfg: GithubAppConfig, injected: GitHubAppClient?): Pair<GitHubAppClient, HttpClient?> {
+    injected?.let { return it to null }
+    if (!cfg.configured) return dev.androidskills.github.DisabledGitHubAppClient() to null
+    val http = dev.androidskills.github.RealGitHubAppClient.httpClient()
+    val client = dev.androidskills.github.RealGitHubAppClient(
+        appId = cfg.appId!!,
+        privateKeyPem = cfg.privateKeyPem!!,
+        webhookSecret = cfg.webhookSecret!!,
+        http = http,
+    )
+    return client to http
 }
 
 private fun resolveOauth(auth: AuthConfig, injected: OAuthClient?): Pair<OAuthClient, HttpClient?> {
