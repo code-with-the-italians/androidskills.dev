@@ -53,7 +53,7 @@ fun Application.module(config: AppConfig = AppConfig.fromEnv(), oauth: OAuthClie
     installApiErrorMapping()
 
     val fileStore: FileStore = LocalFsStore(config.fileStoreDir)
-    val llm: LlmClient = StubLlmClient()
+    val (llm, llmHttp) = resolveLlm(config)
     val (resolvedOauth, ghHttp) = resolveOauth(config.auth, oauth)
     val (resolvedGithubApp, ghAppHttp) = resolveGithubApp(config.githubApp, githubApp)
 
@@ -73,6 +73,7 @@ fun Application.module(config: AppConfig = AppConfig.fromEnv(), oauth: OAuthClie
     // Close the GitHub HTTP client on shutdown (clients are long-lived; one per app).
     if (ghHttp != null) monitor.subscribe(ApplicationStopped) { ghHttp.close() }
     if (ghAppHttp != null) monitor.subscribe(ApplicationStopped) { ghAppHttp.close() }
+    if (llmHttp != null) monitor.subscribe(ApplicationStopped) { llmHttp.close() }
 
     // Sweep expired sessions so the table (and its Litestream replica) doesn't
     // grow unbounded — lookups already ignore expired rows, but they're never
@@ -98,6 +99,14 @@ fun Application.module(config: AppConfig = AppConfig.fromEnv(), oauth: OAuthClie
         contributorRoutes(resolvedGithubApp)
         webhookRoutes(resolvedGithubApp)
     }
+}
+
+private fun resolveLlm(config: AppConfig): Pair<LlmClient, HttpClient?> {
+    val baseUrl = config.llmBaseUrl ?: return StubLlmClient() to null
+    val apiKey = config.llmApiKey ?: return StubLlmClient() to null
+    val model = config.llmModel ?: return StubLlmClient() to null
+    val http = dev.androidskills.llm.OpenAiLlmClient.httpClient()
+    return dev.androidskills.llm.OpenAiLlmClient(baseUrl, apiKey, model, http) to http
 }
 
 private fun resolveGithubApp(cfg: GithubAppConfig, injected: GitHubAppClient?): Pair<GitHubAppClient, HttpClient?> {
