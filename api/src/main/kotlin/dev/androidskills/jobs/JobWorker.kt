@@ -137,23 +137,22 @@ private suspend fun runReviewJob(payload: String, llm: LlmClient) {
 
     // Apply results (§6.3): category, tags, lintScore, security findings.
     transaction {
-        // Resolve category slug → id.
+        // B4: tags are applied unconditionally (only category_id depends on slug resolution).
         val catId = Categories.selectAll().where { Categories.slug eq result.category }.singleOrNull()?.get(Categories.id)
-        if (catId != null) {
-            Skills.update({ Skills.id eq req.skillId }) {
-                it[Skills.categoryId] = catId
-                it[Skills.tags] = appJson.encodeToString(result.tagsValidated)
-                it[Skills.updatedAt] = nowIso()
-            }
+        Skills.update({ Skills.id eq req.skillId }) {
+            if (catId != null) it[Skills.categoryId] = catId
+            it[Skills.tags] = appJson.encodeToString(result.tagsValidated)
+            it[Skills.updatedAt] = nowIso()
         }
-        // Record lintScore + security findings on the submission (§6.3).
-        val reviewOutput = appJson.encodeToString(
-            ReviewOutput.serializer(),
-            ReviewOutput(result.category, result.tagsValidated, result.security.passed, result.security.findings, result.lintScore),
-        )
+        // B1: merge review output into the submission payload WITHOUT destroying staged.
+        val currentRow = Submissions.selectAll().where { Submissions.id eq req.submissionId }.singleOrNull()
+        val currentPayload = currentRow?.get(Submissions.payload)?.let {
+            runCatching { appJson.decodeFromString(dev.androidskills.ingest.SubmissionPayload.serializer(), it) }.getOrNull()
+        } ?: dev.androidskills.ingest.SubmissionPayload()
+        val merged = currentPayload.copy(review = dev.androidskills.ingest.ReviewOutputPayload.from(result))
         Submissions.update({ Submissions.id eq req.submissionId }) {
             it[Submissions.lintScore] = result.lintScore
-            it[Submissions.payload] = reviewOutput
+            it[Submissions.payload] = appJson.encodeToString(dev.androidskills.ingest.SubmissionPayload.serializer(), merged)
             it[Submissions.updatedAt] = nowIso()
         }
     }
@@ -244,12 +243,3 @@ private data class ReviewPayload(val skillId: String, val submissionId: String)
 
 @kotlinx.serialization.Serializable
 private data class ResyncPayload(val bundleId: String, val headSha: String)
-
-@kotlinx.serialization.Serializable
-private data class ReviewOutput(
-    val category: String,
-    val tagsValidated: List<String>,
-    val securityPassed: Boolean,
-    val securityFindings: List<String>,
-    val lintScore: Int,
-)

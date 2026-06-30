@@ -121,7 +121,6 @@ class RealGitHubAppClient(
     override suspend fun downloadZipball(installationId: Long, owner: String, repo: String, ref: String): ByteArray {
         val token = installToken(installationId)
         return ghCall {
-            // GitHub redirects to codeload.github.com; CIO follows redirects by default.
             val resp = http.get("$githubApiBase/repos/$owner/$repo/zipball/$ref") {
                 bearerAuth(token)
                 header("Accept", "application/vnd.github+json")
@@ -129,7 +128,15 @@ class RealGitHubAppClient(
             if (resp.status != HttpStatusCode.OK) {
                 throw GitHubAppException("zipball download failed: HTTP ${resp.status.value}")
             }
-            resp.body<ByteArray>()
+            val contentLength = resp.headers["Content-Length"]?.toLongOrNull()
+            if (contentLength != null && contentLength > MAX_COMPRESSED_ZIPBALL) {
+                throw GitHubAppException("zipball exceeds ${MAX_COMPRESSED_ZIPBALL / (1024 * 1024)} MB compressed")
+            }
+            val raw = resp.body<ByteArray>()
+            if (raw.size > MAX_COMPRESSED_ZIPBALL) {
+                throw GitHubAppException("zipball exceeds ${MAX_COMPRESSED_ZIPBALL / (1024 * 1024)} MB compressed")
+            }
+            raw
         }
     }
 
@@ -192,6 +199,9 @@ class RealGitHubAppClient(
     private fun hex(bytes: ByteArray): String = bytes.joinToString("") { "%02x".format(it) }
 
     companion object {
+        /** B5: compressed-body cap for downloadZipball. */
+        const val MAX_COMPRESSED_ZIPBALL = 50 * 1024 * 1024
+
         fun httpClient(): HttpClient = HttpClient(CIO) {
             install(ContentNegotiation) { json(appJson) }
             expectSuccess = true

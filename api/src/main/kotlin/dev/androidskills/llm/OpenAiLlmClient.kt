@@ -50,12 +50,10 @@ class OpenAiLlmClient(
 
     override suspend fun review(input: SkillManifest): ReviewResult {
         val messages = reviewMessages(input)
-        // Step 1: strict json_schema
-        runCatching { tryJsonSchema(messages) }.onSuccess { return it }
-        logger.info("json_schema step failed, trying tool calling")
+        // Step 1: strict json_schema — only ParseException advances; LlmTransportException propagates.
+        try { return tryJsonSchema(messages) } catch (e: ParseException) { logger.info("json_schema step failed, trying tool calling") }
         // Step 2: tool calling
-        runCatching { tryToolCalling(messages) }.onSuccess { return it }
-        logger.info("tool calling step failed, trying JSON-in-prompt")
+        try { return tryToolCalling(messages) } catch (e: ParseException) { logger.info("tool calling step failed, trying JSON-in-prompt") }
         // Step 3: JSON-in-prompt + one retry
         return tryJsonInPrompt(messages)
     }
@@ -173,21 +171,24 @@ class OpenAiLlmClient(
 
         private val reviewSchema = buildJsonObject {
             put("type", "object")
+            put("additionalProperties", false)
             put("properties", buildJsonObject {
                 put("category", buildJsonObject { put("type", "string") })
                 put("tagsValidated", buildJsonObject { put("type", "array"); put("items", buildJsonObject { put("type", "string") }) })
                 put("security", buildJsonObject {
                     put("type", "object")
+                    put("additionalProperties", false)
                     put("properties", buildJsonObject {
                         put("passed", buildJsonObject { put("type", "boolean") })
                         put("findings", buildJsonObject { put("type", "array"); put("items", buildJsonObject { put("type", "string") }) })
                     })
-                    put("required", buildJsonArray { add(JsonPrimitive("passed")) })
+                    put("required", buildJsonArray { add(JsonPrimitive("passed")); add(JsonPrimitive("findings")) })
                 })
                 put("lintScore", buildJsonObject { put("type", "integer") })
             })
             put("required", buildJsonArray {
-                add(JsonPrimitive("category")); add(JsonPrimitive("security")); add(JsonPrimitive("lintScore"))
+                add(JsonPrimitive("category")); add(JsonPrimitive("tagsValidated"))
+                add(JsonPrimitive("security")); add(JsonPrimitive("lintScore"))
             })
         }
     }

@@ -134,19 +134,28 @@ object IngestPipeline {
                 // Create/update the submission (Q4: per-skill, update key = open in_review for (bundle, skill)).
                 val subId = ensureSubmission(bundleId, skillId, submitterId, skill, version, source)
 
-                // Enqueue a review job.
-                Jobs.insert {
-                    it[Jobs.id] = newId()
-                    it[Jobs.type] = "review"
-                    it[Jobs.payload] = appJson.encodeToString(
-                        ReviewPayload.serializer(),
-                        ReviewPayload(skillId, subId),
-                    )
-                    it[Jobs.state] = "queued"
-                    it[Jobs.attempts] = 0
-                    it[Jobs.runAfter] = now
-                    it[Jobs.createdAt] = now
-                    it[Jobs.updatedAt] = now
+                // Enqueue a review job — guarded (B3: no duplicate review for this submission).
+                val reviewPayload = appJson.encodeToString(
+                    ReviewPayload.serializer(),
+                    ReviewPayload(skillId, subId),
+                )
+                val reviewAlreadyQueued = Jobs.selectAll()
+                    .where {
+                        (Jobs.type eq "review") and (Jobs.payload eq reviewPayload) and
+                            (Jobs.state inList listOf("queued", "running"))
+                    }
+                    .any()
+                if (!reviewAlreadyQueued) {
+                    Jobs.insert {
+                        it[Jobs.id] = newId()
+                        it[Jobs.type] = "review"
+                        it[Jobs.payload] = reviewPayload
+                        it[Jobs.state] = "queued"
+                        it[Jobs.attempts] = 0
+                        it[Jobs.runAfter] = now
+                        it[Jobs.createdAt] = now
+                        it[Jobs.updatedAt] = now
+                    }
                 }
 
                 ingested += IngestedSkill(skillId, skill.slug, isNew, version)
@@ -160,6 +169,7 @@ object IngestPipeline {
         bundleId: String, skillId: String, submitterId: String,
         skill: DetectedSkill, version: String, source: ArchiveSource,
     ): String {
+        val staged = StagedPayload(version, skill.versionSource, skill.name, skill.description, skill.license, skill.tags)
         val existing = Submissions.selectAll()
             .where {
                 (Submissions.bundleId eq bundleId) and
@@ -169,12 +179,13 @@ object IngestPipeline {
             .singleOrNull()
         if (existing != null) {
             val subId = existing[Submissions.id]
-            val payload = appJson.encodeToString(
-                StagedPayload.serializer(),
-                StagedPayload(version, skill.versionSource, skill.name, skill.description, skill.license, skill.tags),
-            )
+            // Read-modify-write: preserve the review key (B1) when overwriting staged.
+            val current = existing[Submissions.payload]?.let {
+                runCatching { appJson.decodeFromString(SubmissionPayload.serializer(), it) }.getOrNull()
+            } ?: SubmissionPayload()
+            val merged = current.copy(staged = staged)
             Submissions.update({ Submissions.id eq subId }) {
-                it[Submissions.payload] = payload
+                it[Submissions.payload] = appJson.encodeToString(SubmissionPayload.serializer(), merged)
                 it[Submissions.updatedAt] = nowIso()
             }
             return subId
@@ -182,8 +193,8 @@ object IngestPipeline {
         val subId = newId()
         val now = nowIso()
         val payload = appJson.encodeToString(
-            StagedPayload.serializer(),
-            StagedPayload(version, skill.versionSource, skill.name, skill.description, skill.license, skill.tags),
+            SubmissionPayload.serializer(),
+            SubmissionPayload(staged = staged),
         )
         Submissions.insertIgnore {
             it[Submissions.id] = subId
@@ -204,16 +215,7 @@ object IngestPipeline {
         return false
     }
 
-    @kotlinx.serialization.Serializable
-    private data class ReviewPayload(val skillId: String, val submissionId: String)
 
     @kotlinx.serialization.Serializable
-    private data class StagedPayload(
-        val version: String,
-        val versionSource: String,
-        val name: String,
-        val description: String,
-        val license: String?,
-        val tags: List<String>,
-    )
+    private data class ReviewPayload(val skillId: String, val submissionId: String)
 }

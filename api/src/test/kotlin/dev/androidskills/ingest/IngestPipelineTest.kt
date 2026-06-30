@@ -167,7 +167,7 @@ class IngestPipelineTest {
 
         // A review job was enqueued for the new version.
         val reviewJobs = transaction { Jobs.selectAll().where { Jobs.type eq "review" }.toList() }
-        assertEquals(2, reviewJobs.size, "expected 2 review jobs (one per ingest)")
+        assertEquals(1, reviewJobs.size, "B3: second ingest reuses the submission; the review job is deduplicated")
     }
 
     @Test
