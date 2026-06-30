@@ -1,6 +1,9 @@
 package dev.androidskills.db
 
+import dev.androidskills.util.appJson
 import dev.androidskills.util.newId
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 import org.jetbrains.exposed.sql.SchemaUtils
 import org.jetbrains.exposed.sql.Transaction
 import org.jetbrains.exposed.sql.insertIgnore
@@ -29,6 +32,10 @@ object Migrations {
             migrateV2()
             writeVersion(2)
         }
+        if (version < 3) {
+            migrateV3()
+            writeVersion(3)
+        }
     }
 
     /** v1: the full initial schema (spec §4) + default category taxonomy. */
@@ -53,6 +60,22 @@ object Migrations {
     private fun Transaction.migrateV2() {
         addColumnIfNotExists("users", "settings_json", "TEXT")
         addColumnIfNotExists("users", "deleted_at", "TEXT")
+    }
+
+    /** v3: platform settings for admin config (step 7). */
+    private fun Transaction.migrateV3() {
+        exec("""
+            CREATE TABLE IF NOT EXISTS platform_settings (
+                key TEXT PRIMARY KEY,
+                value TEXT NOT NULL
+            );
+        """)
+        val default = buildJsonObject {
+            put("reviewPolicy", "manual")
+            put("tokenSoftCap", 1000)
+            put("llmEnabled", false)
+        }
+        exec("INSERT OR IGNORE INTO platform_settings(key, value) VALUES ('settings', '${appJson.encodeToString(default)}');")
     }
 
     private fun Transaction.addColumnIfNotExists(table: String, column: String, type: String) {

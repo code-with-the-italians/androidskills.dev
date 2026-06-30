@@ -1,6 +1,7 @@
 package dev.androidskills
 
 import dev.androidskills.GithubAppConfig
+import dev.androidskills.api.adminRoutes
 import dev.androidskills.api.installApiErrorMapping
 import dev.androidskills.api.publicRoutes
 import dev.androidskills.api.contributorRoutes
@@ -98,6 +99,7 @@ fun Application.module(config: AppConfig = AppConfig.fromEnv(), oauth: OAuthClie
         publicRoutes(fileStore)
         authRoutes(config, resolvedOauth)
         contributorRoutes(resolvedGithubApp)
+        adminRoutes()
         webhookRoutes(resolvedGithubApp)
     }
 }
