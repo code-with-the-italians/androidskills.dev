@@ -24,8 +24,29 @@ import java.util.zip.ZipInputStream
  */
 sealed interface ArchiveSource {
     val bytes: ByteArray
-    data class RepoZipball(override val bytes: ByteArray, val commitSha: String) : ArchiveSource
-    data class UploadedZip(override val bytes: ByteArray, val uploadHash: String) : ArchiveSource
+    data class RepoZipball(
+        override val bytes: ByteArray,
+        val owner: String,
+        val repo: String,
+        val commitSha: String,
+    ) : ArchiveSource {
+        override fun equals(other: Any?): Boolean {
+            if (this === other) return true
+            if (javaClass != other?.javaClass) return false
+            other as RepoZipball
+            return bytes.contentEquals(other.bytes) && owner == other.owner && repo == other.repo && commitSha == other.commitSha
+        }
+        override fun hashCode(): Int = bytes.contentHashCode() * 31 + owner.hashCode() * 31 + repo.hashCode() * 31 + commitSha.hashCode()
+    }
+    data class UploadedZip(override val bytes: ByteArray, val uploadHash: String) : ArchiveSource {
+        override fun equals(other: Any?): Boolean {
+            if (this === other) return true
+            if (javaClass != other?.javaClass) return false
+            other as UploadedZip
+            return bytes.contentEquals(other.bytes) && uploadHash == other.uploadHash
+        }
+        override fun hashCode(): Int = bytes.contentHashCode() * 31 + uploadHash.hashCode()
+    }
 }
 
 /** The read-only metadata for one detected skill (§9: "Detected metadata (read-only)"). */

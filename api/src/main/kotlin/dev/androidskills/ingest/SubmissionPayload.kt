@@ -23,7 +23,15 @@ data class StagedPayload(
     val description: String,
     val license: String?,
     val tags: List<String>,
-)
+    val sourceRef: SourceRef? = null,  // repo source so step-7 approval can fetch the archive
+) {
+    @Serializable
+    data class SourceRef(
+        val repoOwner: String,
+        val repoName: String,
+        val ref: String,
+    )
+}
 
 /** The review output — what the admin queue displays (category, findings, lintScore). */
 @Serializable

@@ -169,7 +169,23 @@ object IngestPipeline {
         bundleId: String, skillId: String, submitterId: String,
         skill: DetectedSkill, version: String, source: ArchiveSource,
     ): String {
-        val staged = StagedPayload(version, skill.versionSource, skill.name, skill.description, skill.license, skill.tags)
+        val sourceRefInfo = when (source) {
+            is ArchiveSource.RepoZipball -> StagedPayload.SourceRef(
+                repoOwner = source.owner,
+                repoName = source.repo,
+                ref = source.commitSha,
+            )
+            is ArchiveSource.UploadedZip -> null // uploads carry no fetchable source
+        }
+        val staged = StagedPayload(
+            version = version,
+            versionSource = skill.versionSource,
+            name = skill.name,
+            description = skill.description,
+            license = skill.license,
+            tags = skill.tags,
+            sourceRef = sourceRefInfo,
+        )
         val existing = Submissions.selectAll()
             .where {
                 (Submissions.bundleId eq bundleId) and

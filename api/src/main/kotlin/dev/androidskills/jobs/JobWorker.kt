@@ -201,7 +201,7 @@ private suspend fun runResyncJob(payload: String, store: FileStore, gh: GitHubAp
 
     val zipball = gh.downloadZipball(installationId, owner, repo, req.headSha)
     IngestPipeline.ingest(
-        ArchiveSource.RepoZipball(zipball, req.headSha),
+        ArchiveSource.RepoZipball(zipball, owner, repo, req.headSha),
         req.bundleId, store, ownerUserId,
     )
 }

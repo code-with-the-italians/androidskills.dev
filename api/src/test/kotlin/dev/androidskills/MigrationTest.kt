@@ -45,13 +45,13 @@ class MigrationTest {
     }
 
     @Test
-    fun `schema_meta version is 1 after migration`() {
+    fun `schema_meta version is 2 after migration`() {
         Database.init(TestSupport.newConfig(dir))
         transaction {
             val v = exec("SELECT value FROM schema_meta WHERE key='version'") { rs ->
                 rs.next(); rs.getString(1).toInt()
             }
-            assertEquals(1, v)
+            assertEquals(2, v)
         }
     }
 
@@ -71,13 +71,27 @@ class MigrationTest {
     fun `re-running init is idempotent`() {
         val cfg = TestSupport.newConfig(dir)
         Database.init(cfg)
-        Database.init(cfg) // second open must not duplicate or re-run v1
+        Database.init(cfg) // second open must not duplicate or re-run migrations
         transaction {
             assertEquals(DEFAULT_CATEGORIES.size, Categories.selectAll().toList().size)
             val v = exec("SELECT value FROM schema_meta WHERE key='version'") { rs ->
                 rs.next(); rs.getString(1).toInt()
             }
-            assertEquals(1, v)
+            assertEquals(2, v)
+        }
+    }
+
+    @Test
+    fun `users table has settings_json and deleted_at columns`() {
+        Database.init(TestSupport.newConfig(dir))
+        transaction {
+            val cols = exec("PRAGMA table_info(users)") { rs ->
+                val out = mutableListOf<String>()
+                while (rs.next()) out += rs.getString(2)
+                out
+            } ?: emptyList()
+            assertTrue("settings_json column missing") { "settings_json" in cols }
+            assertTrue("deleted_at column missing") { "deleted_at" in cols }
         }
     }
 

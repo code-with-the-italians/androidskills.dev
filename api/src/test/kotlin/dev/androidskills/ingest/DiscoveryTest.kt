@@ -25,7 +25,7 @@ class DiscoveryTest {
             "alice-repo-abc123/skills/mvi/references/intent.md" to "Intents are reduced by the VM.\n",
             "alice-repo-abc123/skills/coroutines/SKILL.md" to skillMd("Coroutines", "Testing suspend fns."),
         )
-        val res = Discovery.discover(ArchiveSource.RepoZipball(zip, commitSha = "abc1234567890abcd"))
+        val res = Discovery.discover(ArchiveSource.RepoZipball(zip, "owner", "repo", commitSha = "abc1234567890abcd"))
         val found = assertIs<ScanResult.Found>(res)
         assertEquals(2, found.skills.size)
         val mvi = found.skills.first { it.slug == "mvi" }
@@ -67,7 +67,7 @@ class DiscoveryTest {
             "o-r-s/SKILL.md" to ignored,
             "o-r-s/skills/real/SKILL.md" to skillMd("Real", "d"),
         )
-        val found = assertIs<ScanResult.Found>(Discovery.discover(ArchiveSource.RepoZipball(zip, "sha")))
+        val found = assertIs<ScanResult.Found>(Discovery.discover(ArchiveSource.RepoZipball(zip, "owner", "repo", "sha")))
         assertEquals(listOf("real"), found.skills.map { it.slug })
     }
 
@@ -78,7 +78,7 @@ class DiscoveryTest {
             "o-r-s/README.md" to "readme",
             "o-r-s/SKILL.md" to ignored,
         )
-        assertIs<ScanResult.NoSkillsDir>(Discovery.discover(ArchiveSource.RepoZipball(zip, "sha")))
+        assertIs<ScanResult.NoSkillsDir>(Discovery.discover(ArchiveSource.RepoZipball(zip, "owner", "repo", "sha")))
     }
 
     @Test
@@ -94,7 +94,7 @@ class DiscoveryTest {
                 body
             """.trimIndent(),
         )
-        val found = assertIs<ScanResult.Found>(Discovery.discover(ArchiveSource.RepoZipball(zip, "sha")))
+        val found = assertIs<ScanResult.Found>(Discovery.discover(ArchiveSource.RepoZipball(zip, "owner", "repo", "sha")))
         val bad = found.skills[0]
         assertTrue(bad.parseErrors.any { it.field == "tags" }, "expected tags parseError; got ${bad.parseErrors}")
     }
@@ -106,7 +106,7 @@ class DiscoveryTest {
             "o-r-s/skills/x/SKILL.md" to skillMd("X", "d"),
             "o-r-s/../escape.md" to "evil",
         )
-        val found = assertIs<ScanResult.Found>(Discovery.discover(ArchiveSource.RepoZipball(zip, "sha")))
+        val found = assertIs<ScanResult.Found>(Discovery.discover(ArchiveSource.RepoZipball(zip, "owner", "repo", "sha")))
         assertEquals(1, found.skills.size)
     }
 
@@ -116,7 +116,7 @@ class DiscoveryTest {
             "o-r-s/skills/s$i/SKILL.md" to skillMd("s$i", "d")
         }
         val zip = zip(*entries.toTypedArray())
-        assertFailsArchiveTooLarge { Discovery.discover(ArchiveSource.RepoZipball(zip, "sha")) }
+        assertFailsArchiveTooLarge { Discovery.discover(ArchiveSource.RepoZipball(zip, "owner", "repo", "sha")) }
     }
 
     @Test
@@ -125,14 +125,14 @@ class DiscoveryTest {
         // stream of compressible data (repeated bytes compress tiny, inflate huge).
         val bomb = ByteArray((Discovery.MAX_INFLATED_BYTES + 1024).toInt()) // ~50MB+1KB
         val zip = zip("o-r-s/skills/x/big.txt" to String(bomb)) // String is inefficient but fine for one test
-        assertFailsArchiveTooLarge { Discovery.discover(ArchiveSource.RepoZipball(zip, "sha")) }
+        assertFailsArchiveTooLarge { Discovery.discover(ArchiveSource.RepoZipball(zip, "owner", "repo", "sha")) }
     }
 
     @Test
     fun `bad slug directory is not a skill`() {
         // §10 slug is lowercase kebab; an Upper/dir with spaces yields no skill.
         val zip = zip("o-r-s/skills/Bad_Slug/SKILL.md" to skillMd("Bad", "d"))
-        val found = assertIs<ScanResult.Found>(Discovery.discover(ArchiveSource.RepoZipball(zip, "sha")))
+        val found = assertIs<ScanResult.Found>(Discovery.discover(ArchiveSource.RepoZipball(zip, "owner", "repo", "sha")))
         assertTrue(found.skills.isEmpty(), "Bad_Slug is not a valid slug; got ${found.skills}")
     }
 
