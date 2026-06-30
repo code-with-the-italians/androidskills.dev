@@ -50,6 +50,10 @@ fun Route.contributorRoutes(githubApp: GitHubAppClient) {
         post("submissions/{id}/submit") { submit(call) }
         post("submissions/{id}/withdraw") { withdraw(call) }
         delete("submissions/{id}") { deleteDraft(call) }
+
+        get("stars") { listStars(call) }
+        post("stars/{slug}") { addStar(call) }
+        delete("stars/{slug}") { removeStar(call) }
     }
     route("api/skills/{slug}") {
         post("unpublish") { unpublish(call) }
@@ -175,6 +179,27 @@ private suspend fun deleteDraft(call: ApplicationCall) {
     val principal = call.requireSession()
     val id = call.parameters["id"] ?: throw ApiBadRequestException("Missing submission id")
     SubmissionQueries.deleteDraft(principal, id)
+    call.respond(HttpStatusCode.NoContent)
+}
+
+// ---- stars (step 6) ----
+
+private suspend fun listStars(call: ApplicationCall) {
+    val principal = call.requireSession()
+    call.respond(StarsQueries.listStars(principal))
+}
+
+private suspend fun addStar(call: ApplicationCall) {
+    val principal = call.requireSession()
+    val slug = call.parameters["slug"] ?: throw ApiBadRequestException("Missing slug")
+    StarsQueries.addStar(principal, slug)
+    call.respond(HttpStatusCode.Created, mapOf("ok" to true))
+}
+
+private suspend fun removeStar(call: ApplicationCall) {
+    val principal = call.requireSession()
+    val slug = call.parameters["slug"] ?: throw ApiBadRequestException("Missing slug")
+    StarsQueries.removeStar(principal, slug)
     call.respond(HttpStatusCode.NoContent)
 }
 
