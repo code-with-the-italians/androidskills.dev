@@ -28,6 +28,8 @@ object Users : Table("users") {
     val avatarUrl = text("avatar_url").nullable()
     val role = varchar("role", 24).default("member")        // member|contributor|admin
     val status = varchar("status", 24).default("active")    // active|suspended
+    val settingsJson = text("settings_json").nullable()     // JSON UserSettings
+    val deletedAt = text("deleted_at").nullable()           // soft-delete marker (step 6)
     val createdAt = text("created_at")
     val updatedAt = text("updated_at")
 

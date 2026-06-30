@@ -9,6 +9,7 @@ import dev.androidskills.ingest.ScanResult
 import dev.androidskills.auth.requireSession
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.ApplicationCall
+import io.ktor.server.request.receive
 import io.ktor.server.response.respond
 import io.ktor.server.routing.Route
 import io.ktor.server.routing.get
@@ -32,6 +33,10 @@ fun Route.contributorRoutes(githubApp: GitHubAppClient) {
     route("api/me") {
         get("repos") { repos(call, githubApp) }
         post("repos/{owner}/{repo}/scan") { scan(call, githubApp) }
+
+        get("submissions") { mySubmissions(call) }
+        post("submissions") { createSubmissions(call, githubApp) }
+        get("submissions/{id}") { getSubmission(call) }
     }
 }
 
@@ -81,7 +86,7 @@ private suspend fun scan(call: ApplicationCall, gh: GitHubAppClient) {
         )
     }
 
-    val result = Discovery.discover(ArchiveSource.RepoZipball(zipball, head))
+    val result = Discovery.discover(ArchiveSource.RepoZipball(zipball, owner, repo, head))
     val response = when (result) {
         is ScanResult.Found -> ScanResponse(slug = "$owner/$repo", commitSha = head, skills = result.skills.map { it.toDto() })
         ScanResult.NoSkillsDir -> throw ApiValidationException(
@@ -112,3 +117,25 @@ private fun DetectedSkill.toDto() = DetectedSkillDto(
     tokenUpfront, tokenOndemand, tokenBand,
     parseErrors.map { DetectedFieldError(it.field, it.reason) }, fileCount,
 )
+
+// ---- submissions (step 6) ----
+
+private suspend fun createSubmissions(call: ApplicationCall, gh: GitHubAppClient) {
+    val principal = call.requireSession()
+    val request = call.receive<SubmissionQueries.CreateDraftsRequest>()
+    val response = SubmissionQueries.createDrafts(principal, request, gh)
+    call.respond(HttpStatusCode.Created, response)
+}
+
+private suspend fun mySubmissions(call: ApplicationCall) {
+    val principal = call.requireSession()
+    call.respond(SubmissionQueries.mySubmissions(principal))
+}
+
+private suspend fun getSubmission(call: ApplicationCall) {
+    val principal = call.requireSession()
+    val id = call.parameters["id"] ?: throw ApiBadRequestException("Missing submission id")
+    val detail = SubmissionQueries.getSubmission(principal, id)
+        ?: throw ApiNotFoundException("Submission not found")
+    call.respond(detail)
+}

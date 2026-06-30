@@ -25,6 +25,10 @@ object Migrations {
             migrateV1()
             writeVersion(1)
         }
+        if (version < 2) {
+            migrateV2()
+            writeVersion(2)
+        }
     }
 
     /** v1: the full initial schema (spec §4) + default category taxonomy. */
@@ -40,6 +44,21 @@ object Migrations {
                 it[Categories.slug] = slug
                 it[Categories.name] = name
             }
+        }
+    }
+
+    /** v2: contributor settings + soft-delete support (step 6). Idempotent so a
+     *  fresh v1 table created by the current [Users] object (which already has
+     *  these columns) doesn't fail on re-ALTER. */
+    private fun Transaction.migrateV2() {
+        addColumnIfNotExists("users", "settings_json", "TEXT")
+        addColumnIfNotExists("users", "deleted_at", "TEXT")
+    }
+
+    private fun Transaction.addColumnIfNotExists(table: String, column: String, type: String) {
+        val exists = exec("SELECT 1 FROM pragma_table_info('$table') WHERE name='$column'") { rs -> rs.next() }
+        if (exists != true) {
+            exec("ALTER TABLE $table ADD COLUMN $column $type;")
         }
     }
 
