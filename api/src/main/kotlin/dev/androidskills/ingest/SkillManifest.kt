@@ -270,7 +270,7 @@ object ManifestValidator {
     // a non-digit. This rejects invalid forms the loose regex let through, e.g.
     // `1.2.3-alpha..1` (empty identifier) and `1.2.3-01` (leading-zero numeric).
     // Build identifiers are `[0-9A-Za-z-]+` (leading zeros allowed by the spec).
-    private val SEMVER = Regex(
+    val SEMVER = Regex(
         """^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)""" +
             """(?:-(?:0|[1-9]\d*|[0-9]*[A-Za-z-][0-9A-Za-z-]*)(?:\.(?:0|[1-9]\d*|[0-9]*[A-Za-z-][0-9A-Za-z-]*))*)?""" +
             """(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$""",

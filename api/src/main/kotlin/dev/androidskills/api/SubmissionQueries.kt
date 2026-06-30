@@ -3,20 +3,25 @@ package dev.androidskills.api
 import dev.androidskills.auth.Principal
 import dev.androidskills.db.BundleKind
 import dev.androidskills.db.Bundles
+import dev.androidskills.db.Jobs
 import dev.androidskills.db.SkillStatus
 import dev.androidskills.db.Skills
 import dev.androidskills.db.Submissions
 import dev.androidskills.db.VersionSource
-import org.jetbrains.exposed.sql.SortOrder
-import org.jetbrains.exposed.sql.and
+import dev.androidskills.db.Versions
 import dev.androidskills.github.GitHubAppClient
 import dev.androidskills.github.GitHubAppException
+import dev.androidskills.ingest.ManifestValidator
 import dev.androidskills.ingest.StagedPayload
 import dev.androidskills.ingest.SubmissionPayload
 import dev.androidskills.util.appJson
 import dev.androidskills.util.newId
 import dev.androidskills.util.nowIso
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.encodeToString
+import org.jetbrains.exposed.sql.SortOrder
+import org.jetbrains.exposed.sql.and
+import org.jetbrains.exposed.sql.deleteWhere
 import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.transactions.transaction
@@ -35,6 +40,7 @@ object SubmissionQueries {
 
     /** Lowercase kebab-case, matching the spec §10 slug rule. */
     private val SLUG_RE = Regex("^[a-z0-9]+(-[a-z0-9]+)*$")
+    private val TAG_RE = Regex("^[a-z0-9][a-z0-9._+-]{0,39}$")
 
     @Serializable
     data class CreateDraftsRequest(
@@ -273,6 +279,118 @@ object SubmissionQueries {
         )
     }
 
+    /**
+     * Moves a draft submission to `in_review` and enqueues a metadata-only review
+     * job (guarded against duplicates). Validates the manifest per §10.
+     */
+    fun submit(principal: Principal, submissionId: String) {
+        transaction {
+            val row = Submissions.selectAll()
+                .where { (Submissions.id eq submissionId) and (Submissions.submitterId eq principal.userId) }
+                .singleOrNull() ?: throw ApiNotFoundException("Submission not found")
+            if (row[Submissions.state] != "draft") {
+                throw ApiConflictException("Submission is not a draft", code = "invalid_state_transition")
+            }
+            val skillId = row[Submissions.skillId]
+                ?: throw IllegalStateException("Draft submission $submissionId has no skill")
+            val payload = row[Submissions.payload]?.let {
+                runCatching { appJson.decodeFromString(SubmissionPayload.serializer(), it) }.getOrNull()
+            }
+            val staged = payload?.staged
+                ?: throw IllegalStateException("Draft submission $submissionId has no staged payload")
+            val selection = SelectedSkill(
+                slug = Skills.selectAll().where { Skills.id eq skillId }.singleOrNull()?.get(Skills.slug) ?: "",
+                name = staged.name,
+                description = staged.description,
+                license = staged.license ?: "",
+                tags = staged.tags,
+                version = staged.version,
+            )
+            val expectSemVer = staged.versionSource == VersionSource.manifest.name
+            val errors = validateForSubmit(selection, expectSemVer)
+            if (errors.isNotEmpty()) throw ApiValidationException(errors)
+
+            val now = nowIso()
+            Submissions.update({ Submissions.id eq submissionId }) {
+                it[Submissions.state] = "in_review"
+                it[Submissions.updatedAt] = now
+            }
+            enqueueReview(skillId, submissionId, now)
+        }
+    }
+
+    /**
+     * Withdraws an `in_review` submission back to `draft`. Clears any queued
+     * review job; a running job is left alone (its output will be merged but
+     * ignored until the next submit).
+     */
+    fun withdraw(principal: Principal, submissionId: String) {
+        transaction {
+            val row = Submissions.selectAll()
+                .where { (Submissions.id eq submissionId) and (Submissions.submitterId eq principal.userId) }
+                .singleOrNull() ?: throw ApiNotFoundException("Submission not found")
+            if (row[Submissions.state] != "in_review") {
+                throw ApiConflictException("Submission is not in review", code = "invalid_state_transition")
+            }
+            Submissions.update({ Submissions.id eq submissionId }) {
+                it[Submissions.state] = "draft"
+                it[Submissions.updatedAt] = nowIso()
+            }
+            // Remove queued review jobs for this submission.
+            val reviewPayload = appJson.encodeToString(
+                ReviewPayload(skillId = row[Submissions.skillId] ?: "", submissionId = submissionId),
+            )
+            val deleteOp = org.jetbrains.exposed.sql.SqlExpressionBuilder.run {
+                (Jobs.type eq "review") and (Jobs.payload eq reviewPayload) and (Jobs.state eq "queued")
+            }
+            Jobs.deleteWhere { deleteOp }
+        }
+    }
+
+    /**
+     * Deletes a draft submission and its unlisted skill shell, but only if the
+     * skill has no published versions (prevents accidental data loss).
+     */
+    fun deleteDraft(principal: Principal, submissionId: String) {
+        transaction {
+            val row = Submissions.selectAll()
+                .where { (Submissions.id eq submissionId) and (Submissions.submitterId eq principal.userId) }
+                .singleOrNull() ?: throw ApiNotFoundException("Submission not found")
+            if (row[Submissions.state] != "draft") {
+                throw ApiConflictException("Only drafts can be deleted", code = "invalid_state_transition")
+            }
+            val skillId = row[Submissions.skillId]
+            val hasVersions = skillId?.let { sid -> Versions.selectAll().where { Versions.skillId eq sid }.any() } ?: false
+            val subOp = org.jetbrains.exposed.sql.SqlExpressionBuilder.run { Submissions.id eq submissionId }
+            Submissions.deleteWhere { subOp }
+            if (skillId != null && !hasVersions) {
+                val skillOp = org.jetbrains.exposed.sql.SqlExpressionBuilder.run { Skills.id eq skillId }
+                Skills.deleteWhere { skillOp }
+            }
+        }
+    }
+
+    private fun enqueueReview(skillId: String, submissionId: String, now: String) {
+        val payload = appJson.encodeToString(
+            ReviewPayload(skillId = skillId, submissionId = submissionId),
+        )
+        val alreadyQueued = Jobs.selectAll()
+            .where { (Jobs.type eq "review") and (Jobs.payload eq payload) and (Jobs.state inList listOf("queued", "running")) }
+            .any()
+        if (!alreadyQueued) {
+            Jobs.insert {
+                it[Jobs.id] = newId()
+                it[Jobs.type] = "review"
+                it[Jobs.payload] = payload
+                it[Jobs.state] = "queued"
+                it[Jobs.attempts] = 0
+                it[Jobs.runAfter] = now
+                it[Jobs.createdAt] = now
+                it[Jobs.updatedAt] = now
+            }
+        }
+    }
+
     private fun buildStaged(
         selection: SelectedSkill,
         version: String,
@@ -292,9 +410,33 @@ object SubmissionQueries {
         ),
     )
 
+    /**
+     * Validates the manifest fields required before a submission can move to
+     * `in_review` (spec §10). Returns a map of field → reason, empty if valid.
+     * [expectSemVer] is true when the version came from the manifest (not a
+     * derived git HEAD ref).
+     */
+    fun validateForSubmit(selection: SelectedSkill, expectSemVer: Boolean): Map<String, String> {
+        val errors = mutableMapOf<String, String>()
+        if (!SLUG_RE.matches(selection.slug)) errors["slug"] = "must be lowercase kebab-case"
+        if (selection.name.isBlank()) errors["name"] = "is required"
+        if (selection.description.isBlank()) errors["description"] = "is required"
+        if (selection.license.isBlank()) errors["license"] = "is required"
+        selection.tags.forEachIndexed { i, tag ->
+            if (!TAG_RE.matches(tag)) errors["tags[$i]"] = "must be lowercase alnum/._+- (max 40)"
+        }
+        if (expectSemVer && selection.version != null && !ManifestValidator.SEMVER.matches(selection.version)) {
+            errors["version"] = "must be valid SemVer"
+        }
+        return errors
+    }
+
     private fun validateSlug(slug: String) {
         if (!SLUG_RE.matches(slug)) {
             throw ApiValidationException(mapOf("slug" to "must be lowercase kebab-case"))
         }
     }
 }
+
+    @Serializable
+    private data class ReviewPayload(val skillId: String, val submissionId: String)

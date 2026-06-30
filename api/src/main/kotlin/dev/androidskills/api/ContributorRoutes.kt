@@ -12,6 +12,7 @@ import io.ktor.server.application.ApplicationCall
 import io.ktor.server.request.receive
 import io.ktor.server.response.respond
 import io.ktor.server.routing.Route
+import io.ktor.server.routing.delete
 import io.ktor.server.routing.get
 import io.ktor.server.routing.post
 import io.ktor.server.routing.route
@@ -37,6 +38,9 @@ fun Route.contributorRoutes(githubApp: GitHubAppClient) {
         get("submissions") { mySubmissions(call) }
         post("submissions") { createSubmissions(call, githubApp) }
         get("submissions/{id}") { getSubmission(call) }
+        post("submissions/{id}/submit") { submit(call) }
+        post("submissions/{id}/withdraw") { withdraw(call) }
+        delete("submissions/{id}") { deleteDraft(call) }
     }
 }
 
@@ -138,4 +142,25 @@ private suspend fun getSubmission(call: ApplicationCall) {
     val detail = SubmissionQueries.getSubmission(principal, id)
         ?: throw ApiNotFoundException("Submission not found")
     call.respond(detail)
+}
+
+private suspend fun submit(call: ApplicationCall) {
+    val principal = call.requireSession()
+    val id = call.parameters["id"] ?: throw ApiBadRequestException("Missing submission id")
+    SubmissionQueries.submit(principal, id)
+    call.respond(HttpStatusCode.OK, mapOf("ok" to true))
+}
+
+private suspend fun withdraw(call: ApplicationCall) {
+    val principal = call.requireSession()
+    val id = call.parameters["id"] ?: throw ApiBadRequestException("Missing submission id")
+    SubmissionQueries.withdraw(principal, id)
+    call.respond(HttpStatusCode.OK, mapOf("ok" to true))
+}
+
+private suspend fun deleteDraft(call: ApplicationCall) {
+    val principal = call.requireSession()
+    val id = call.parameters["id"] ?: throw ApiBadRequestException("Missing submission id")
+    SubmissionQueries.deleteDraft(principal, id)
+    call.respond(HttpStatusCode.NoContent)
 }

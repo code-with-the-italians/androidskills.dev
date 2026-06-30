@@ -8,18 +8,21 @@ import dev.androidskills.auth.Principal
 import dev.androidskills.auth.SessionStore
 import dev.androidskills.auth.UsersRepo
 import dev.androidskills.db.Bundles
+import dev.androidskills.db.Jobs
 import dev.androidskills.db.Role
 import dev.androidskills.db.Sessions
 import dev.androidskills.db.Skills
 import dev.androidskills.db.Submissions
 import dev.androidskills.db.UserStatus
 import dev.androidskills.db.Users
-import dev.androidskills.github.DisabledGitHubAppClient
+import dev.androidskills.db.Versions
 import dev.androidskills.github.GitHubAppClient
 import dev.androidskills.github.GitHubAppException
 import dev.androidskills.github.Installation
 import dev.androidskills.github.RepoRef
+import dev.androidskills.util.nowIso
 import kotlinx.coroutines.runBlocking
+import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.transactions.transaction
 import kotlin.test.AfterTest
@@ -186,6 +189,110 @@ class SubmissionQueriesTest {
         val (_, bob) = createUser(43L, "bob")
         val response = SubmissionQueries.createDrafts(alice, draftRequest("skill-one"), fakeGh())
         assertEquals(null, SubmissionQueries.getSubmission(bob, response.submissionIds[0]))
+    }
+
+    @Test
+    fun `submit moves draft to in_review and enqueues review job`(): Unit = runBlocking {
+        setupDb()
+        val (_, principal) = createUser(42L, "alice")
+        val response = SubmissionQueries.createDrafts(principal, draftRequest("skill-one"), fakeGh())
+        val subId = response.submissionIds[0]
+
+        SubmissionQueries.submit(principal, subId)
+
+        transaction {
+            val sub = Submissions.selectAll().where { Submissions.id eq subId }.single()
+            assertEquals("in_review", sub[Submissions.state])
+            val jobs = Jobs.selectAll().where { Jobs.type eq "review" }.toList()
+            assertEquals(1, jobs.size)
+            assertEquals("queued", jobs[0][Jobs.state])
+        }
+    }
+
+    @Test
+    fun `submit 422 on invalid manifest`(): Unit = runBlocking {
+        setupDb()
+        val (_, principal) = createUser(42L, "alice")
+        val request = SubmissionQueries.CreateDraftsRequest(
+            repoOwner = "owner", repoName = "repo", ref = "abc123",
+            skills = listOf(SubmissionQueries.SelectedSkill(
+                slug = "skill-one", name = "", description = "", license = "",
+            )),
+        )
+        val response = SubmissionQueries.createDrafts(principal, request, fakeGh())
+        assertFailsWith<ApiValidationException> {
+            SubmissionQueries.submit(principal, response.submissionIds[0])
+        }
+    }
+
+    @Test
+    fun `submit 409 when not draft`(): Unit = runBlocking {
+        setupDb()
+        val (_, principal) = createUser(42L, "alice")
+        val response = SubmissionQueries.createDrafts(principal, draftRequest("skill-one"), fakeGh())
+        SubmissionQueries.submit(principal, response.submissionIds[0])
+        assertFailsWith<ApiConflictException> {
+            SubmissionQueries.submit(principal, response.submissionIds[0])
+        }
+    }
+
+    @Test
+    fun `withdraw moves in_review back to draft`(): Unit = runBlocking {
+        setupDb()
+        val (_, principal) = createUser(42L, "alice")
+        val response = SubmissionQueries.createDrafts(principal, draftRequest("skill-one"), fakeGh())
+        val subId = response.submissionIds[0]
+        SubmissionQueries.submit(principal, subId)
+
+        SubmissionQueries.withdraw(principal, subId)
+
+        transaction {
+            val sub = Submissions.selectAll().where { Submissions.id eq subId }.single()
+            assertEquals("draft", sub[Submissions.state])
+            val jobs = Jobs.selectAll().where { Jobs.type eq "review" }.toList()
+            assertEquals(0, jobs.size)
+        }
+    }
+
+    @Test
+    fun `deleteDraft removes submission and shell skill`(): Unit = runBlocking {
+        setupDb()
+        val (_, principal) = createUser(42L, "alice")
+        val response = SubmissionQueries.createDrafts(principal, draftRequest("skill-one"), fakeGh())
+        val subId = response.submissionIds[0]
+
+        SubmissionQueries.deleteDraft(principal, subId)
+
+        transaction {
+            assertEquals(0, Submissions.selectAll().count())
+            assertEquals(0, Skills.selectAll().count())
+        }
+    }
+
+    @Test
+    fun `deleteDraft keeps skill when versions exist`(): Unit = runBlocking {
+        setupDb()
+        val (_, principal) = createUser(42L, "alice")
+        val response = SubmissionQueries.createDrafts(principal, draftRequest("skill-one"), fakeGh())
+        val subId = response.submissionIds[0]
+        val skillId = transaction { Submissions.selectAll().where { Submissions.id eq subId }.single()[Submissions.skillId] }
+            ?: error("missing skill")
+        transaction {
+            Versions.insert {
+                it[Versions.id] = "00000000-0000-0000-0000-000000000001"
+                it[Versions.skillId] = skillId
+                it[Versions.version] = "1.0.0"
+                it[Versions.sourceRef] = "sha"
+                it[Versions.createdAt] = nowIso()
+            }
+        }
+
+        SubmissionQueries.deleteDraft(principal, subId)
+
+        transaction {
+            assertEquals(0, Submissions.selectAll().count())
+            assertEquals(1, Skills.selectAll().count())
+        }
     }
 
     private fun draftRequest(slug: String, repoName: String = "repo") = SubmissionQueries.CreateDraftsRequest(
