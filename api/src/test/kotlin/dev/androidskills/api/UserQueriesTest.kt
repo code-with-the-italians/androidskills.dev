@@ -99,6 +99,18 @@ class UserQueriesTest {
     }
 
     @Test
+    fun `deleteAccount revokes existing sessions`() {
+        setupDb()
+        val (uid, principal) = createUser(42L, "alice")
+        val token = SessionStore.create(uid, 3600)
+        assertNotNull(SessionStore.lookup(token))
+
+        UserQueries.deleteAccount(principal)
+
+        assertNull(SessionStore.lookup(token))
+    }
+
+    @Test
     fun `upsertFromGitHub reactivates soft deleted account`() {
         setupDb()
         val (uid, principal) = createUser(42L, "alice")

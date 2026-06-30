@@ -17,6 +17,7 @@ import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.insertIgnore
 import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.transactions.transaction
+import org.jetbrains.exposed.sql.update
 import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -136,6 +137,31 @@ class StarsQueriesTest {
         val (uid, principal) = createUser(42L, "alice")
         assertFailsWith<ApiNotFoundException> {
             StarsQueries.addStar(principal, "missing")
+        }
+    }
+
+    @Test
+    fun `addStar 404 for unlisted skill`() {
+        setupDb()
+        val (uid, principal) = createUser(42L, "alice")
+        val sid = insertPublishedSkill(uid, "skill-one")
+        transaction {
+            val op = org.jetbrains.exposed.sql.SqlExpressionBuilder.run { Skills.id eq sid }
+            Skills.update({ op }) {
+                it[Skills.status] = "unlisted"
+            }
+        }
+        assertFailsWith<ApiNotFoundException> {
+            StarsQueries.addStar(principal, "skill-one")
+        }
+    }
+
+    @Test
+    fun `removeStar 404 for missing skill`() {
+        setupDb()
+        val (uid, principal) = createUser(42L, "alice")
+        assertFailsWith<ApiNotFoundException> {
+            StarsQueries.removeStar(principal, "missing")
         }
     }
 }

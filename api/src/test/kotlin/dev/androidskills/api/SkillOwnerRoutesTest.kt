@@ -113,6 +113,75 @@ class SkillOwnerRoutesTest {
     }
 
     @Test
+    fun `resync route 403 for non-owner`() = testApplication {
+        val (_, owner) = setupUserAndSkill()
+        // A second user logs in and tries to resync the same skill.
+        val otherUid = UsersRepo.upsertFromGitHub(GitHubUser(43L, "bob", "Bob", null), null)
+        val otherToken = SessionStore.create(otherUid, 3600)
+        application {
+            module(
+                config = TestSupport.newConfig(dir),
+                oauth = fakeOAuth(),
+                githubApp = fakeGh(),
+            )
+        }
+        val res = client.post("/api/skills/my-skill/resync") {
+            header("Cookie", "as_session=$otherToken")
+        }
+        assertEquals(HttpStatusCode.Forbidden, res.status)
+    }
+
+    @Test
+    fun `resync route 404 for missing skill`() = testApplication {
+        val (_, token) = setupUserAndSkill()
+        application {
+            module(
+                config = TestSupport.newConfig(dir),
+                oauth = fakeOAuth(),
+                githubApp = fakeGh(),
+            )
+        }
+        val res = client.post("/api/skills/no-such-skill/resync") {
+            header("Cookie", "as_session=$token")
+        }
+        assertEquals(HttpStatusCode.NotFound, res.status)
+    }
+
+    @Test
+    fun `unpublish route 403 for non-owner`() = testApplication {
+        setupUserAndSkill()
+        val otherUid = UsersRepo.upsertFromGitHub(GitHubUser(43L, "bob", "Bob", null), null)
+        val otherToken = SessionStore.create(otherUid, 3600)
+        application {
+            module(
+                config = TestSupport.newConfig(dir),
+                oauth = fakeOAuth(),
+                githubApp = fakeGh(),
+            )
+        }
+        val res = client.post("/api/skills/my-skill/unpublish") {
+            header("Cookie", "as_session=$otherToken")
+        }
+        assertEquals(HttpStatusCode.Forbidden, res.status)
+    }
+
+    @Test
+    fun `unpublish route 404 for missing skill`() = testApplication {
+        val (_, token) = setupUserAndSkill()
+        application {
+            module(
+                config = TestSupport.newConfig(dir),
+                oauth = fakeOAuth(),
+                githubApp = fakeGh(),
+            )
+        }
+        val res = client.post("/api/skills/no-such-skill/unpublish") {
+            header("Cookie", "as_session=$token")
+        }
+        assertEquals(HttpStatusCode.NotFound, res.status)
+    }
+
+    @Test
     fun `resync route 503 when github app disabled`() = testApplication {
         val (_, token) = setupUserAndSkill()
         application {

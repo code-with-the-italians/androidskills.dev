@@ -114,12 +114,19 @@ object SubmissionQueries {
         // installed the App on the account that owns the repo.
         val installationId = try {
             gh.installations()
-                .firstOrNull { it.accountLogin.equals(request.repoOwner, ignoreCase = true) }
+                .firstOrNull {
+                    // SEC1: must be an installation controlled by the principal. The App-level
+                    // /app/installations list includes every account that installed the App; we
+                    // reject any installation whose account is not the caller's (org installs
+                    // require membership proof and are deferred).
+                    it.accountId == principal.githubId &&
+                        it.accountLogin.equals(request.repoOwner, ignoreCase = true)
+                }
                 ?.id
         } catch (e: GitHubAppException) {
             throw ApiBadGatewayException("GitHub installations request failed: ${e.message}", "github_installations_failed")
         } ?: throw ApiValidationException(
-            mapOf("repo" to "install the GitHub App on '$request.repoOwner' first"),
+            mapOf("repo" to "install the GitHub App on '${request.repoOwner}' first"),
             code = "github_app_not_installed",
         )
 
@@ -436,7 +443,7 @@ object SubmissionQueries {
             throw ApiValidationException(mapOf("slug" to "must be lowercase kebab-case"))
         }
     }
-}
 
     @Serializable
     private data class ReviewPayload(val skillId: String, val submissionId: String)
+}

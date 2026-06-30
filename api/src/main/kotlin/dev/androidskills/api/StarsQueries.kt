@@ -3,6 +3,7 @@ package dev.androidskills.api
 import dev.androidskills.auth.Principal
 import dev.androidskills.db.Categories
 import dev.androidskills.db.Skills
+import dev.androidskills.db.SkillStatus
 import dev.androidskills.db.Stars
 import dev.androidskills.util.nowIso
 import kotlinx.serialization.Serializable
@@ -56,11 +57,13 @@ object StarsQueries {
 
     fun addStar(principal: Principal, slug: String) {
         transaction {
-            val skillId = Skills.selectAll().where { Skills.slug eq slug }.singleOrNull()?.get(Skills.id)
-                ?: throw ApiNotFoundException("Skill not found")
+            val skill = Skills.selectAll()
+                .where { (Skills.slug eq slug) and (Skills.status eq SkillStatus.published.name) }
+                .singleOrNull()
+            if (skill == null) throw ApiNotFoundException("Skill not found")
             Stars.insertIgnore {
                 it[Stars.userId] = principal.userId
-                it[Stars.skillId] = skillId
+                it[Stars.skillId] = skill[Skills.id]
                 it[Stars.createdAt] = nowIso()
             }
         }

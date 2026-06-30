@@ -4,10 +4,12 @@ import dev.androidskills.auth.GitHubUser
 import dev.androidskills.auth.Principal
 import dev.androidskills.auth.UsersRepo
 import dev.androidskills.db.Role
+import dev.androidskills.db.Sessions
 import dev.androidskills.db.Users
 import dev.androidskills.util.appJson
 import dev.androidskills.util.nowIso
 import kotlinx.serialization.Serializable
+import org.jetbrains.exposed.sql.deleteWhere
 import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.transactions.transaction
 import org.jetbrains.exposed.sql.update
@@ -57,6 +59,10 @@ object UserQueries {
                 it[Users.deletedAt] = nowIso()
                 it[Users.updatedAt] = nowIso()
             }
+            // LOW2: revoke all existing sessions so a deleted user cannot remain logged in,
+            // and so old cookies do not become valid again if the account is later reactivated.
+            val op = org.jetbrains.exposed.sql.SqlExpressionBuilder.run { Sessions.userId eq principal.userId }
+            Sessions.deleteWhere { op }
         }
     }
 }

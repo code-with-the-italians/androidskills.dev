@@ -145,9 +145,22 @@ class SubmissionQueriesTest {
 
         SubmissionQueries.createDrafts(alice, request, fakeGh())
         val ex = assertFailsWith<ApiConflictException> {
-            SubmissionQueries.createDrafts(bob, request, fakeGh())
+            // Bob has his own installation on the same owner account, but the bundle is already Alice's.
+            SubmissionQueries.createDrafts(bob, request, fakeGh(listOf(Installation(2L, 43L, "owner", "User"))))
         }
         assertEquals("bundle_ownership_conflict", ex.code)
+    }
+
+    @Test
+    fun `createDrafts 422 when installation belongs to another account`(): Unit = runBlocking {
+        setupDb()
+        // SEC1: an installation for owner "owner" exists, but it belongs to account 42 (not Bob's 43).
+        val (_, bob) = createUser(43L, "bob")
+        val request = draftRequest("skill-one")
+        val ex = assertFailsWith<ApiValidationException> {
+            SubmissionQueries.createDrafts(bob, request, fakeGh(listOf(Installation(1L, 42L, "owner", "User"))))
+        }
+        assertEquals("github_app_not_installed", ex.code)
     }
 
     @Test
@@ -309,4 +322,49 @@ class SubmissionQueriesTest {
             ),
         ),
     )
+
+    @Test
+    fun `submit 404 for other user`(): Unit = runBlocking {
+        setupDb()
+        val (_, alice) = createUser(42L, "alice")
+        val (_, bob) = createUser(43L, "bob")
+        val response = SubmissionQueries.createDrafts(alice, draftRequest("skill-one"), fakeGh())
+        assertFailsWith<ApiNotFoundException> {
+            SubmissionQueries.submit(bob, response.submissionIds[0])
+        }
+    }
+
+    @Test
+    fun `withdraw 404 for other user`(): Unit = runBlocking {
+        setupDb()
+        val (_, alice) = createUser(42L, "alice")
+        val (_, bob) = createUser(43L, "bob")
+        val response = SubmissionQueries.createDrafts(alice, draftRequest("skill-one"), fakeGh())
+        SubmissionQueries.submit(alice, response.submissionIds[0])
+        assertFailsWith<ApiNotFoundException> {
+            SubmissionQueries.withdraw(bob, response.submissionIds[0])
+        }
+    }
+
+    @Test
+    fun `deleteDraft 404 for other user`(): Unit = runBlocking {
+        setupDb()
+        val (_, alice) = createUser(42L, "alice")
+        val (_, bob) = createUser(43L, "bob")
+        val response = SubmissionQueries.createDrafts(alice, draftRequest("skill-one"), fakeGh())
+        assertFailsWith<ApiNotFoundException> {
+            SubmissionQueries.deleteDraft(bob, response.submissionIds[0])
+        }
+    }
+
+    @Test
+    fun `deleteDraft 409 when not draft`(): Unit = runBlocking {
+        setupDb()
+        val (_, principal) = createUser(42L, "alice")
+        val response = SubmissionQueries.createDrafts(principal, draftRequest("skill-one"), fakeGh())
+        SubmissionQueries.submit(principal, response.submissionIds[0])
+        assertFailsWith<ApiConflictException> {
+            SubmissionQueries.deleteDraft(principal, response.submissionIds[0])
+        }
+    }
 }

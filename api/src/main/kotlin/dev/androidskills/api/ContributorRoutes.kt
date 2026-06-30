@@ -252,7 +252,12 @@ private suspend fun resync(call: ApplicationCall, gh: GitHubAppClient) {
         ?: throw ApiNotFoundException("Bundle not found")
     val installationId = bundle[Bundles.installationId]
         ?: throw ApiBadGatewayException("Bundle has no installation", "bundle_no_installation")
-    val (owner, repo) = bundle[Bundles.provenance].split("/", limit = 2)
+    val (owner, repo) = bundle[Bundles.provenance].split("/", limit = 2).let {
+        if (it.size == 2) it[0] to it[1] else throw ApiBadGatewayException(
+            "Bundle provenance is malformed: ${bundle[Bundles.provenance]}",
+            "bundle_provenance_malformed",
+        )
+    }
 
     val head = try { gh.defaultBranchHead(installationId, owner, repo) }
     catch (e: GitHubAppException) { throw ApiBadGatewayException("GitHub ref lookup failed: ${e.message}", "github_ref_failed") }
