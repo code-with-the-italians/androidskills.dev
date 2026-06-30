@@ -99,7 +99,7 @@ fun Application.module(config: AppConfig = AppConfig.fromEnv(), oauth: OAuthClie
         publicRoutes(fileStore)
         authRoutes(config, resolvedOauth)
         contributorRoutes(resolvedGithubApp)
-        adminRoutes()
+        adminRoutes(fileStore, resolvedGithubApp)
         webhookRoutes(resolvedGithubApp)
     }
 }

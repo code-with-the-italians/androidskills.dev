@@ -1,5 +1,6 @@
 package dev.androidskills.ingest
 
+import dev.androidskills.api.ApiConflictException
 import dev.androidskills.db.Bundles
 import dev.androidskills.db.Jobs
 import dev.androidskills.db.Skills
@@ -13,6 +14,7 @@ import dev.androidskills.util.appJson
 import dev.androidskills.util.newId
 import dev.androidskills.util.nowIso
 import org.jetbrains.exposed.sql.and
+import org.jetbrains.exposed.sql.deleteWhere
 import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.insertIgnore
 import org.jetbrains.exposed.sql.selectAll
@@ -224,6 +226,96 @@ object IngestPipeline {
         }
         return subId
     }
+
+    /**
+     * Step-7 promotion: copies the staged archive content onto an existing skill
+     * shell (file mirror, skill_files, readme_md, live metadata, version zip/row).
+     * Unlike [ingest], this does NOT create a new skill row and does NOT enqueue
+     * a review job — the review already happened when the submission was in_review.
+     *
+     * Returns the promoted version. Throws if the slug is not found in the archive.
+     */
+    fun promote(skillId: String, source: ArchiveSource, bundleId: String, store: FileStore, submitterId: String): PromoteResult {
+        val scanResult = Discovery.discover(source)
+        if (scanResult is ScanResult.NoSkillsDir) {
+            throw IllegalStateException("No top-level 'skills/' directory in archive")
+        }
+        val detected = (scanResult as ScanResult.Found).skills
+        val extracted = Discovery.extract(source)
+
+        val skillRow = transaction {
+            Skills.selectAll().where { Skills.id eq skillId }.singleOrNull()
+        } ?: throw IllegalStateException("Skill $skillId not found for promotion")
+        val slug = skillRow[Skills.slug]
+        val version = skillRow[Skills.version]
+        val skillDir = "skills/$slug"
+
+        val detectedSkill = detected.firstOrNull { it.slug == slug }
+            ?: throw ApiConflictException("Skill '$slug' not found in the archive; contributor may have removed or renamed it", "slug_mismatch")
+
+        val files = extracted.filter { Discovery.topDir(it.path) == skillDir }
+        val skillMd = files.firstOrNull { it.path == "$skillDir/SKILL.md" }
+        val body = skillMd?.bytes?.toString(Charsets.UTF_8) ?: ""
+        val fileEntries = files.map { it.path.removePrefix("$skillDir/") to it.bytes }
+
+        // Build and store version zip before DB writes.
+        val zipKey = "skills/$skillId/versions/$version.zip"
+        val zipBytes = ZipBuilder.build(fileEntries.map { (p, b) -> p to b }, readmeMd = body.ifBlank { null })
+        store.put(zipKey, zipBytes)
+
+        // Write file mirror and replace DB skill_files.
+        for ((relPath, bytes) in fileEntries) {
+            val safePath = SkillPaths.safeRelativeOrNull(relPath) ?: continue
+            store.put("skills/$skillId/files/$safePath", bytes)
+        }
+
+        transaction {
+            val now = nowIso()
+            // Delete existing skill_files so we can re-insert without unique constraint violations.
+            val deleteOp = org.jetbrains.exposed.sql.SqlExpressionBuilder.run { SkillFiles.skillId eq skillId }
+            SkillFiles.deleteWhere { deleteOp }
+            for ((relPath, bytes) in fileEntries) {
+                val safePath = SkillPaths.safeRelativeOrNull(relPath) ?: continue
+                SkillFiles.insert {
+                    it[SkillFiles.id] = newId()
+                    it[SkillFiles.skillId] = skillId
+                    it[SkillFiles.path] = safePath
+                    it[SkillFiles.size] = bytes.size
+                    it[SkillFiles.isBinary] = isProbablyBinary(bytes)
+                    it[SkillFiles.r2Key] = "skills/$skillId/files/$safePath"
+                }
+            }
+
+            // Update live skill metadata from the archive (source-of-truth fields).
+            Skills.update({ Skills.id eq skillId }) {
+                it[Skills.name] = detectedSkill.name
+                it[Skills.description] = detectedSkill.description
+                it[Skills.license] = detectedSkill.license
+                it[Skills.tags] = appJson.encodeToString(detectedSkill.tags)
+                it[Skills.version] = detectedSkill.version
+                it[Skills.versionSource] = detectedSkill.versionSource
+                it[Skills.tokenUpfront] = detectedSkill.tokenUpfront
+                it[Skills.tokenOndemand] = detectedSkill.tokenOndemand
+                it[Skills.tokenBand] = detectedSkill.tokenBand
+                it[Skills.readmeMd] = body
+                it[Skills.updatedAt] = now
+            }
+
+            // Ensure version row exists (idempotent for re-promotion).
+            Versions.insertIgnore {
+                it[Versions.id] = newId()
+                it[Versions.skillId] = skillId
+                it[Versions.version] = detectedSkill.version
+                it[Versions.sourceRef] = "${detectedSkill.versionSource}:${detectedSkill.version}"
+                it[Versions.r2ZipKey] = zipKey
+                it[Versions.createdAt] = now
+            }
+        }
+
+        return PromoteResult(skillId, slug, detectedSkill.version)
+    }
+
+    data class PromoteResult(val skillId: String, val slug: String, val version: String)
 
     private fun isProbablyBinary(bytes: ByteArray): Boolean {
         val n = minOf(bytes.size, 2048)
