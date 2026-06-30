@@ -358,13 +358,49 @@ class SubmissionQueriesTest {
     }
 
     @Test
-    fun `deleteDraft 409 when not draft`(): Unit = runBlocking {
+    fun `createDrafts 409 when skill already published`(): Unit = runBlocking {
+        setupDb()
+        val (uid, principal) = createUser(42L, "alice")
+        // Seed a published skill directly (simulates approval path).
+        transaction {
+            Bundles.insert {
+                it[Bundles.id] = "00000000-0000-0000-0000-000000000001"
+                it[Bundles.kind] = "repo"
+                it[Bundles.provenance] = "owner/repo"
+                it[Bundles.ownerUserId] = uid
+                it[Bundles.installationId] = 1L
+                it[Bundles.createdAt] = nowIso()
+            }
+            Skills.insert {
+                it[Skills.id] = "00000000-0000-0000-0000-000000000002"
+                it[Skills.bundleId] = "00000000-0000-0000-0000-000000000001"
+                it[Skills.slug] = "skill-one"
+                it[Skills.name] = "Skill"
+                it[Skills.description] = "Desc"
+                it[Skills.license] = "MIT"
+                it[Skills.version] = "1.0.0"
+                it[Skills.versionSource] = "manifest"
+                it[Skills.status] = "published"
+                it[Skills.verified] = true
+                it[Skills.createdAt] = nowIso()
+                it[Skills.updatedAt] = nowIso()
+            }
+        }
+        val ex = assertFailsWith<ApiConflictException> {
+            SubmissionQueries.createDrafts(principal, draftRequest("skill-one"), fakeGh())
+        }
+        assertEquals("skill_already_published", ex.code)
+    }
+
+    @Test
+    fun `createDrafts 409 when submission already in_review`(): Unit = runBlocking {
         setupDb()
         val (_, principal) = createUser(42L, "alice")
         val response = SubmissionQueries.createDrafts(principal, draftRequest("skill-one"), fakeGh())
         SubmissionQueries.submit(principal, response.submissionIds[0])
-        assertFailsWith<ApiConflictException> {
-            SubmissionQueries.deleteDraft(principal, response.submissionIds[0])
+        val ex = assertFailsWith<ApiConflictException> {
+            SubmissionQueries.createDrafts(principal, draftRequest("skill-one"), fakeGh())
         }
+        assertEquals("submission_already_active", ex.code)
     }
 }

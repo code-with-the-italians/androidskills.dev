@@ -163,7 +163,10 @@ object SubmissionQueries {
                 val version = selection.version ?: request.ref.take(12)
                 val versionSource = if (selection.version != null) VersionSource.manifest.name else VersionSource.git_head.name
 
-                // Slug must not already belong to a different bundle.
+                // Slug must not already belong to a different bundle. If it belongs to
+                // the same bundle, we only allow re-drafting an unlisted shell; a published
+                // skill or an active submission must be handled via the admin queue (Bugbot
+                // high + medium findings).
                 val existingSkill = Skills.selectAll().where { Skills.slug eq selection.slug }.singleOrNull()
                 if (existingSkill != null && existingSkill[Skills.bundleId] != bundleId) {
                     throw ApiConflictException(
@@ -171,9 +174,30 @@ object SubmissionQueries {
                         code = "slug_conflict",
                     )
                 }
+                if (existingSkill != null && existingSkill[Skills.status] == SkillStatus.published.name) {
+                    throw ApiConflictException(
+                        "Skill '${selection.slug}' is already published; updates go through the admin queue",
+                        code = "skill_already_published",
+                    )
+                }
+                if (existingSkill != null) {
+                    val activeSub = Submissions.selectAll()
+                        .where {
+                            (Submissions.bundleId eq bundleId) and
+                                (Submissions.skillId eq existingSkill[Skills.id]) and
+                                (Submissions.state inList listOf("in_review", "changes_requested", "published", "rejected"))
+                        }
+                        .singleOrNull()
+                    if (activeSub != null) {
+                        throw ApiConflictException(
+                            "An active submission already exists for '${selection.slug}'",
+                            code = "submission_already_active",
+                        )
+                    }
+                }
 
                 val skillId = if (existingSkill != null) {
-                    // Same bundle: update the shell from the latest scan metadata.
+                    // Same bundle, unlisted shell: update the shell from the latest scan metadata.
                     val id = existingSkill[Skills.id]
                     Skills.update({ Skills.id eq id }) {
                         it[Skills.name] = selection.name
