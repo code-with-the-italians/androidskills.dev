@@ -123,15 +123,36 @@ internal suspend fun processOneJob(llm: LlmClient, store: FileStore, gh: GitHubA
 
 private suspend fun runReviewJob(payload: String, llm: LlmClient) {
     val req = appJson.decodeFromString(ReviewPayload.serializer(), payload)
-    val skill = transaction {
-        Skills.selectAll().where { Skills.id eq req.skillId }.singleOrNull()
-    } ?: throw IllegalStateException("Skill ${req.skillId} not found for review")
 
-    val manifest = SkillManifest(
-        name = skill[Skills.name],
-        description = skill[Skills.description],
-        tags = try { appJson.decodeFromString<List<String>>(skill[Skills.tags]) } catch (_: Exception) { emptyList() },
-    )
+    // Bugbot B1-fix: load the submission to get the staged metadata (resync writes
+    // the NEW version's name/desc/tags into payload.staged; the live skill row is
+    // the OLD content). Fall back to the live skill row for a first-ingest review
+    // (no staged payload — the skill row IS the new content).
+    val sub = transaction {
+        Submissions.selectAll().where { Submissions.id eq req.submissionId }.singleOrNull()
+    } ?: throw IllegalStateException("Submission ${req.submissionId} not found for review")
+    val subPayload = sub[Submissions.payload]?.let {
+        runCatching { appJson.decodeFromString(dev.androidskills.ingest.SubmissionPayload.serializer(), it) }.getOrNull()
+    }
+
+    val manifest = if (subPayload?.staged != null) {
+        // Resync: use the STAGED metadata, not the stale live skill row.
+        SkillManifest(
+            name = subPayload.staged.name,
+            description = subPayload.staged.description,
+            tags = subPayload.staged.tags,
+        )
+    } else {
+        // First ingest: the live skill row IS the new content.
+        val skill = transaction {
+            Skills.selectAll().where { Skills.id eq req.skillId }.singleOrNull()
+        } ?: throw IllegalStateException("Skill ${req.skillId} not found for review")
+        SkillManifest(
+            name = skill[Skills.name],
+            description = skill[Skills.description],
+            tags = try { appJson.decodeFromString<List<String>>(skill[Skills.tags]) } catch (_: Exception) { emptyList() },
+        )
+    }
 
     val result = llm.review(manifest)
 

@@ -152,8 +152,9 @@ class RealGitHubAppClient(
             .getOrElse { return null } // unparseable → treat as unhandled
         return when {
             payload.zen != null -> null // ping event
-            payload.after != null -> {
-                // Push event: ref/after/repository are at the root of the payload.
+            payload.ref != null && payload.after != null && !payload.after!!.all { it == '0' } -> {
+                // Push event: require ref + after, and after must not be all-zeros
+                // (all-zeros = branch deleted, not a content push — Bugbot finding).
                 val fullName = payload.repository?.fullName ?: return null
                 val (owner, name) = fullName.split("/", limit = 2).let {
                     if (it.size == 2) it[0] to it[1] else return null
