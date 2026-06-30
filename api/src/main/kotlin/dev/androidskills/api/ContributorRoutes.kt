@@ -7,10 +7,19 @@ import dev.androidskills.ingest.DetectedSkill
 import dev.androidskills.ingest.Discovery
 import dev.androidskills.ingest.ScanResult
 import dev.androidskills.auth.requireSession
+import dev.androidskills.db.Bundles
+import dev.androidskills.db.Jobs
+import dev.androidskills.db.Skills
+import dev.androidskills.util.appJson
+import dev.androidskills.util.newId
+import dev.androidskills.util.nowIso
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.ApplicationCall
 import io.ktor.server.request.receive
 import io.ktor.server.response.respond
+import org.jetbrains.exposed.sql.insert
+import org.jetbrains.exposed.sql.selectAll
+import org.jetbrains.exposed.sql.transactions.transaction
 import io.ktor.server.routing.Route
 import io.ktor.server.routing.delete
 import io.ktor.server.routing.get
@@ -41,6 +50,10 @@ fun Route.contributorRoutes(githubApp: GitHubAppClient) {
         post("submissions/{id}/submit") { submit(call) }
         post("submissions/{id}/withdraw") { withdraw(call) }
         delete("submissions/{id}") { deleteDraft(call) }
+    }
+    route("api/skills/{slug}") {
+        post("unpublish") { unpublish(call) }
+        post("resync") { resync(call, githubApp) }
     }
 }
 
@@ -163,4 +176,41 @@ private suspend fun deleteDraft(call: ApplicationCall) {
     val id = call.parameters["id"] ?: throw ApiBadRequestException("Missing submission id")
     SubmissionQueries.deleteDraft(principal, id)
     call.respond(HttpStatusCode.NoContent)
+}
+
+// ---- skill owner actions (step 6) ----
+
+private suspend fun unpublish(call: ApplicationCall) {
+    val principal = call.requireSession()
+    val slug = call.parameters["slug"] ?: throw ApiBadRequestException("Missing slug")
+    SkillOwnerQueries.unpublish(principal, slug)
+    call.respond(HttpStatusCode.OK, mapOf("ok" to true))
+}
+
+private suspend fun resync(call: ApplicationCall, gh: GitHubAppClient) {
+    if (!gh.configured) {
+        call.respond(HttpStatusCode.ServiceUnavailable, ErrorResponse(ErrorBody("github_app_disabled", "GitHub App is not configured")))
+        return
+    }
+    val principal = call.requireSession()
+    val slug = call.parameters["slug"] ?: throw ApiBadRequestException("Missing slug")
+
+    val bundleId = SkillOwnerQueries.ownedBundleId(principal, slug)
+        ?: if (skillExists(slug)) throw ApiForbiddenException("Not the skill owner") else throw ApiNotFoundException("Skill not found")
+
+    val bundle = transaction { Bundles.selectAll().where { Bundles.id eq bundleId }.singleOrNull() }
+        ?: throw ApiNotFoundException("Bundle not found")
+    val installationId = bundle[Bundles.installationId]
+        ?: throw ApiBadGatewayException("Bundle has no installation", "bundle_no_installation")
+    val (owner, repo) = bundle[Bundles.provenance].split("/", limit = 2)
+
+    val head = try { gh.defaultBranchHead(installationId, owner, repo) }
+    catch (e: GitHubAppException) { throw ApiBadGatewayException("GitHub ref lookup failed: ${e.message}", "github_ref_failed") }
+
+    SkillOwnerQueries.enqueueResync(principal, slug, head)
+    call.respond(HttpStatusCode.Accepted, mapOf("ok" to true))
+}
+
+private fun skillExists(slug: String) = transaction {
+    Skills.selectAll().where { Skills.slug eq slug }.any()
 }

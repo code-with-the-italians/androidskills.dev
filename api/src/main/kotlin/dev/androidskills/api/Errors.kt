@@ -46,6 +46,9 @@ class ApiValidationException(
     val code: String = "validation_failed",
 ) : RuntimeException(message)
 
+/** 403 — authenticated caller lacks permission for a public resource action. */
+class ApiForbiddenException(message: String = "Forbidden") : RuntimeException(message)
+
 /** 409 — duplicate slug, first-come ownership conflict. */
 class ApiConflictException(message: String, val code: String = "conflict") : RuntimeException(message)
 
@@ -60,6 +63,9 @@ fun Application.installApiErrorMapping() {
         val log = LoggerFactory.getLogger("dev.androidskills.api.Errors")
         exception<ApiNotFoundException> { call, ex ->
             call.respond(HttpStatusCode.NotFound, ErrorResponse(ErrorBody("not_found", ex.message ?: "Not found")))
+        }
+        exception<ApiForbiddenException> { call, ex ->
+            call.respond(HttpStatusCode.Forbidden, ErrorResponse(ErrorBody("forbidden", ex.message ?: "Forbidden")))
         }
         exception<ApiUnauthorizedException> { call, ex ->
             call.respond(HttpStatusCode.Unauthorized, ErrorResponse(ErrorBody("unauthorized", ex.message ?: "Authentication required")))
