@@ -24,6 +24,7 @@ import io.ktor.server.routing.Route
 import io.ktor.server.routing.delete
 import io.ktor.server.routing.get
 import io.ktor.server.routing.post
+import io.ktor.server.routing.put
 import io.ktor.server.routing.route
 import kotlinx.serialization.Serializable
 
@@ -54,6 +55,10 @@ fun Route.contributorRoutes(githubApp: GitHubAppClient) {
         get("stars") { listStars(call) }
         post("stars/{slug}") { addStar(call) }
         delete("stars/{slug}") { removeStar(call) }
+
+        get("settings") { getSettings(call) }
+        put("settings") { updateSettings(call) }
+        delete("") { deleteAccount(call) }
     }
     route("api/skills/{slug}") {
         post("unpublish") { unpublish(call) }
@@ -200,6 +205,26 @@ private suspend fun removeStar(call: ApplicationCall) {
     val principal = call.requireSession()
     val slug = call.parameters["slug"] ?: throw ApiBadRequestException("Missing slug")
     StarsQueries.removeStar(principal, slug)
+    call.respond(HttpStatusCode.NoContent)
+}
+
+// ---- settings + account deletion (step 6) ----
+
+private suspend fun getSettings(call: ApplicationCall) {
+    val principal = call.requireSession()
+    call.respond(UserQueries.getSettings(principal))
+}
+
+private suspend fun updateSettings(call: ApplicationCall) {
+    val principal = call.requireSession()
+    val settings = call.receive<UserQueries.UserSettings>()
+    UserQueries.updateSettings(principal, settings)
+    call.respond(HttpStatusCode.OK, mapOf("ok" to true))
+}
+
+private suspend fun deleteAccount(call: ApplicationCall) {
+    val principal = call.requireSession()
+    UserQueries.deleteAccount(principal)
     call.respond(HttpStatusCode.NoContent)
 }
 

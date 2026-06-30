@@ -5,9 +5,10 @@ import dev.androidskills.db.Sessions
 import dev.androidskills.db.UserStatus
 import dev.androidskills.db.Users
 import dev.androidskills.util.nowIso
+import org.jetbrains.exposed.sql.and
 import org.jetbrains.exposed.sql.deleteWhere
-import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.insert
+import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.transactions.transaction
 import java.security.SecureRandom
 import java.time.Instant
@@ -46,7 +47,9 @@ object SessionStore {
         val expiresAt = runCatching { Instant.parse(row[Sessions.expiresAt]) }.getOrNull()
             ?: return@transaction null
         if (expiresAt.isBefore(now)) return@transaction null
-        val user = Users.selectAll().where { Users.id eq row[Sessions.userId] }.singleOrNull()
+        val user = Users.selectAll()
+            .where { (Users.id eq row[Sessions.userId]) and (Users.deletedAt.isNull()) }
+            .singleOrNull()
             ?: return@transaction null
         // A suspended user is never admitted — even mid-session.
         val status = runCatching { UserStatus.parse(user[Users.status]) }.getOrNull()

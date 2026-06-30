@@ -69,6 +69,8 @@ object UsersRepo {
                 it[Users.handle] = uniqueHandle(user.handle, user.githubId, excludeId = id)
                 it[Users.name] = user.name
                 it[Users.avatarUrl] = user.avatarUrl
+                // Re-login reactivates a soft-deleted account (step 6).
+                it[Users.deletedAt] = null
                 // NOTE: role is NOT touched here — a bootstrap/demoted/suspended
                 // user keeps their current role on re-login (P1-1).
                 it[Users.updatedAt] = now
