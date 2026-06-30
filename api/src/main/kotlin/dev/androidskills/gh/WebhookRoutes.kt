@@ -65,7 +65,11 @@ private suspend fun handle(call: ApplicationCall, gh: GitHubAppClient) {
     }
 
     when (event) {
-        is GithubWebhookEvent.Push -> if (event.isDefaultBranch) enqueueResync(event)
+        is GithubWebhookEvent.Push -> {
+            // Q2b: don't enqueue resync when the App client isn't configured — otherwise
+            // every push to a tracked repo piles up guaranteed-fail jobs + noisy WARN logs.
+            if (gh.configured && event.isDefaultBranch) enqueueResync(event)
+        }
         is GithubWebhookEvent.InstallationAccess -> trackInstallation(event)
     }
     call.respond(HttpStatusCode.Accepted, mapOf("ok" to true))

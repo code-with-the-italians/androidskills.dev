@@ -71,7 +71,7 @@ object Discovery {
     }
 
     /** Extracts + applies the source-specific root-normalization (gotcha #1). */
-    private fun extract(source: ArchiveSource): List<Extracted> {
+    internal fun extract(source: ArchiveSource): List<Extracted> {
         val raw = ArrayList<Extracted>(64)
         var inflated = 0L
         ZipInputStream(ByteArrayInputStream(source.bytes)).use { zis ->
@@ -180,7 +180,7 @@ object Discovery {
         return rel in setOf("references", "examples", "scripts")
     }
 
-    private fun topDir(path: String): String {
+    internal fun topDir(path: String): String {
         // path is normalized like "skills/foo/bar.md"; top dir under skills/ is "skills/foo".
         val after = path.removePrefix("skills/")
         val next = after.indexOf('/')
@@ -194,7 +194,7 @@ object Discovery {
         return false
     }
 
-    private data class Extracted(val path: String, val bytes: ByteArray, val binary: Boolean) {
+    internal data class Extracted(val path: String, val bytes: ByteArray, val binary: Boolean) {
         override fun equals(other: Any?) = other is Extracted && path == other.path
         override fun hashCode() = path.hashCode()
     }
