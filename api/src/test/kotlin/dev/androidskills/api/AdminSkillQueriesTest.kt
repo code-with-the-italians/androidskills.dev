@@ -158,4 +158,16 @@ class AdminSkillQueriesTest {
         assertEquals(1, response.failed.size)
         assertNotNull(response.failed["missing"])
     }
+
+    @Test
+    fun `bulk delete is a stub and returns failed`() {
+        val s = seed()
+        val response = AdminSkillQueries.bulk(
+            principal(s.adminId),
+            AdminSkillQueries.BulkActionRequest(ids = listOf(s.skillId), action = "delete"),
+        )
+        assertTrue(response.results.isEmpty())
+        assertEquals(1, response.failed.size)
+        assertNotNull(response.failed[s.skillId])
+    }
 }

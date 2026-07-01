@@ -43,11 +43,9 @@ object AdminUserQueries {
     )
 
     fun list(filter: String? = null, search: String? = null, page: Int? = 1): List<UserListItem> = transaction {
-        filter?.let {
-            when (it) {
-                "active", "suspended" -> Unit
-                else -> throw ApiValidationException(mapOf("filter" to "must be active or suspended"))
-            }
+        val validStatuses = setOf("active", "suspended")
+        if (filter != null && filter !in validStatuses) {
+            throw ApiValidationException(mapOf("filter" to "must be active or suspended"))
         }
 
         val query = Users
@@ -61,10 +59,12 @@ object AdminUserQueries {
                 }
             }
             .orderBy(Users.createdAt to SortOrder.DESC)
-            .limit(PAGE_SIZE)
-            .offset(((page ?: 1).coerceAtLeast(1) - 1L) * PAGE_SIZE)
 
-        val rows = query.toList()
+        val paged = page?.let { p ->
+            query.limit(PAGE_SIZE).offset(((p.coerceAtLeast(1) - 1L) * PAGE_SIZE))
+        } ?: query
+
+        val rows = paged.toList()
         val userIds = rows.map { it[Users.id] }
         val counts = if (userIds.isEmpty()) emptyMap() else {
             Skills.join(Bundles, JoinType.INNER, Skills.bundleId, Bundles.id)
@@ -109,7 +109,7 @@ object AdminUserQueries {
 
             // If demoting or suspending an admin, ensure they are not the last admin.
             val targetRole = user[Users.role]
-            if (targetRole == Role.admin.name && (role != Role.admin.name || status == UserStatus.suspended.name)) {
+            if (targetRole == Role.admin.name && ((role != null && role != Role.admin.name) || status == UserStatus.suspended.name)) {
                 val adminCount = Users.selectAll().where { Users.role eq Role.admin.name }.count()
                 if (adminCount <= 1) {
                     throw ApiConflictException("Cannot remove the last admin", "last_admin_guard")
@@ -137,7 +137,7 @@ object AdminUserQueries {
     }
 
     fun exportCsv(filter: String? = null, search: String? = null): String = transaction {
-        val rows = list(filter, search, page = 1)
+        val rows = list(filter, search, page = null)
         val lines = mutableListOf("id,handle,role,status,skillCount,createdAt")
         rows.forEach { u ->
             lines += listOf(

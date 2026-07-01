@@ -62,7 +62,7 @@ class AdminQueueDecisionTest {
         override suspend fun verifyAndParseEvent(body: ByteArray, signature: String): GithubWebhookEvent? = null
     }
 
-    private fun makeZipball(slug: String): ByteArray {
+    private fun makeZipball(slug: String, version: String = "1.0.0"): ByteArray {
         val baos = ByteArrayOutputStream()
         ZipOutputStream(baos).use { zos ->
             zos.putNextEntry(ZipEntry("repo-main/skills/$slug/SKILL.md"))
@@ -74,7 +74,7 @@ class AdminQueueDecisionTest {
                 license: Apache-2.0
                 tags: [android, kotlin]
                 metadata:
-                  version: 1.0.0
+                  version: $version
                 ---
                 # $slug
                 
@@ -243,6 +243,102 @@ class AdminQueueDecisionTest {
             val audit = AuditLog.selectAll().where { AuditLog.target eq "submission:${s.submissionId}" }.single()
             assertEquals("submission.approve", audit[AuditLog.action])
             assertEquals(s.adminId, audit[AuditLog.actorId])
+
+            // Regression guards: readme persisted and the stored version zip is complete.
+            assertTrue(skill[Skills.readmeMd]?.contains("# $slug") == true, "readme_md should be populated")
+            val versionRow = Versions.selectAll().where { Versions.skillId eq s.skillId }.single()
+            val zipKey = versionRow[Versions.r2ZipKey]!!
+            val zipBytes = store.get(zipKey)
+            assertNotNull(zipBytes, "version zip should be stored")
+            val entries = readZipEntries(zipBytes)
+            assertTrue(entries.contains("SKILL.md"))
+            assertTrue(entries.contains("README.md"))
+            assertTrue(entries.contains("src/main.kt"))
+        }
+    }
+
+    private fun readZipEntries(bytes: ByteArray): Set<String> {
+        val names = mutableSetOf<String>()
+        java.util.zip.ZipInputStream(bytes.inputStream()).use { zis ->
+            var entry = zis.nextEntry
+            while (entry != null) {
+                names += entry.name
+                entry = zis.nextEntry
+            }
+        }
+        return names
+    }
+
+    @Test
+    fun `re-promotion with a new version stores both versions and updates live version`() {
+        val slug = "test-skill"
+        val s = seed(slug)
+
+        // Approve v1.0.0
+        runBlocking {
+            AdminQueueQueries.decision(
+                principal(s.adminId, s.adminHandle),
+                s.submissionId,
+                AdminQueueQueries.DecisionRequest("approve"),
+                store,
+                FakeApp(makeZipball(slug)),
+            )
+        }
+
+        // Update staged payload to v2.0.0 and approve again with a manifest that also says v2.0.0.
+        val stagedV2 = StagedPayload(
+            version = "2.0.0",
+            versionSource = "manifest",
+            name = "test-skill",
+            description = "A test skill v2.",
+            license = "Apache-2.0",
+            tags = listOf("android"),
+            sourceRef = StagedPayload.SourceRef("owner", "repo", "def456"),
+        )
+        transaction {
+            Submissions.update({ Submissions.id eq s.submissionId }) {
+                it[Submissions.state] = "in_review"
+                it[Submissions.payload] = appJson.encodeToString(
+                    SubmissionPayload.serializer(),
+                    SubmissionPayload(
+                        staged = stagedV2,
+                        review = ReviewOutputPayload(
+                            category = "kotlin-language",
+                            tagsValidated = listOf("android"),
+                            securityPassed = true,
+                            securityFindings = emptyList(),
+                            lintScore = 90,
+                        ),
+                    ),
+                )
+                it[Submissions.updatedAt] = nowIso()
+            }
+        }
+
+        runBlocking {
+            AdminQueueQueries.decision(
+                principal(s.adminId, s.adminHandle),
+                s.submissionId,
+                AdminQueueQueries.DecisionRequest("approve"),
+                store,
+                FakeApp(makeZipball(slug, version = "2.0.0")),
+            )
+        }
+
+        transaction {
+            val skill = Skills.selectAll().where { Skills.id eq s.skillId }.single()
+            assertEquals("2.0.0", skill[Skills.version])
+            // Description stays tied to the manifest body, which our fixture keeps as "A test skill."
+            assertEquals("A test skill.", skill[Skills.description])
+
+            val versions = Versions.selectAll()
+                .where { Versions.skillId eq s.skillId }
+                .orderBy(Versions.version)
+                .map { it[Versions.version] to it[Versions.r2ZipKey] }
+                .toMap()
+            assertEquals(setOf("1.0.0", "2.0.0"), versions.keys)
+            assertTrue(versions["1.0.0"]!!.endsWith("/1.0.0.zip"))
+            assertTrue(versions["2.0.0"]!!.endsWith("/2.0.0.zip"))
         }
     }
 

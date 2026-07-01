@@ -247,7 +247,6 @@ object IngestPipeline {
             Skills.selectAll().where { Skills.id eq skillId }.singleOrNull()
         } ?: throw IllegalStateException("Skill $skillId not found for promotion")
         val slug = skillRow[Skills.slug]
-        val version = skillRow[Skills.version]
         val skillDir = "skills/$slug"
 
         val detectedSkill = detected.firstOrNull { it.slug == slug }
@@ -259,7 +258,7 @@ object IngestPipeline {
         val fileEntries = files.map { it.path.removePrefix("$skillDir/") to it.bytes }
 
         // Build and store version zip before DB writes.
-        val zipKey = "skills/$skillId/versions/$version.zip"
+        val zipKey = "skills/$skillId/versions/${detectedSkill.version}.zip"
         val zipBytes = ZipBuilder.build(fileEntries.map { (p, b) -> p to b }, readmeMd = body.ifBlank { null })
         store.put(zipKey, zipBytes)
 

@@ -109,17 +109,95 @@ class AdminUserQueriesTest {
     }
 
     @Test
-    fun `last admin guard prevents demotion`() {
+    fun `last admin guard blocks demoting second to last admin`() {
         val s = seed()
-        // Remove the second admin if any; here only one admin exists.
+        val secondAdmin = newId()
+        transaction {
+            Users.insert {
+                it[Users.id] = secondAdmin
+                it[Users.githubId] = 3
+                it[Users.handle] = "other-admin"
+                it[Users.role] = Role.admin.name
+                it[Users.status] = UserStatus.active.name
+                it[Users.createdAt] = nowIso()
+                it[Users.updatedAt] = nowIso()
+            }
+        }
+        // Demote the original admin (not self) while the other admin exists -> should succeed.
+        AdminUserQueries.patch(
+            principal(secondAdmin),
+            s.adminId,
+            AdminUserQueries.AdminUserPatch(role = "member"),
+        )
+        transaction {
+            val row = Users.selectAll().where { Users.id eq s.adminId }.single()
+            assertEquals(Role.member.name, row[Users.role])
+        }
+
+        // With only one admin left, demoting that last admin should fail.
         val ex = assertFailsWith<ApiConflictException> {
             AdminUserQueries.patch(
-                principal(s.adminId),
-                s.adminId,
+                principal(s.adminId), // now member, but principal is constructed as admin for the call
+                secondAdmin,
                 AdminUserQueries.AdminUserPatch(role = "member"),
             )
         }
-        assertEquals("admin_self_guard", ex.code)
+        assertEquals("last_admin_guard", ex.code)
+    }
+
+    @Test
+    fun `status-only patch on last admin does not trigger last admin guard`() {
+        val s = seed()
+        val secondAdmin = newId()
+        transaction {
+            Users.insert {
+                it[Users.id] = secondAdmin
+                it[Users.githubId] = 3
+                it[Users.handle] = "other-admin"
+                it[Users.role] = Role.admin.name
+                it[Users.status] = UserStatus.active.name
+                it[Users.createdAt] = nowIso()
+                it[Users.updatedAt] = nowIso()
+            }
+        }
+        // Reinstating a suspended admin should not hit last_admin_guard.
+        transaction {
+            Users.update({ Users.id eq secondAdmin }) {
+                it[Users.status] = UserStatus.suspended.name
+                it[Users.updatedAt] = nowIso()
+            }
+        }
+        AdminUserQueries.patch(
+            principal(s.adminId),
+            secondAdmin,
+            AdminUserQueries.AdminUserPatch(status = "active"),
+        )
+        transaction {
+            val row = Users.selectAll().where { Users.id eq secondAdmin }.single()
+            assertEquals(UserStatus.active.name, row[Users.status])
+        }
+    }
+
+    @Test
+    fun `csv export includes all users not just first page`() {
+        val s = seed()
+        transaction {
+            repeat(55) { i ->
+                Users.insert {
+                    it[Users.id] = newId()
+                    it[Users.githubId] = 100L + i
+                    it[Users.handle] = "user-$i"
+                    it[Users.role] = Role.member.name
+                    it[Users.status] = UserStatus.active.name
+                    it[Users.createdAt] = nowIso()
+                    it[Users.updatedAt] = nowIso()
+                }
+            }
+        }
+        val csv = AdminUserQueries.exportCsv()
+        assertTrue(csv.contains("user-0"), "CSV should include user beyond page 1")
+        assertTrue(csv.contains("user-54"), "CSV should include the last seeded user")
+        assertEquals(58, csv.lines().filter { it.isNotBlank() }.size)
     }
 
     @Test
