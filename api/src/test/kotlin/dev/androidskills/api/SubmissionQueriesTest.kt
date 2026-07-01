@@ -25,6 +25,8 @@ import kotlinx.coroutines.runBlocking
 import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.transactions.transaction
+import org.jetbrains.exposed.sql.update
+import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -393,14 +395,48 @@ class SubmissionQueriesTest {
     }
 
     @Test
-    fun `createDrafts 409 when submission already in_review`(): Unit = runBlocking {
+    fun `createDrafts re-drafts preserve existing review payload`(): Unit = runBlocking {
         setupDb()
         val (_, principal) = createUser(42L, "alice")
         val response = SubmissionQueries.createDrafts(principal, draftRequest("skill-one"), fakeGh())
-        SubmissionQueries.submit(principal, response.submissionIds[0])
-        val ex = assertFailsWith<ApiConflictException> {
-            SubmissionQueries.createDrafts(principal, draftRequest("skill-one"), fakeGh())
+        val subId = response.submissionIds[0]
+
+        // Inject a review into the payload (as if the worker ran before a re-scan).
+        transaction {
+            val row = Submissions.selectAll().where { Submissions.id eq subId }.single()
+            val p = dev.androidskills.util.appJson.decodeFromString(
+                dev.androidskills.ingest.SubmissionPayload.serializer(),
+                row[Submissions.payload]!!,
+            )
+            val reviewed = p.copy(
+                review = dev.androidskills.ingest.ReviewOutputPayload(
+                    category = "kotlin-language",
+                    tagsValidated = listOf("android"),
+                    securityPassed = true,
+                    securityFindings = emptyList(),
+                    lintScore = 90,
+                ),
+            )
+            Submissions.update({ Submissions.id eq subId }) {
+                it[Submissions.payload] = dev.androidskills.util.appJson.encodeToString(
+                    dev.androidskills.ingest.SubmissionPayload.serializer(),
+                    reviewed,
+                )
+            }
         }
-        assertEquals("submission_already_active", ex.code)
+
+        // Re-create drafts for the same skill with a new ref — should merge, not overwrite.
+        SubmissionQueries.createDrafts(principal, draftRequest("skill-one").copy(ref = "def456"), fakeGh())
+
+        transaction {
+            val sub = Submissions.selectAll().where { Submissions.id eq subId }.single()
+            val p = dev.androidskills.util.appJson.decodeFromString(
+                dev.androidskills.ingest.SubmissionPayload.serializer(),
+                sub[Submissions.payload]!!,
+            )
+            assertNotNull(p.review, "review payload must be preserved on re-draft")
+            assertEquals(90, p.review!!.lintScore)
+            assertEquals("def456", p.staged!!.sourceRef!!.ref)
+        }
     }
 }

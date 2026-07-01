@@ -166,11 +166,18 @@ private suspend fun runReviewJob(payload: String, llm: LlmClient) {
             it[Skills.updatedAt] = nowIso()
         }
         // B1: merge review output into the submission payload WITHOUT destroying staged.
+        // X1: pin the staged sourceRef as the reviewed sha so approve cannot silently
+        // fetch a later push.
         val currentRow = Submissions.selectAll().where { Submissions.id eq req.submissionId }.singleOrNull()
         val currentPayload = currentRow?.get(Submissions.payload)?.let {
             runCatching { appJson.decodeFromString(dev.androidskills.ingest.SubmissionPayload.serializer(), it) }.getOrNull()
         } ?: dev.androidskills.ingest.SubmissionPayload()
-        val merged = currentPayload.copy(review = dev.androidskills.ingest.ReviewOutputPayload.from(result))
+        val merged = currentPayload.copy(
+            review = dev.androidskills.ingest.ReviewOutputPayload.from(result),
+            reviewedSourceRef = currentPayload.staged?.sourceRef?.let {
+                dev.androidskills.ingest.StagedPayload.SourceRef(it.repoOwner, it.repoName, it.ref)
+            } ?: currentPayload.reviewedSourceRef,
+        )
         Submissions.update({ Submissions.id eq req.submissionId }) {
             it[Submissions.lintScore] = result.lintScore
             it[Submissions.payload] = appJson.encodeToString(dev.androidskills.ingest.SubmissionPayload.serializer(), merged)

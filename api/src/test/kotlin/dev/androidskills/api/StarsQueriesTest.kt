@@ -157,11 +157,20 @@ class StarsQueriesTest {
     }
 
     @Test
-    fun `removeStar 404 for missing skill`() {
+    fun `listStars omits unlisted skills`() {
         setupDb()
         val (uid, principal) = createUser(42L, "alice")
-        assertFailsWith<ApiNotFoundException> {
-            StarsQueries.removeStar(principal, "missing")
+        val sid = insertPublishedSkill(uid, "skill-one")
+        StarsQueries.addStar(principal, "skill-one")
+        assertEquals(1, StarsQueries.listStars(principal).size)
+
+        transaction {
+            val op = org.jetbrains.exposed.sql.SqlExpressionBuilder.run { Skills.id eq sid }
+            Skills.update({ op }) {
+                it[Skills.status] = "unlisted"
+            }
         }
+
+        assertEquals(0, StarsQueries.listStars(principal).size)
     }
 }

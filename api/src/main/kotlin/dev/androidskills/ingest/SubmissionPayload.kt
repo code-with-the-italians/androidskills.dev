@@ -12,6 +12,7 @@ import kotlinx.serialization.Serializable
 data class SubmissionPayload(
     val staged: StagedPayload? = null,
     val review: ReviewOutputPayload? = null,
+    val reviewedSourceRef: StagedPayload.SourceRef? = null, // pinned at review time; approve checks against staged.sourceRef
 )
 
 /** The staged version's metadata — what step-7 promotion promotes to the live skill. */
