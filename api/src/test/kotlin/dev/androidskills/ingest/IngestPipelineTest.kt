@@ -202,4 +202,85 @@ class IngestPipelineTest {
         val subsAfter = transaction { Submissions.selectAll().where { Submissions.skillId eq skillId }.toList() }
         assertEquals(1, subsAfter.size, "open in_review submission must be reused, not duplicated")
     }
+
+    @Test
+    fun `promote guard runs before file store and DB writes`() {
+        val (bundleId, userId) = seedBundle()
+        val skillId = dev.androidskills.util.newId()
+        val now = dev.androidskills.util.nowIso()
+        transaction {
+            Skills.insert {
+                it[Skills.id] = skillId
+                it[Skills.bundleId] = bundleId
+                it[Skills.slug] = "guard-test"
+                it[Skills.name] = "Old"
+                it[Skills.description] = "Old"
+                it[Skills.version] = "0.0.0"
+                it[Skills.versionSource] = "manifest"
+                it[Skills.status] = "unlisted"
+                it[Skills.verified] = false
+                it[Skills.createdAt] = now
+                it[Skills.updatedAt] = now
+            }
+        }
+
+        val zipBytes = skillZip("guard-test", "Guard Test", "New", "1.0.0")
+        val ex = kotlin.test.assertFailsWith<dev.androidskills.api.ApiConflictException> {
+            IngestPipeline.promote(
+                skillId,
+                ArchiveSource.UploadedZip(zipBytes, "hash"),
+                bundleId,
+                store,
+                userId,
+                guard = { throw dev.androidskills.api.ApiConflictException("blocked", "blocked") },
+            )
+        }
+        assertEquals("blocked", ex.code)
+
+        assertFalse(store.exists("skills/$skillId/versions/1.0.0.zip"))
+        val row = transaction { Skills.selectAll().where { Skills.id eq skillId }.single() }
+        assertEquals("Old", row[Skills.name])
+        assertEquals("0.0.0", row[Skills.version])
+        val files = transaction { SkillFiles.selectAll().where { SkillFiles.skillId eq skillId }.count() }
+        assertEquals(0, files)
+    }
+
+    @Test
+    fun `promote updates an existing skill shell`() {
+        val (bundleId, userId) = seedBundle()
+        val skillId = dev.androidskills.util.newId()
+        val now = dev.androidskills.util.nowIso()
+        transaction {
+            Skills.insert {
+                it[Skills.id] = skillId
+                it[Skills.bundleId] = bundleId
+                it[Skills.slug] = "promote-test"
+                it[Skills.name] = "Old"
+                it[Skills.description] = "Old"
+                it[Skills.version] = "0.0.0"
+                it[Skills.versionSource] = "manifest"
+                it[Skills.status] = "unlisted"
+                it[Skills.verified] = false
+                it[Skills.createdAt] = now
+                it[Skills.updatedAt] = now
+            }
+        }
+
+        val zipBytes = skillZip("promote-test", "Promote Test", "New", "1.0.0")
+        IngestPipeline.promote(
+            skillId,
+            ArchiveSource.UploadedZip(zipBytes, "hash"),
+            bundleId,
+            store,
+            userId,
+        )
+
+        val row = transaction { Skills.selectAll().where { Skills.id eq skillId }.single() }
+        assertEquals("Promote Test", row[Skills.name])
+        assertEquals("New", row[Skills.description])
+        assertEquals("1.0.0", row[Skills.version])
+        val files = transaction { SkillFiles.selectAll().where { SkillFiles.skillId eq skillId }.map { it[SkillFiles.path] } }
+        assertTrue(files.contains("SKILL.md"))
+        assertTrue(files.contains("references/guide.md"))
+    }
 }

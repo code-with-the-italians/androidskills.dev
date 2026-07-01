@@ -106,7 +106,7 @@ private suspend fun listUsers(call: ApplicationCall) {
     val principal = call.requireAdmin()
     val filter = call.request.queryParameters["filter"]
     val search = call.request.queryParameters["q"]
-    val page = call.request.queryParameters["page"]?.toIntOrNull()
+    val page = call.request.queryParameters["page"]?.toIntOrNull() ?: 1
     call.respond(AdminUserQueries.list(filter, search, page))
 }
 
