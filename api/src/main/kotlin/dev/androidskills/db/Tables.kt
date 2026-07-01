@@ -226,6 +226,13 @@ object AuditLog : Table("audit_log") {
     }
 }
 
+object PlatformSettings : Table("platform_settings") {
+    val key = text("key")
+    val value = text("value")
+
+    override val primaryKey = PrimaryKey(key)
+}
+
 object Reports : Table("reports") {
     val id = varchar("id", 36)
     val skillId = varchar("skill_id", 36).references(Skills.id, onDelete = ReferenceOption.CASCADE)

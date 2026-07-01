@@ -3,6 +3,7 @@ package dev.androidskills
 import dev.androidskills.db.DEFAULT_CATEGORIES
 import dev.androidskills.db.Bundles
 import dev.androidskills.db.Categories
+import dev.androidskills.db.PlatformSettings
 import dev.androidskills.db.SkillFiles
 import dev.androidskills.db.Skills
 import dev.androidskills.db.Users
@@ -16,6 +17,7 @@ import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class MigrationTest {
@@ -45,13 +47,13 @@ class MigrationTest {
     }
 
     @Test
-    fun `schema_meta version is 2 after migration`() {
+    fun `schema_meta version is 3 after migration`() {
         Database.init(TestSupport.newConfig(dir))
         transaction {
             val v = exec("SELECT value FROM schema_meta WHERE key='version'") { rs ->
                 rs.next(); rs.getString(1).toInt()
             }
-            assertEquals(2, v)
+            assertEquals(3, v)
         }
     }
 
@@ -77,7 +79,26 @@ class MigrationTest {
             val v = exec("SELECT value FROM schema_meta WHERE key='version'") { rs ->
                 rs.next(); rs.getString(1).toInt()
             }
-            assertEquals(2, v)
+            assertEquals(3, v)
+        }
+    }
+
+    @Test
+    fun `v3 creates platform_settings with default settings row`() {
+        Database.init(TestSupport.newConfig(dir))
+        transaction {
+            val tables = exec("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name") { rs ->
+                val out = mutableListOf<String>()
+                while (rs.next()) out += rs.getString(1)
+                out
+            } ?: emptyList()
+            assertTrue("platform_settings table missing") { "platform_settings" in tables }
+
+            val row = PlatformSettings.selectAll().where { PlatformSettings.key eq "settings" }.singleOrNull()
+            assertNotNull(row)
+            val json = row!![PlatformSettings.value]
+            assertTrue(json.contains("reviewPolicy"))
+            assertTrue(json.contains("tokenSoftCap"))
         }
     }
 
