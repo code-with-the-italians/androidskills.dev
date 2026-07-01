@@ -209,6 +209,12 @@ object AdminQueueQueries {
                 )
 
                 transaction {
+                    val current = Submissions.selectAll()
+                        .where { Submissions.id eq submissionId }
+                        .singleOrNull()
+                    if (current?.get(Submissions.state) !in listOf("in_review", "changes_requested")) {
+                        throw ApiConflictException("Submission state changed concurrently", "concurrent_state_change")
+                    }
                     val now = nowIso()
                     val review = payload.review
                     val categorySlug = review?.category
@@ -240,6 +246,12 @@ object AdminQueueQueries {
             }
             "request_changes" -> {
                 transaction {
+                    val current = Submissions.selectAll()
+                        .where { Submissions.id eq submissionId }
+                        .singleOrNull()
+                    if (current?.get(Submissions.state) !in listOf("in_review", "changes_requested")) {
+                        throw ApiConflictException("Submission state changed concurrently", "concurrent_state_change")
+                    }
                     Submissions.update({ Submissions.id eq submissionId }) {
                         it[Submissions.state] = "changes_requested"
                         it[Submissions.note] = request.note
@@ -255,6 +267,12 @@ object AdminQueueQueries {
             }
             "reject" -> {
                 transaction {
+                    val current = Submissions.selectAll()
+                        .where { Submissions.id eq submissionId }
+                        .singleOrNull()
+                    if (current?.get(Submissions.state) !in listOf("in_review", "changes_requested")) {
+                        throw ApiConflictException("Submission state changed concurrently", "concurrent_state_change")
+                    }
                     Submissions.update({ Submissions.id eq submissionId }) {
                         it[Submissions.state] = "rejected"
                         it[Submissions.note] = request.note

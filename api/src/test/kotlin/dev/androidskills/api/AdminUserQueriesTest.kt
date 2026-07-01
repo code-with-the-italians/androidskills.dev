@@ -79,6 +79,26 @@ class AdminUserQueriesTest {
     }
 
     @Test
+    fun `list paginates by default`() {
+        val s = seed()
+        transaction {
+            repeat(55) { i ->
+                Users.insert {
+                    it[Users.id] = newId()
+                    it[Users.githubId] = 100L + i
+                    it[Users.handle] = "user-$i"
+                    it[Users.role] = Role.member.name
+                    it[Users.status] = UserStatus.active.name
+                    it[Users.createdAt] = nowIso()
+                    it[Users.updatedAt] = nowIso()
+                }
+            }
+        }
+        val items = AdminUserQueries.list() // default page 1
+        assertEquals(AdminUserQueries.PAGE_SIZE, items.size)
+    }
+
+    @Test
     fun `patch role and status`() {
         val s = seed()
         AdminUserQueries.patch(
@@ -123,7 +143,6 @@ class AdminUserQueriesTest {
                 it[Users.updatedAt] = nowIso()
             }
         }
-        // Demote the original admin (not self) while the other admin exists -> should succeed.
         AdminUserQueries.patch(
             principal(secondAdmin),
             s.adminId,
@@ -134,10 +153,9 @@ class AdminUserQueriesTest {
             assertEquals(Role.member.name, row[Users.role])
         }
 
-        // With only one admin left, demoting that last admin should fail.
         val ex = assertFailsWith<ApiConflictException> {
             AdminUserQueries.patch(
-                principal(s.adminId), // now member, but principal is constructed as admin for the call
+                principal(s.adminId),
                 secondAdmin,
                 AdminUserQueries.AdminUserPatch(role = "member"),
             )
@@ -160,7 +178,6 @@ class AdminUserQueriesTest {
                 it[Users.updatedAt] = nowIso()
             }
         }
-        // Reinstating a suspended admin should not hit last_admin_guard.
         transaction {
             Users.update({ Users.id eq secondAdmin }) {
                 it[Users.status] = UserStatus.suspended.name
