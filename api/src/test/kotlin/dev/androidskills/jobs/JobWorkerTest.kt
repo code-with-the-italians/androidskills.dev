@@ -83,9 +83,19 @@ class JobWorkerTest {
         }
         val subId = transaction {
             val id = newId(); val now = nowIso()
+            val staged = dev.androidskills.ingest.StagedPayload(
+                version = "1.0.0", versionSource = "manifest", name = "Test", description = "d",
+                license = "MIT", tags = listOf("kotlin"),
+                sourceRef = dev.androidskills.ingest.StagedPayload.SourceRef("alice", "repo", "reviewedsha"),
+            )
+            val payload = appJson.encodeToString(
+                dev.androidskills.ingest.SubmissionPayload.serializer(),
+                dev.androidskills.ingest.SubmissionPayload(staged = staged),
+            )
             Submissions.insert {
                 it[Submissions.id] = id; it[Submissions.bundleId] = bundleId; it[Submissions.skillId] = skillId
-                it[Submissions.submitterId] = userId; it[Submissions.state] = "in_review"; it[Submissions.createdAt] = now; it[Submissions.updatedAt] = now
+                it[Submissions.submitterId] = userId; it[Submissions.state] = "in_review"
+                it[Submissions.payload] = payload; it[Submissions.createdAt] = now; it[Submissions.updatedAt] = now
             }; id
         }
         return skillId to subId
@@ -126,6 +136,12 @@ class JobWorkerTest {
         val sub = transaction { Submissions.selectAll().where { Submissions.id eq subId }.single() }
         assertEquals(85, sub[Submissions.lintScore])
         assertTrue(sub[Submissions.payload]?.contains("kotlin-language") == true)
+
+        val parsedPayload = appJson.decodeFromString(
+            dev.androidskills.ingest.SubmissionPayload.serializer(),
+            sub[Submissions.payload]!!,
+        )
+        assertEquals("reviewedsha", parsedPayload.reviewedSourceRef?.ref, "review must pin the staged source ref")
 
         val job = transaction { Jobs.selectAll().where { Jobs.id eq jobId }.single() }
         assertEquals("done", job[Jobs.state])

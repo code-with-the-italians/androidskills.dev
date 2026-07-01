@@ -449,12 +449,20 @@ class AdminQueueDecisionTest {
     }
 
     @Test
-    fun `decision on non awaiting submission throws conflict`() {
+    fun `approve rejects if source ref moved since review`() {
         val slug = "test-skill"
-        val s = seed(slug)
+        val s = seed(slug, ref = "abc123")
+
+        // Simulate the review pinning abc123, then a later push moving staged ref to def456.
         transaction {
+            val row = Submissions.selectAll().where { Submissions.id eq s.submissionId }.single()
+            val p = appJson.decodeFromString(SubmissionPayload.serializer(), row[Submissions.payload]!!)!!
+            val moved = p.copy(
+                reviewedSourceRef = StagedPayload.SourceRef("owner", "repo", "abc123"),
+                staged = p.staged!!.copy(sourceRef = StagedPayload.SourceRef("owner", "repo", "def456")),
+            )
             Submissions.update({ Submissions.id eq s.submissionId }) {
-                it[Submissions.state] = "published"
+                it[Submissions.payload] = appJson.encodeToString(SubmissionPayload.serializer(), moved)
                 it[Submissions.updatedAt] = nowIso()
             }
         }
@@ -466,10 +474,57 @@ class AdminQueueDecisionTest {
                     s.submissionId,
                     AdminQueueQueries.DecisionRequest("approve"),
                     store,
-                    FakeApp(ByteArray(0)),
+                    FakeApp(makeZipball(slug)),
                 )
             }
         }
-        assertEquals("invalid_state_transition", ex.code)
+        assertEquals("review_sha_moved", ex.code)
+
+        transaction {
+            val skill = Skills.selectAll().where { Skills.id eq s.skillId }.single()
+            assertEquals("unlisted", skill[Skills.status])
+            assertEquals(false, skill[Skills.verified])
+        }
+    }
+
+    @Test
+    fun `approve preserves existing category when review category is unresolvable`() {
+        val slug = "test-skill"
+        val catId = transaction {
+            Categories.selectAll().where { Categories.slug eq "kotlin-language" }.single()[Categories.id]
+        }
+        val s = seed(slug)
+        transaction {
+            Skills.update({ Skills.id eq s.skillId }) {
+                it[Skills.categoryId] = catId
+                it[Skills.updatedAt] = nowIso()
+            }
+        }
+
+        // review category is unknown → should not wipe the existing category.
+        transaction {
+            val row = Submissions.selectAll().where { Submissions.id eq s.submissionId }.single()
+            val p = appJson.decodeFromString(SubmissionPayload.serializer(), row[Submissions.payload]!!)!!
+            val noCat = p.copy(review = p.review!!.copy(category = "unknown-category"))
+            Submissions.update({ Submissions.id eq s.submissionId }) {
+                it[Submissions.payload] = appJson.encodeToString(SubmissionPayload.serializer(), noCat)
+                it[Submissions.updatedAt] = nowIso()
+            }
+        }
+
+        runBlocking {
+            AdminQueueQueries.decision(
+                principal(s.adminId, s.adminHandle),
+                s.submissionId,
+                AdminQueueQueries.DecisionRequest("approve"),
+                store,
+                FakeApp(makeZipball(slug)),
+            )
+        }
+
+        transaction {
+            val skill = Skills.selectAll().where { Skills.id eq s.skillId }.single()
+            assertEquals(catId, skill[Skills.categoryId])
+        }
     }
 }
