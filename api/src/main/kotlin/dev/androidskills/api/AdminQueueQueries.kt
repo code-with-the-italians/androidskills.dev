@@ -206,6 +206,16 @@ object AdminQueueQueries {
                     bundleId,
                     store,
                     submission[Submissions.submitterId],
+                    guard = {
+                        val current = transaction {
+                            Submissions.selectAll()
+                                .where { Submissions.id eq submissionId }
+                                .singleOrNull()
+                        }
+                        if (current?.get(Submissions.state) !in listOf("in_review", "changes_requested")) {
+                            throw ApiConflictException("Submission state changed concurrently", "concurrent_state_change")
+                        }
+                    },
                 )
 
                 transaction {

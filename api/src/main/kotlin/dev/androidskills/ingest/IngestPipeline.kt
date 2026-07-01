@@ -235,7 +235,7 @@ object IngestPipeline {
      *
      * Returns the promoted version. Throws if the slug is not found in the archive.
      */
-    fun promote(skillId: String, source: ArchiveSource, bundleId: String, store: FileStore, submitterId: String): PromoteResult {
+    fun promote(skillId: String, source: ArchiveSource, bundleId: String, store: FileStore, submitterId: String, guard: () -> Unit = {}): PromoteResult {
         val scanResult = Discovery.discover(source)
         if (scanResult is ScanResult.NoSkillsDir) {
             throw IllegalStateException("No top-level 'skills/' directory in archive")
@@ -257,9 +257,15 @@ object IngestPipeline {
         val body = skillMd?.bytes?.toString(Charsets.UTF_8) ?: ""
         val fileEntries = files.map { it.path.removePrefix("$skillDir/") to it.bytes }
 
-        // Build and store version zip before DB writes.
+        // Build version zip, then run the caller-supplied guard before any side effects.
+        // This prevents file-store / DB writes if the submission state changed concurrently
+        // between the initial check and promotion (e.g. another admin rejected the submission).
         val zipKey = "skills/$skillId/versions/${detectedSkill.version}.zip"
         val zipBytes = ZipBuilder.build(fileEntries.map { (p, b) -> p to b }, readmeMd = body.ifBlank { null })
+
+        guard()
+
+        // Build and store version zip before DB writes.
         store.put(zipKey, zipBytes)
 
         // Write file mirror and replace DB skill_files.
