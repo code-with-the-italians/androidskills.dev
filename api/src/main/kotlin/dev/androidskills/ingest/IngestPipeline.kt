@@ -197,11 +197,12 @@ object IngestPipeline {
             .singleOrNull()
         if (existing != null) {
             val subId = existing[Submissions.id]
-            // Read-modify-write: preserve the review key (B1) when overwriting staged.
+            // Read-modify-write: preserve the review key (B1) and the reviewed sha pin (X1)
+            // when overwriting staged.
             val current = existing[Submissions.payload]?.let {
                 runCatching { appJson.decodeFromString(SubmissionPayload.serializer(), it) }.getOrNull()
             } ?: SubmissionPayload()
-            val merged = current.copy(staged = staged)
+            val merged = current.copy(staged = staged, reviewedSourceRef = current.reviewedSourceRef)
             Submissions.update({ Submissions.id eq subId }) {
                 it[Submissions.payload] = appJson.encodeToString(SubmissionPayload.serializer(), merged)
                 it[Submissions.updatedAt] = nowIso()

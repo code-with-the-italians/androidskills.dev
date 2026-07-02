@@ -154,6 +154,13 @@ private suspend fun runReviewJob(payload: String, llm: LlmClient) {
         )
     }
 
+    // Capture the ref that is actually being reviewed. A concurrent resync/push could
+    // rewrite staged.sourceRef while the LLM call is in flight, so we must not re-read
+    // it after the LLM call.
+    val capturedSourceRef = subPayload?.staged?.sourceRef?.let {
+        dev.androidskills.ingest.StagedPayload.SourceRef(it.repoOwner, it.repoName, it.ref)
+    }
+
     val result = llm.review(manifest)
 
     // Apply results (§6.3): category, tags, lintScore, security findings.
@@ -166,11 +173,13 @@ private suspend fun runReviewJob(payload: String, llm: LlmClient) {
             it[Skills.updatedAt] = nowIso()
         }
         // B1: merge review output into the submission payload WITHOUT destroying staged.
-        val currentRow = Submissions.selectAll().where { Submissions.id eq req.submissionId }.singleOrNull()
-        val currentPayload = currentRow?.get(Submissions.payload)?.let {
-            runCatching { appJson.decodeFromString(dev.androidskills.ingest.SubmissionPayload.serializer(), it) }.getOrNull()
-        } ?: dev.androidskills.ingest.SubmissionPayload()
-        val merged = currentPayload.copy(review = dev.androidskills.ingest.ReviewOutputPayload.from(result))
+        // X1: pin the captured sourceRef as the reviewed sha so approve cannot silently
+        // fetch a later push.
+        val currentPayload = subPayload ?: dev.androidskills.ingest.SubmissionPayload()
+        val merged = currentPayload.copy(
+            review = dev.androidskills.ingest.ReviewOutputPayload.from(result),
+            reviewedSourceRef = capturedSourceRef ?: currentPayload.reviewedSourceRef,
+        )
         Submissions.update({ Submissions.id eq req.submissionId }) {
             it[Submissions.lintScore] = result.lintScore
             it[Submissions.payload] = appJson.encodeToString(dev.androidskills.ingest.SubmissionPayload.serializer(), merged)

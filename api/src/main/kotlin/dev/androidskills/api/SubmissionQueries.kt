@@ -241,7 +241,10 @@ object SubmissionQueries {
                 val subId = if (existingSub != null) {
                     val id = existingSub[Submissions.id]
                     val staged = buildStaged(selection, version, versionSource, request)
-                    val merged = SubmissionPayload(staged = staged)
+                    val currentPayload = existingSub[Submissions.payload]?.let {
+                        runCatching { appJson.decodeFromString(SubmissionPayload.serializer(), it) }.getOrNull()
+                    } ?: SubmissionPayload()
+                    val merged = currentPayload.copy(staged = staged)
                     Submissions.update({ Submissions.id eq id }) {
                         it[Submissions.payload] = appJson.encodeToString(SubmissionPayload.serializer(), merged)
                         it[Submissions.updatedAt] = now

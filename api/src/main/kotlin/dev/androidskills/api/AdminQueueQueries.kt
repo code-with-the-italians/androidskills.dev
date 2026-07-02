@@ -189,6 +189,17 @@ object AdminQueueQueries {
                 val sourceRef = payload.staged?.sourceRef
                     ?: throw ApiBadGatewayException("Submission has no source ref", "missing_source_ref")
 
+                // X1: the review pinned a specific sha; if the staged ref moved (new push
+                // while in review), the admin must re-review before approving.
+                payload.reviewedSourceRef?.let { pinned ->
+                    if (sourceRef.ref != pinned.ref) {
+                        throw ApiConflictException(
+                            "Submission content changed since review; re-review required",
+                            "review_sha_moved",
+                        )
+                    }
+                }
+
                 val installationId = bundle[Bundles.installationId]
                     ?: throw ApiBadGatewayException("Bundle has no installation", "bundle_no_installation")
                 val (owner, repo) = bundle[Bundles.provenance].split("/", limit = 2).let {
@@ -235,7 +246,7 @@ object AdminQueueQueries {
                     Skills.update({ Skills.id eq skillId }) {
                         it[Skills.status] = "published"
                         it[Skills.verified] = true
-                        it[Skills.categoryId] = categoryId
+                        categoryId?.let { cid -> it[Skills.categoryId] = cid }
                         it[Skills.updatedAt] = now
                     }
                     Submissions.update({ Submissions.id eq submissionId }) {

@@ -35,7 +35,7 @@ object StarsQueries {
         val skillIds = stars.map { it.first }
         val skillsById = if (skillIds.isEmpty()) emptyMap() else {
             Skills.selectAll()
-                .where { Skills.id inList skillIds }
+                .where { (Skills.id inList skillIds) and (Skills.status eq SkillStatus.published.name) }
                 .associateBy({ it[Skills.id] }, { it })
         }
         val categoryIds = skillsById.values.mapNotNull { it[Skills.categoryId] }.distinct()
