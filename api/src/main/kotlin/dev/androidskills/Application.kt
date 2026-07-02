@@ -47,6 +47,7 @@ import org.jetbrains.exposed.sql.transactions.transaction
  *   when creds are absent (spec §13: "unset → auth disabled").
  */
 fun Application.module(config: AppConfig = AppConfig.fromEnv(), oauth: OAuthClient? = null, githubApp: GitHubAppClient? = null) {
+    config.validate()
     Database.init(config)
 
     install(ContentNegotiation) { json() }
