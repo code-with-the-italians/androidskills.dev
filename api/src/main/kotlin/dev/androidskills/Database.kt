@@ -40,6 +40,8 @@ object Database {
         Migrations.run(db)
     }
 
+    fun check(): Boolean = runCatching { journalMode() }.isSuccess
+
     fun journalMode(): String = transaction(db) {
         var mode = "unknown"
         exec("PRAGMA journal_mode;") { rs -> if (rs.next()) mode = rs.getString(1) }

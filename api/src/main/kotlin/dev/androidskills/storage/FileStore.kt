@@ -12,6 +12,7 @@ interface FileStore {
     fun put(key: String, bytes: ByteArray)
     fun get(key: String): ByteArray?
     fun exists(key: String): Boolean
+    fun check(): Boolean
 }
 
 class LocalFsStore(private val root: Path) : FileStore {
@@ -20,6 +21,8 @@ class LocalFsStore(private val root: Path) : FileStore {
     init {
         Files.createDirectories(root)
     }
+
+    override fun check(): Boolean = Files.isDirectory(root) && Files.isWritable(root)
 
     private fun resolve(key: String): Path =
         root.resolve(key).normalize().also {

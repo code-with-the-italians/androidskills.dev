@@ -11,12 +11,14 @@ import dev.androidskills.auth.OAuthClient
 import dev.androidskills.auth.authRoutes
 import dev.androidskills.db.Skills
 import dev.androidskills.github.GitHubAppClient
+import dev.androidskills.github.PemLoader
 import dev.androidskills.gh.webhookRoutes
 import dev.androidskills.llm.LlmClient
 import dev.androidskills.llm.StubLlmClient
 import dev.androidskills.storage.FileStore
 import dev.androidskills.storage.LocalFsStore
 import io.ktor.client.HttpClient
+import io.ktor.http.HttpStatusCode
 import io.ktor.serialization.kotlinx.json.json
 import io.ktor.server.application.Application
 import io.ktor.server.application.ApplicationStopped
@@ -97,6 +99,22 @@ fun Application.module(config: AppConfig = AppConfig.fromEnv(), oauth: OAuthClie
                 ),
             )
         }
+        get("/api/health/deep") {
+            val dbOk = Database.check()
+            val fileStoreOk = fileStore.check()
+            val githubAppOk = if (config.githubApp.configured) {
+                PemLoader.validatePem(config.githubApp.privateKeyPem)
+            } else true
+            val llmOk = if (config.llmBaseUrl != null) {
+                config.llmApiKey != null && config.llmModel != null &&
+                    runCatching { java.net.URI(config.llmBaseUrl) }.isSuccess
+            } else true
+            val checks = DeepHealthChecks(dbOk, fileStoreOk, githubAppOk, llmOk)
+            val ok = dbOk && fileStoreOk && githubAppOk && llmOk
+            val status = if (ok) "ok" else "degraded"
+            val code = if (ok) HttpStatusCode.OK else HttpStatusCode.ServiceUnavailable
+            call.respond(code, DeepHealthResponse(status, checks))
+        }
         publicRoutes(fileStore)
         authRoutes(config, resolvedOauth)
         contributorRoutes(resolvedGithubApp)
@@ -159,4 +177,18 @@ data class HealthResponse(
     val fileStore: String,
     val llm: String,
     val auth: String,
+)
+
+@Serializable
+data class DeepHealthResponse(
+    val status: String,
+    val checks: DeepHealthChecks,
+)
+
+@Serializable
+data class DeepHealthChecks(
+    val database: Boolean,
+    val fileStore: Boolean,
+    val githubApp: Boolean,
+    val llm: Boolean,
 )
