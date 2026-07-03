@@ -18,6 +18,7 @@ import dev.androidskills.llm.StubLlmClient
 import dev.androidskills.storage.FileStore
 import dev.androidskills.storage.LocalFsStore
 import io.ktor.client.HttpClient
+import io.ktor.http.ContentType
 import io.ktor.http.HttpStatusCode
 import io.ktor.serialization.kotlinx.json.json
 import io.ktor.server.application.Application
@@ -31,6 +32,7 @@ import io.ktor.server.plugins.ratelimit.RateLimit
 import io.ktor.server.plugins.ratelimit.RateLimitName
 import io.ktor.server.plugins.ratelimit.rateLimit
 import io.ktor.server.response.respond
+import io.ktor.server.response.respondText
 import io.ktor.server.routing.get
 import io.ktor.server.routing.routing
 import kotlin.time.Duration.Companion.seconds
@@ -150,6 +152,11 @@ fun Application.module(config: AppConfig = AppConfig.fromEnv(), oauth: OAuthClie
             val status = if (ok) "ok" else "degraded"
             val code = if (ok) HttpStatusCode.OK else HttpStatusCode.ServiceUnavailable
             call.respond(code, DeepHealthResponse(status, checks))
+        }
+        get("/api/openapi.yaml") {
+            val spec = this::class.java.classLoader.getResourceAsStream("openapi.yaml")?.use { it.readAllBytes() }?.decodeToString()
+                ?: throw IllegalStateException("openapi.yaml missing from classpath")
+            call.respondText(spec, ContentType("application", "yaml"))
         }
         publicRoutes(fileStore)
         authRoutes(config, resolvedOauth)
