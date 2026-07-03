@@ -5,6 +5,8 @@ import dev.androidskills.api.ApiBadRequestException
 import dev.androidskills.api.ErrorBody
 import dev.androidskills.api.ErrorResponse
 import dev.androidskills.util.constantTimeEquals
+import io.ktor.server.plugins.ratelimit.RateLimitName
+import io.ktor.server.plugins.ratelimit.rateLimit
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.ApplicationCall
 import io.ktor.server.response.respond
@@ -32,7 +34,8 @@ fun Route.authRoutes(config: AppConfig, oauth: OAuthClient) {
     val redirectUri = "${auth.publicBaseUrl.trimEnd('/')}/api/auth/github/callback"
 
     route("api") {
-        get("auth/github/start") {
+        rateLimit(RateLimitName("auth")) {
+            get("auth/github/start") {
             if (!oauth.configured) {
                 call.respond(HttpStatusCode.ServiceUnavailable, ErrorResponse(ErrorBody("auth_disabled", "GitHub OAuth is not configured")))
                 return@get
@@ -93,10 +96,12 @@ fun Route.authRoutes(config: AppConfig, oauth: OAuthClient) {
             clearSessionCookie(call, auth)
             call.respond(mapOf("ok" to true))
         }
-
-        get("me") {
-            val principal = call.requireSession()
-            call.respond(principal.toMe())
+        }
+        rateLimit(RateLimitName("authenticated")) {
+            get("me") {
+                val principal = call.requireSession()
+                call.respond(principal.toMe())
+            }
         }
     }
 }

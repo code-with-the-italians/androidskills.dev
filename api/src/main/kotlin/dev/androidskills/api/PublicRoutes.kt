@@ -1,6 +1,8 @@
 package dev.androidskills.api
 
 import dev.androidskills.storage.FileStore
+import io.ktor.server.plugins.ratelimit.RateLimitName
+import io.ktor.server.plugins.ratelimit.rateLimit
 import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
@@ -19,64 +21,66 @@ import io.ktor.server.routing.route
 fun Route.publicRoutes(fileStore: FileStore) {
     val q = PublicQueries
 
-    route("api") {
-        get("stats") { call.respond(q.stats()) }
+    rateLimit(RateLimitName("public")) {
+        route("api") {
+            get("stats") { call.respond(q.stats()) }
 
-        get("skills") { call.respond(q.search(parseSearchParams(call))) }
-        get("skills/{slug}") { call.respond(q.skillDetail(call.parameters["slug"]!!)) }
-        get("skills/{slug}/files") { call.respond(q.fileTree(call.parameters["slug"]!!)) }
-        get("skills/{slug}/files/{path...}") {
-            val slug = call.parameters["slug"]!!
-            // {path...} is a tailcard: read every captured segment and rejoin so
-            // nested paths like references/guide.md survive the DB path match.
-            val path = call.parameters.getAll("path")?.joinToString("/").orEmpty()
-            val raw = call.request.queryParameters["raw"] == "1"
-            val res = q.fileContent(slug, path, fileStore)
-            if (raw && !res.downloadOnly) {
-                // Raw preview is ALWAYS text/plain (+ nosniff): a published skill
-                // can include an .html file, and serving it as text/html would give
-                // it same-origin script execution — catastrophic once auth/admin
-                // routes share this origin. Source files render fine as text.
-                call.response.headers.append("X-Content-Type-Options", "nosniff")
-                call.respondText(res.content ?: "", contentType = ContentType.Text.Plain.withCharset(Charsets.UTF_8))
-            } else {
-                call.respond(
-                    FileContentResponse(
-                        slug = res.slug, path = res.path, size = res.size, isBinary = res.isBinary,
-                        content = res.content, downloadOnly = res.downloadOnly, downloadUrl = null,
-                    ),
-                )
+            get("skills") { call.respond(q.search(parseSearchParams(call))) }
+            get("skills/{slug}") { call.respond(q.skillDetail(call.parameters["slug"]!!)) }
+            get("skills/{slug}/files") { call.respond(q.fileTree(call.parameters["slug"]!!)) }
+            get("skills/{slug}/files/{path...}") {
+                val slug = call.parameters["slug"]!!
+                // {path...} is a tailcard: read every captured segment and rejoin so
+                // nested paths like references/guide.md survive the DB path match.
+                val path = call.parameters.getAll("path")?.joinToString("/").orEmpty()
+                val raw = call.request.queryParameters["raw"] == "1"
+                val res = q.fileContent(slug, path, fileStore)
+                if (raw && !res.downloadOnly) {
+                    // Raw preview is ALWAYS text/plain (+ nosniff): a published skill
+                    // can include an .html file, and serving it as text/html would give
+                    // it same-origin script execution — catastrophic once auth/admin
+                    // routes share this origin. Source files render fine as text.
+                    call.response.headers.append("X-Content-Type-Options", "nosniff")
+                    call.respondText(res.content ?: "", contentType = ContentType.Text.Plain.withCharset(Charsets.UTF_8))
+                } else {
+                    call.respond(
+                        FileContentResponse(
+                            slug = res.slug, path = res.path, size = res.size, isBinary = res.isBinary,
+                            content = res.content, downloadOnly = res.downloadOnly, downloadUrl = null,
+                        ),
+                    )
+                }
             }
-        }
-        get("skills/{slug}/versions") { call.respond(q.versions(call.parameters["slug"]!!)) }
-        get("skills/{slug}/download") {
-            val slug = call.parameters["slug"]!!
-            val version = call.request.queryParameters["version"]
-            val res = q.download(slug, version, fileStore)
-            call.response.headers.append(HttpHeaders.ContentDisposition, "attachment; filename=\"${res.filename}\"")
-            call.respondBytes(res.bytes, contentType = ContentType.parse(res.contentType))
-        }
+            get("skills/{slug}/versions") { call.respond(q.versions(call.parameters["slug"]!!)) }
+            get("skills/{slug}/download") {
+                val slug = call.parameters["slug"]!!
+                val version = call.request.queryParameters["version"]
+                val res = q.download(slug, version, fileStore)
+                call.response.headers.append(HttpHeaders.ContentDisposition, "attachment; filename=\"${res.filename}\"")
+                call.respondBytes(res.bytes, contentType = ContentType.parse(res.contentType))
+            }
 
-        get("categories") { call.respond(q.categories()) }
-        get("trends") { call.respond(q.trends()) }
-        get("timeline") {
-            val page = PublicQueries.parsePageStrict(call.request.queryParameters["page"])
-            val size = PublicQueries.parsePageSizeStrict(call.request.queryParameters["pageSize"])
-            call.respond(q.timeline(page, size))
-        }
-        get("bundles") {
-            val page = PublicQueries.parsePageStrict(call.request.queryParameters["page"])
-            val size = PublicQueries.parsePageSizeStrict(call.request.queryParameters["pageSize"])
-            call.respond(q.bundles(page, size))
-        }
-        get("bundles/{id}") { call.respond(q.bundle(call.parameters["id"]!!)) }
-        get("authors/{handle}") { call.respond(q.author(call.parameters["handle"]!!)) }
+            get("categories") { call.respond(q.categories()) }
+            get("trends") { call.respond(q.trends()) }
+            get("timeline") {
+                val page = PublicQueries.parsePageStrict(call.request.queryParameters["page"])
+                val size = PublicQueries.parsePageSizeStrict(call.request.queryParameters["pageSize"])
+                call.respond(q.timeline(page, size))
+            }
+            get("bundles") {
+                val page = PublicQueries.parsePageStrict(call.request.queryParameters["page"])
+                val size = PublicQueries.parsePageSizeStrict(call.request.queryParameters["pageSize"])
+                call.respond(q.bundles(page, size))
+            }
+            get("bundles/{id}") { call.respond(q.bundle(call.parameters["id"]!!)) }
+            get("authors/{handle}") { call.respond(q.author(call.parameters["handle"]!!)) }
 
-        post("skills/{slug}/report") {
-            val slug = call.parameters["slug"]!!
-            val body = runCatching { call.receive<ReportRequest>() }.getOrDefault(ReportRequest())
-            val result = q.createReport(slug, body.reason, reporterId = null) // anonymous by default
-            call.respond(HttpStatusCode.Created, result)
+            post("skills/{slug}/report") {
+                val slug = call.parameters["slug"]!!
+                val body = runCatching { call.receive<ReportRequest>() }.getOrDefault(ReportRequest())
+                val result = q.createReport(slug, body.reason, reporterId = null) // anonymous by default
+                call.respond(HttpStatusCode.Created, result)
+            }
         }
     }
 }

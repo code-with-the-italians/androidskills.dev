@@ -2,6 +2,8 @@ package dev.androidskills.api
 
 import dev.androidskills.github.GitHubAppClient
 import dev.androidskills.github.GitHubAppException
+import io.ktor.server.plugins.ratelimit.RateLimitName
+import io.ktor.server.plugins.ratelimit.rateLimit
 import dev.androidskills.ingest.ArchiveSource
 import dev.androidskills.ingest.DetectedSkill
 import dev.androidskills.ingest.Discovery
@@ -41,28 +43,30 @@ import kotlinx.serialization.Serializable
  * `members:read`) — deferred to step 6 where org-ownership actually matters.
  */
 fun Route.contributorRoutes(githubApp: GitHubAppClient) {
-    route("api/me") {
-        get("repos") { repos(call, githubApp) }
-        post("repos/{owner}/{repo}/scan") { scan(call, githubApp) }
+    rateLimit(RateLimitName("authenticated")) {
+        route("api/me") {
+            get("repos") { repos(call, githubApp) }
+            post("repos/{owner}/{repo}/scan") { scan(call, githubApp) }
 
-        get("submissions") { mySubmissions(call) }
-        post("submissions") { createSubmissions(call, githubApp) }
-        get("submissions/{id}") { getSubmission(call) }
-        post("submissions/{id}/submit") { submit(call) }
-        post("submissions/{id}/withdraw") { withdraw(call) }
-        delete("submissions/{id}") { deleteDraft(call) }
+            get("submissions") { mySubmissions(call) }
+            post("submissions") { createSubmissions(call, githubApp) }
+            get("submissions/{id}") { getSubmission(call) }
+            post("submissions/{id}/submit") { submit(call) }
+            post("submissions/{id}/withdraw") { withdraw(call) }
+            delete("submissions/{id}") { deleteDraft(call) }
 
-        get("stars") { listStars(call) }
-        post("stars/{slug}") { addStar(call) }
-        delete("stars/{slug}") { removeStar(call) }
+            get("stars") { listStars(call) }
+            post("stars/{slug}") { addStar(call) }
+            delete("stars/{slug}") { removeStar(call) }
 
-        get("settings") { getSettings(call) }
-        put("settings") { updateSettings(call) }
-        delete("") { deleteAccount(call) }
-    }
-    route("api/skills/{slug}") {
-        post("unpublish") { unpublish(call) }
-        post("resync") { resync(call, githubApp) }
+            get("settings") { getSettings(call) }
+            put("settings") { updateSettings(call) }
+            delete("") { deleteAccount(call) }
+        }
+        route("api/skills/{slug}") {
+            post("unpublish") { unpublish(call) }
+            post("resync") { resync(call, githubApp) }
+        }
     }
 }
 
@@ -100,9 +104,9 @@ private suspend fun scan(call: ApplicationCall, gh: GitHubAppClient) {
         throw ApiBadGatewayException("GitHub installations request failed: ${e.message}", "github_installations_failed")
     }
     val head = try { gh.defaultBranchHead(installationId, owner, repo) }
-        catch (e: GitHubAppException) { throw ApiBadGatewayException("GitHub ref lookup failed: ${e.message}", "github_ref_failed") }
+    catch (e: GitHubAppException) { throw ApiBadGatewayException("GitHub ref lookup failed: ${e.message}", "github_ref_failed") }
     val zipball = try { gh.downloadZipball(installationId, owner, repo, head) }
-        catch (e: GitHubAppException) { throw ApiBadGatewayException("GitHub archive download failed: ${e.message}", "github_archive_failed") }
+    catch (e: GitHubAppException) { throw ApiBadGatewayException("GitHub archive download failed: ${e.message}", "github_archive_failed") }
     // Compressed-body cap (Q4, plan §3 step 1 — the caller bounds this so a giant
     // zipball can't sit fully in memory before Discovery's inflated guard runs).
     if (zipball.size > MAX_COMPRESSED_ZIPBALL) {

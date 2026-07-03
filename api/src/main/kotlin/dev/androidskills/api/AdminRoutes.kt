@@ -3,6 +3,8 @@ package dev.androidskills.api
 import dev.androidskills.auth.requireAdmin
 import dev.androidskills.github.GitHubAppClient
 import dev.androidskills.storage.FileStore
+import io.ktor.server.plugins.ratelimit.RateLimitName
+import io.ktor.server.plugins.ratelimit.rateLimit
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.ApplicationCall
 import io.ktor.server.request.receive
@@ -19,34 +21,36 @@ import io.ktor.server.routing.route
  * Admin routes (spec §9 Admin). Non-admins get 404 via [requireAdmin].
  */
 fun Route.adminRoutes(fileStore: FileStore, githubApp: GitHubAppClient) {
-    route("api/admin") {
-        route("queue") {
-            get { listQueue(call) }
-            get("{id}") { queueDetail(call) }
-            post("{id}/decision") { queueDecision(call, fileStore, githubApp) }
-        }
-        route("skills") {
-            get { listSkills(call) }
-            patch("{id}") { patchSkill(call) }
-            post("bulk") { bulkSkills(call) }
-        }
-        route("users") {
-            get { listUsers(call) }
-            get("export") { exportUsers(call) }
-            patch("{id}") { patchUser(call) }
-        }
-        route("categories") {
-            get { listCategories(call) }
-            post { createCategory(call) }
-            patch("{slug}") { renameCategory(call) }
-            post("{slug}/merge") { mergeCategory(call) }
-        }
-        route("settings") {
-            get { getSettings(call) }
-            put { putSettings(call) }
-        }
-        route("audit") {
-            get { listAudit(call) }
+    rateLimit(RateLimitName("admin")) {
+        route("api/admin") {
+            route("queue") {
+                get { listQueue(call) }
+                get("{id}") { queueDetail(call) }
+                post("{id}/decision") { queueDecision(call, fileStore, githubApp) }
+            }
+            route("skills") {
+                get { listSkills(call) }
+                patch("{id}") { patchSkill(call) }
+                post("bulk") { bulkSkills(call) }
+            }
+            route("users") {
+                get { listUsers(call) }
+                get("export") { exportUsers(call) }
+                patch("{id}") { patchUser(call) }
+            }
+            route("categories") {
+                get { listCategories(call) }
+                post { createCategory(call) }
+                patch("{slug}") { renameCategory(call) }
+                post("{slug}/merge") { mergeCategory(call) }
+            }
+            route("settings") {
+                get { getSettings(call) }
+                put { putSettings(call) }
+            }
+            route("audit") {
+                get { listAudit(call) }
+            }
         }
     }
 }

@@ -92,6 +92,13 @@ fun Application.installApiErrorMapping() {
         exception<ApiBadGatewayException> { call, ex ->
             call.respond(HttpStatusCode.BadGateway, ErrorResponse(ErrorBody(ex.code, ex.message ?: "Bad gateway")))
         }
+        status(HttpStatusCode.TooManyRequests) { call, status ->
+            val retryAfter = call.response.headers["Retry-After"] ?: "60"
+            if (!call.response.headers.contains("Retry-After")) {
+                call.response.headers.append("Retry-After", retryAfter)
+            }
+            call.respond(status, ErrorResponse(ErrorBody("rate_limit", "Rate limit exceeded")))
+        }
         exception<Throwable> { call, ex ->
             log.error("Unhandled error serving ${call.request.local.uri}", ex)
             call.respond(

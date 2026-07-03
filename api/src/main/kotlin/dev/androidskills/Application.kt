@@ -21,14 +21,19 @@ import io.ktor.client.HttpClient
 import io.ktor.http.HttpStatusCode
 import io.ktor.serialization.kotlinx.json.json
 import io.ktor.server.application.Application
+import io.ktor.server.application.ApplicationCall
 import io.ktor.server.application.ApplicationStopped
 import io.ktor.server.application.install
 import io.ktor.server.application.log
 import io.ktor.server.plugins.calllogging.CallLogging
 import io.ktor.server.plugins.contentnegotiation.ContentNegotiation
+import io.ktor.server.plugins.ratelimit.RateLimit
+import io.ktor.server.plugins.ratelimit.RateLimitName
+import io.ktor.server.plugins.ratelimit.rateLimit
 import io.ktor.server.response.respond
 import io.ktor.server.routing.get
 import io.ktor.server.routing.routing
+import kotlin.time.Duration.Companion.seconds
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -55,6 +60,26 @@ fun Application.module(config: AppConfig = AppConfig.fromEnv(), oauth: OAuthClie
     install(ContentNegotiation) { json() }
     install(CallLogging)
     installApiErrorMapping()
+
+    val trustedProxyCount = System.getenv("TRUSTED_PROXY_COUNT")?.toIntOrNull()?.coerceAtLeast(0) ?: 1
+    install(RateLimit) {
+        register(RateLimitName("public")) {
+            rateLimiter(limit = 120, refillPeriod = 60.seconds)
+            requestKey { call -> clientIp(call, trustedProxyCount) }
+        }
+        register(RateLimitName("auth")) {
+            rateLimiter(limit = 10, refillPeriod = 60.seconds)
+            requestKey { call -> clientIp(call, trustedProxyCount) }
+        }
+        register(RateLimitName("authenticated")) {
+            rateLimiter(limit = 60, refillPeriod = 60.seconds)
+            requestKey { call -> clientIp(call, trustedProxyCount) }
+        }
+        register(RateLimitName("admin")) {
+            rateLimiter(limit = 60, refillPeriod = 60.seconds)
+            requestKey { call -> clientIp(call, trustedProxyCount) }
+        }
+    }
 
     val fileStore: FileStore = LocalFsStore(config.fileStoreDir)
     val (llm, llmHttp) = resolveLlm(config)
@@ -149,6 +174,20 @@ private fun resolveOauth(auth: AuthConfig, injected: OAuthClient?): Pair<OAuthCl
     val c = auth.oauth ?: return DisabledOAuthClient() to null
     val http = GitHubOAuthClient.httpClient()
     return GitHubOAuthClient(c.clientId, c.clientSecret, http) to http
+}
+
+internal fun clientIp(call: ApplicationCall, trustedProxyCount: Int): String {
+    if (trustedProxyCount == 0) return call.request.local.remoteHost
+    val xff = call.request.headers["X-Forwarded-For"]
+    if (!xff.isNullOrBlank()) {
+        val parts = xff.split(",").map { it.trim() }.filter { it.isNotEmpty() }
+        if (parts.isNotEmpty()) {
+            val idx = parts.size - trustedProxyCount
+            return if (idx in parts.indices) parts[idx] else parts.last()
+        }
+    }
+    call.request.headers["X-Real-Ip"]?.takeIf { it.isNotBlank() }?.let { return it }
+    return call.request.local.remoteHost
 }
 
 private fun startSessionPurge(app: Application) {
