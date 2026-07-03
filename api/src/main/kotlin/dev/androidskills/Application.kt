@@ -11,22 +11,29 @@ import dev.androidskills.auth.OAuthClient
 import dev.androidskills.auth.authRoutes
 import dev.androidskills.db.Skills
 import dev.androidskills.github.GitHubAppClient
+import dev.androidskills.github.PemLoader
 import dev.androidskills.gh.webhookRoutes
 import dev.androidskills.llm.LlmClient
 import dev.androidskills.llm.StubLlmClient
 import dev.androidskills.storage.FileStore
 import dev.androidskills.storage.LocalFsStore
 import io.ktor.client.HttpClient
+import io.ktor.http.HttpStatusCode
 import io.ktor.serialization.kotlinx.json.json
 import io.ktor.server.application.Application
+import io.ktor.server.application.ApplicationCall
 import io.ktor.server.application.ApplicationStopped
 import io.ktor.server.application.install
 import io.ktor.server.application.log
 import io.ktor.server.plugins.calllogging.CallLogging
 import io.ktor.server.plugins.contentnegotiation.ContentNegotiation
+import io.ktor.server.plugins.ratelimit.RateLimit
+import io.ktor.server.plugins.ratelimit.RateLimitName
+import io.ktor.server.plugins.ratelimit.rateLimit
 import io.ktor.server.response.respond
 import io.ktor.server.routing.get
 import io.ktor.server.routing.routing
+import kotlin.time.Duration.Companion.seconds
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -47,11 +54,32 @@ import org.jetbrains.exposed.sql.transactions.transaction
  *   when creds are absent (spec §13: "unset → auth disabled").
  */
 fun Application.module(config: AppConfig = AppConfig.fromEnv(), oauth: OAuthClient? = null, githubApp: GitHubAppClient? = null) {
+    config.validate()
     Database.init(config)
 
     install(ContentNegotiation) { json() }
     install(CallLogging)
     installApiErrorMapping()
+
+    val trustedProxyCount = System.getenv("TRUSTED_PROXY_COUNT")?.toIntOrNull()?.coerceAtLeast(0) ?: 1
+    install(RateLimit) {
+        register(RateLimitName("public")) {
+            rateLimiter(limit = 120, refillPeriod = 60.seconds)
+            requestKey { call -> clientIp(call, trustedProxyCount) }
+        }
+        register(RateLimitName("auth")) {
+            rateLimiter(limit = 10, refillPeriod = 60.seconds)
+            requestKey { call -> clientIp(call, trustedProxyCount) }
+        }
+        register(RateLimitName("authenticated")) {
+            rateLimiter(limit = 60, refillPeriod = 60.seconds)
+            requestKey { call -> clientIp(call, trustedProxyCount) }
+        }
+        register(RateLimitName("admin")) {
+            rateLimiter(limit = 60, refillPeriod = 60.seconds)
+            requestKey { call -> clientIp(call, trustedProxyCount) }
+        }
+    }
 
     val fileStore: FileStore = LocalFsStore(config.fileStoreDir)
     val (llm, llmHttp) = resolveLlm(config)
@@ -60,6 +88,17 @@ fun Application.module(config: AppConfig = AppConfig.fromEnv(), oauth: OAuthClie
 
     // P3-3: surface the resolved cookie posture once at boot — Secure/Domain drive
     // auth correctness and a mis-set SESSION_COOKIE_DOMAIN is a silent footgun.
+    log.info(
+        "androidskills {} starting: dataDir={}, db={}, fileStore={}, oauth={}, githubApp={}, llm={}, health={}",
+        config.version,
+        config.fileStoreDir.parent,
+        Database.journalMode(),
+        fileStore.kind,
+        if (resolvedOauth.configured) "configured" else "disabled",
+        if (resolvedGithubApp.configured) "configured" else "disabled",
+        if (llm is dev.androidskills.llm.StubLlmClient) "disabled" else "enabled",
+        "${config.auth.publicBaseUrl}/api/health",
+    )
     log.info(
         "auth: oauth={}, sessionCookie secure={}, domain={}",
         if (resolvedOauth.configured) "configured" else "disabled",
@@ -95,6 +134,22 @@ fun Application.module(config: AppConfig = AppConfig.fromEnv(), oauth: OAuthClie
                     auth = if (resolvedOauth.configured) "oauth" else "disabled",
                 ),
             )
+        }
+        get("/api/health/deep") {
+            val dbOk = Database.check()
+            val fileStoreOk = fileStore.check()
+            val githubAppOk = if (config.githubApp.configured) {
+                PemLoader.validatePem(config.githubApp.privateKeyPem)
+            } else true
+            val llmOk = if (config.llmBaseUrl != null) {
+                config.llmApiKey != null && config.llmModel != null &&
+                    runCatching { java.net.URI(config.llmBaseUrl) }.isSuccess
+            } else true
+            val checks = DeepHealthChecks(dbOk, fileStoreOk, githubAppOk, llmOk)
+            val ok = dbOk && fileStoreOk && githubAppOk && llmOk
+            val status = if (ok) "ok" else "degraded"
+            val code = if (ok) HttpStatusCode.OK else HttpStatusCode.ServiceUnavailable
+            call.respond(code, DeepHealthResponse(status, checks))
         }
         publicRoutes(fileStore)
         authRoutes(config, resolvedOauth)
@@ -132,6 +187,19 @@ private fun resolveOauth(auth: AuthConfig, injected: OAuthClient?): Pair<OAuthCl
     return GitHubOAuthClient(c.clientId, c.clientSecret, http) to http
 }
 
+internal fun clientIp(call: ApplicationCall, trustedProxyCount: Int): String {
+    if (trustedProxyCount == 0) return call.request.local.remoteHost
+    val xff = call.request.headers["X-Forwarded-For"]
+    if (!xff.isNullOrBlank()) {
+        val parts = xff.split(",").map { it.trim() }.filter { it.isNotEmpty() }
+        if (parts.isNotEmpty()) {
+            val idx = parts.size - trustedProxyCount
+            return if (idx in parts.indices) parts[idx] else parts.last()
+        }
+    }
+    return call.request.local.remoteHost
+}
+
 private fun startSessionPurge(app: Application) {
     val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     val job = scope.launch {
@@ -158,4 +226,18 @@ data class HealthResponse(
     val fileStore: String,
     val llm: String,
     val auth: String,
+)
+
+@Serializable
+data class DeepHealthResponse(
+    val status: String,
+    val checks: DeepHealthChecks,
+)
+
+@Serializable
+data class DeepHealthChecks(
+    val database: Boolean,
+    val fileStore: Boolean,
+    val githubApp: Boolean,
+    val llm: Boolean,
 )

@@ -1,14 +1,14 @@
 package dev.androidskills
 
+import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.Paths
 
 /**
  * Environment-driven config with local-dev defaults. The cloud-shaped values
- * (LLM endpoint, R2 credentials, GitHub OAuth) are read from env / Kamal secrets
- * in prod and simply absent locally, which selects the stub/local/disabled
- * implementations. The HTTP port is owned by Ktor (application.conf / PORT),
- * not this object.
+ * (LLM endpoint, GitHub OAuth) are read from env / Kamal secrets in prod and
+ * simply absent locally, which selects the stub/local/disabled implementations.
+ * The HTTP port is owned by Ktor (application.conf / PORT), not this object.
  */
 data class AppConfig(
     val version: String,
@@ -30,16 +30,64 @@ data class AppConfig(
             "llmBaseUrl=$llmBaseUrl, llmApiKey=${if (llmApiKey == null) "null" else "***"}, " +
             "llmModel=$llmModel, seedDemo=$seedDemo, auth=$auth, githubApp=$githubApp)"
 
+    /**
+     * Fail-fast validation for required paths and URLs. This runs after env parsing
+     * so the app exits with a clear error instead of failing mysteriously later.
+     */
+    fun validate() {
+        ensureWritable(dbPath.parent ?: error("DATA_DIR has no parent directory"), "DATA_DIR")
+        ensureWritable(fileStoreDir, "DATA_DIR/files")
+        runCatching { java.net.URI(auth.publicBaseUrl) }.getOrElse {
+            throw IllegalStateException("PUBLIC_BASE_URL is not a valid URL: ${auth.publicBaseUrl}")
+        }
+    }
+
     companion object {
-        fun fromEnv(): AppConfig {
-            fun env(k: String) = System.getenv(k)?.takeIf { it.isNotBlank() }
+        fun fromEnv(): AppConfig = fromMap(System.getenv())
+
+        fun fromMap(env: Map<String, String>): AppConfig {
+            fun env(k: String) = env[k]?.takeIf { it.isNotBlank() }
             val dataDir = Paths.get(env("DATA_DIR") ?: "../data").toAbsolutePath().normalize()
             val publicBaseUrl = env("PUBLIC_BASE_URL") ?: "http://localhost:8080"
+
             val oauthClientId = env("GITHUB_OAUTH_CLIENT_ID")
             val oauthClientSecret = env("GITHUB_OAUTH_CLIENT_SECRET")
+            requireAllOrNone(
+                "GitHub OAuth",
+                mapOf(
+                    "GITHUB_OAUTH_CLIENT_ID" to oauthClientId,
+                    "GITHUB_OAUTH_CLIENT_SECRET" to oauthClientSecret,
+                ),
+            )
+
+            val llmBaseUrl = env("LLM_BASE_URL")
+            val llmApiKey = env("LLM_API_KEY")
+            val llmModel = env("LLM_MODEL")
+            requireAllOrNone(
+                "LLM",
+                mapOf(
+                    "LLM_BASE_URL" to llmBaseUrl,
+                    "LLM_API_KEY" to llmApiKey,
+                    "LLM_MODEL" to llmModel,
+                ),
+            )
+
+            val githubAppId = env("GITHUB_APP_ID")
+            val githubAppPrivateKey = env("GITHUB_APP_PRIVATE_KEY")
+            val githubAppWebhookSecret = env("GITHUB_WEBHOOK_SECRET")
+            requireAllOrNone(
+                "GitHub App",
+                mapOf(
+                    "GITHUB_APP_ID" to githubAppId,
+                    "GITHUB_APP_PRIVATE_KEY" to githubAppPrivateKey,
+                    "GITHUB_WEBHOOK_SECRET" to githubAppWebhookSecret,
+                ),
+            )
+
             val oauth = if (oauthClientId != null && oauthClientSecret != null) {
                 OAuthConfig(oauthClientId, oauthClientSecret)
             } else null
+
             // Secure cookies by default, but relax for plain-HTTP localhost so a dev
             // browser can actually log in locally (spec §7 wants Secure; the test
             // client and prod-over-HTTPS are unaffected). Overridable via env.
@@ -48,13 +96,14 @@ data class AppConfig(
             val host = runCatching { java.net.URI(publicBaseUrl).host }.getOrNull()
             val localHosts = setOf("localhost", "127.0.0.1", "0.0.0.0", "[::1]", "::1")
             val secureDefault = host == null || host !in localHosts
+
             return AppConfig(
                 version = env("APP_VERSION") ?: "0.0.1-local",
                 dbPath = dataDir.resolve("androidskills.db"),
                 fileStoreDir = dataDir.resolve("files"),
-                llmBaseUrl = env("LLM_BASE_URL"),
-                llmApiKey = env("LLM_API_KEY"),
-                llmModel = env("LLM_MODEL"),
+                llmBaseUrl = llmBaseUrl,
+                llmApiKey = llmApiKey,
+                llmModel = llmModel,
                 seedDemo = env("SEED_DEMO")?.equals("1", ignoreCase = true) == true,
                 auth = AuthConfig(
                     oauth = oauth,
@@ -65,9 +114,30 @@ data class AppConfig(
                     } ?: secureDefault,
                     bootstrapAdminGithubId = env("BOOTSTRAP_ADMIN_GITHUB_ID")?.toLongOrNull(),
                 ),
-                githubApp = GithubAppConfig.fromEnv(),
+                githubApp = GithubAppConfig.fromMap(env),
             )
         }
+    }
+}
+
+private fun requireAllOrNone(feature: String, vars: Map<String, String?>) {
+    val present = vars.count { it.value != null }
+    if (present != 0 && present != vars.size) {
+        val missing = vars.filter { it.value == null }.keys.joinToString(", ")
+        throw IllegalStateException("$feature is partially configured; missing: $missing")
+    }
+}
+
+private fun ensureWritable(path: Path, name: String) {
+    var check: Path? = path
+    while (check != null && !Files.exists(check)) {
+        check = check.parent
+    }
+    if (check == null) {
+        throw IllegalStateException("$name ($path) has no existing parent directory")
+    }
+    if (!Files.isDirectory(check) || !Files.isWritable(check)) {
+        throw IllegalStateException("$name directory ($check) is not writable")
     }
 }
 
@@ -143,10 +213,17 @@ data class GithubAppConfig(
     companion object {
         fun disabled() = GithubAppConfig(appId = null, privateKeyPem = null, webhookSecret = null)
 
-        fun fromEnv(): GithubAppConfig {
-            fun env(k: String) = System.getenv(k)?.takeIf { it.isNotBlank() }
+        fun fromEnv(): GithubAppConfig = fromMap(System.getenv())
+
+        fun fromMap(env: Map<String, String>): GithubAppConfig {
+            fun env(k: String) = env[k]?.takeIf { it.isNotBlank() }
+            val appIdStr = env("GITHUB_APP_ID")
+            val appId = appIdStr?.toLongOrNull()
+            if (appIdStr != null && appId == null) {
+                throw IllegalStateException("GITHUB_APP_ID must be a numeric GitHub App id")
+            }
             return GithubAppConfig(
-                appId = env("GITHUB_APP_ID")?.toLongOrNull(),
+                appId = appId,
                 privateKeyPem = env("GITHUB_APP_PRIVATE_KEY"),
                 webhookSecret = env("GITHUB_WEBHOOK_SECRET"),
             )

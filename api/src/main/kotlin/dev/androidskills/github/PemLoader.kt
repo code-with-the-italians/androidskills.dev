@@ -43,6 +43,9 @@ internal object PemLoader {
         0x04, 0x82.toByte(), 0x00, 0x00,                                    // OCTET STRING, length at [24,25]
     )
 
+    fun validatePem(pem: String?): Boolean =
+        !pem.isNullOrBlank() && runCatching { loadPrivateKey(pem) }.isSuccess
+
     fun loadPrivateKey(pem: String): PrivateKey {
         val (base64, kind) = parsePem(pem)
         val der = Base64.getDecoder().decode(base64)

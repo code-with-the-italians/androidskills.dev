@@ -22,6 +22,7 @@ dependencies {
     implementation(ktorLibs.serialization.kotlinx.json)
     implementation(ktorLibs.server.callLogging)
     implementation(ktorLibs.server.statusPages)
+    implementation(ktorLibs.server.rateLimit)
     implementation(libs.logback.classic)
 
     // Persistence: SQLite via Exposed
