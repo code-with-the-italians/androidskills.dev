@@ -197,7 +197,6 @@ internal fun clientIp(call: ApplicationCall, trustedProxyCount: Int): String {
             return if (idx in parts.indices) parts[idx] else parts.last()
         }
     }
-    call.request.headers["X-Real-Ip"]?.takeIf { it.isNotBlank() }?.let { return it }
     return call.request.local.remoteHost
 }
 

@@ -217,8 +217,13 @@ data class GithubAppConfig(
 
         fun fromMap(env: Map<String, String>): GithubAppConfig {
             fun env(k: String) = env[k]?.takeIf { it.isNotBlank() }
+            val appIdStr = env("GITHUB_APP_ID")
+            val appId = appIdStr?.toLongOrNull()
+            if (appIdStr != null && appId == null) {
+                throw IllegalStateException("GITHUB_APP_ID must be a numeric GitHub App id")
+            }
             return GithubAppConfig(
-                appId = env("GITHUB_APP_ID")?.toLongOrNull(),
+                appId = appId,
                 privateKeyPem = env("GITHUB_APP_PRIVATE_KEY"),
                 webhookSecret = env("GITHUB_WEBHOOK_SECRET"),
             )

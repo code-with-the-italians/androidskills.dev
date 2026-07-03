@@ -35,13 +35,13 @@ class ClientIpTest {
     }
 
     @Test
-    fun `falls back to x-real-ip`() = testApplication {
+    fun `falls back to remote host when X-Forwarded-For is missing`() = testApplication {
         routing {
             get("/ip") { call.respondText(clientIp(call, 1)) }
         }
-        val res = client.get("/ip") {
-            headers.append("X-Real-Ip", "2.3.4.5")
-        }
-        assertEquals("2.3.4.5", res.bodyAsText())
+        val res = client.get("/ip")
+        // Test engine reports remoteHost as "localhost"; key point is that a
+        // missing X-Forwarded-For does not allow a client-spoofed X-Real-Ip.
+        assertEquals("localhost", res.bodyAsText())
     }
 }

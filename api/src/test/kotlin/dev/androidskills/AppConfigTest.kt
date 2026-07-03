@@ -78,6 +78,18 @@ class AppConfigTest {
     }
 
     @Test
+    fun `github app id must be numeric`() {
+        val env = base + mapOf(
+            "GITHUB_APP_ID" to "not-a-number",
+            "GITHUB_APP_PRIVATE_KEY" to "-----BEGIN RSA PRIVATE KEY-----\nkey\n-----END RSA PRIVATE KEY-----",
+            "GITHUB_WEBHOOK_SECRET" to "wh-secret",
+        )
+        val ex = assertFailsWith<IllegalStateException> { AppConfig.fromMap(env) }
+        assertTrue(ex.message!!.contains("GITHUB_APP_ID"))
+        assertTrue(ex.message!!.contains("numeric"))
+    }
+
+    @Test
     fun `github app half configured throws`() {
         val env = base + mapOf(
             "GITHUB_APP_ID" to "123456",
