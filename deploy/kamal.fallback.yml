@@ -1,0 +1,73 @@
+# Fallback Kamal configuration if kamal-proxy cannot route /api and /gh to the api
+# service while routing everything else to the web service on the same domain.
+#
+# In this model kamal-proxy sends all traffic to the web service, and the Astro
+# Node server proxies /api/* and /gh/* to the api service. The api service is
+# not exposed by kamal-proxy; it must be reachable from the web container (e.g.
+# via a host-published port or the shared Docker network).
+#
+# This file is a reference only; the primary config is deploy/kamal.yml.
+
+service: androidskills
+image: ghcr.io/code-with-the-italians/androidskills
+
+servers:
+  web:
+    hosts:
+      - <%= ENV["KAMAL_HOST"] %>
+    proxy:
+      path_prefix: /
+      healthcheck:
+        path: /
+        interval: 5s
+        timeout: 3s
+      app_port: 4321
+
+  api:
+    hosts:
+      - <%= ENV["KAMAL_HOST"] %>
+    # SQLite single-writer invariant: old container stops before new one starts.
+    deploy:
+      rolling: false
+    # Not exposed by kamal-proxy; reached internally by the web container.
+    # Publish a host-local port so the web container can proxy to it.
+    options:
+      publish:
+        - 127.0.0.1:8080:8080
+      volume:
+        - /var/lib/androidskills/data:/data
+
+proxy:
+  ssl: true
+  host: androidskills.dev
+  forward_headers: true
+
+registry:
+  username: <%= ENV["KAMAL_REGISTRY_USERNAME"] %>
+  password: <%= ENV["KAMAL_REGISTRY_PASSWORD"] %>
+
+builder:
+  arch: amd64
+  cache:
+    type: registry
+    image: ghcr.io/code-with-the-italians/androidskills-build-cache
+
+env:
+  clear:
+    APP_VERSION: 0.0.1
+    DATA_DIR: /data
+    PUBLIC_BASE_URL: https://androidskills.dev
+    TRUSTED_PROXY_COUNT: "1"
+  secret:
+    - GITHUB_OAUTH_CLIENT_ID
+    - GITHUB_OAUTH_CLIENT_SECRET
+    - GITHUB_APP_ID
+    - GITHUB_APP_PRIVATE_KEY
+    - GITHUB_WEBHOOK_SECRET
+    - LLM_BASE_URL
+    - LLM_API_KEY
+    - LLM_MODEL
+    - BOOTSTRAP_ADMIN_GITHUB_ID
+    - SESSION_COOKIE_DOMAIN
+    - SESSION_COOKIE_SECURE
+    - SEED_DEMO
