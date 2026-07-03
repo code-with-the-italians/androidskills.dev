@@ -20,14 +20,20 @@ COPY src src
 RUN ./gradlew buildFatJar --no-daemon
 
 # Stage 2: runtime image (non-distroless so the Litestream entrypoint script can run later)
+FROM litestream/litestream:0.3.13 AS litestream
+
 FROM eclipse-temurin:21-jre-jammy
 
 WORKDIR /app
 
+COPY --from=litestream /usr/local/bin/litestream /usr/local/bin/litestream
 COPY --from=builder /build/build/libs/androidskills-api-all.jar androidskills-api.jar
+COPY litestream.yml /etc/litestream.yml
+COPY entrypoint.sh /app/entrypoint.sh
+RUN chmod +x /app/entrypoint.sh
 
 EXPOSE 8080
 
 ENV JAVA_OPTS="-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0"
 
-ENTRYPOINT ["java", "-jar", "androidskills-api.jar"]
+ENTRYPOINT ["/app/entrypoint.sh"]

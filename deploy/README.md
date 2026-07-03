@@ -57,6 +57,12 @@ The domain currently serves GitHub Pages (`CNAME` at the repo root). Repointing 
 
 The `api` container entrypoint (`api/entrypoint.sh`) restores the SQLite database from R2 if the file is missing, then starts Ktor under Litestream replication. On a routine redeploy the host volume still contains the DB, so no restore is performed. Restore is only for an empty volume / new host.
 
+Configure `api/litestream.yml` for your object-storage backend (R2 by default). The required env vars are `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET`, `R2_ENDPOINT`, and optionally `R2_BACKUP_PATH`.
+
+## Graceful shutdown
+
+With Litestream as PID 1, the old container must receive a clean SIGTERM so Litestream forwards it to Ktor, Ktor runs its `ApplicationStopped` hooks (cancel job worker, close HTTP clients), and Litestream writes a final WAL checkpoint before the new container takes over. Ensure Kamal's `stop_grace`/`stop_grace_period` for the `api` service is long enough for this drain (typically 10–30s). A hard SIGKILL mid-checkpoint is the one thing that can leave the WAL in a state the new container has to recover.
+
 ## SSH / host volume
 
 The SQLite DB and mirrored files live on the host at `/var/lib/androidskills/data` and are mounted into the `api` container. Ensure that directory exists and is writable before the first deploy.
