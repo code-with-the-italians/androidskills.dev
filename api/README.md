@@ -42,6 +42,26 @@ Optional:
 
 The app exits non-zero at boot if env validation fails or database migrations fail.
 
+## Running in Docker
+
+Build a production image from the repo root:
+
+```bash
+docker build -t androidskills-api ./api
+```
+
+Run locally, mounting a host directory for SQLite/files:
+
+```bash
+docker run -p 8080:8080 \
+  -v "$(pwd)/data:/data" \
+  -e DATA_DIR=/data \
+  -e PUBLIC_BASE_URL=http://localhost:8080 \
+  androidskills-api
+```
+
+The image is non-distroless so the Litestream replication entrypoint script can run in production (see `deploy/`). Health is checked by the Kamal proxy hitting `/api/health`; no Docker `HEALTHCHECK` is configured.
+
 ## Useful tasks
 
 | Task | Description |
