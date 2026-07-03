@@ -37,9 +37,7 @@ data class AppConfig(
     fun validate() {
         ensureWritable(dbPath.parent ?: error("DATA_DIR has no parent directory"), "DATA_DIR")
         ensureWritable(fileStoreDir, "DATA_DIR/files")
-        runCatching { java.net.URI(auth.publicBaseUrl) }.getOrElse {
-            throw IllegalStateException("PUBLIC_BASE_URL is not a valid URL: ${auth.publicBaseUrl}")
-        }
+        validatePublicBaseUrl(auth.publicBaseUrl)
     }
 
     companion object {
@@ -117,6 +115,24 @@ data class AppConfig(
                 githubApp = GithubAppConfig.fromMap(env),
             )
         }
+    }
+}
+
+private fun validatePublicBaseUrl(url: String) {
+    val uri = runCatching { java.net.URI(url) }.getOrElse {
+        throw IllegalStateException("PUBLIC_BASE_URL is not a valid URL: $url")
+    }
+    if (uri.scheme !in setOf("http", "https")) {
+        throw IllegalStateException("PUBLIC_BASE_URL must use http:// or https://: $url")
+    }
+    if (uri.host.isNullOrBlank()) {
+        throw IllegalStateException("PUBLIC_BASE_URL must include a host: $url")
+    }
+    if (uri.path?.trim('/')?.isNotEmpty() == true) {
+        throw IllegalStateException("PUBLIC_BASE_URL must not include a path (use only scheme://host): $url")
+    }
+    if (uri.userInfo != null || uri.query != null || uri.fragment != null) {
+        throw IllegalStateException("PUBLIC_BASE_URL must contain only scheme://host[:port]: $url")
     }
 }
 

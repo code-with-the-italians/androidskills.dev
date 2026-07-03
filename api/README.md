@@ -18,7 +18,7 @@ Copy `api/.env.example` to `.env` and fill in the values for your environment. T
 Required for any boot:
 
 - `DATA_DIR` — directory for SQLite and mirrored files. Must be writable (default: `../data`).
-- `PUBLIC_BASE_URL` — canonical URL used for OAuth redirects and absolute links (default: `http://localhost:8080`).
+- `PUBLIC_BASE_URL` — canonical URL used for OAuth redirects and absolute links (default: `http://localhost:8080`). Must be a bare scheme://host[:port] URL with no trailing path or credentials.
 
 Feature sets are **all-or-nothing**. If any env var in a feature is present but the others are missing, the app fails to start with a clear error. If all are absent, the feature is disabled cleanly.
 
@@ -33,6 +33,7 @@ Optional:
 - `BOOTSTRAP_ADMIN_GITHUB_ID` — numeric GitHub user id promoted to admin on first login.
 - `SESSION_COOKIE_DOMAIN` — optional `Domain` attribute; leave blank for host-only.
 - `SESSION_COOKIE_SECURE` — `1`/`true` to require `Secure` cookies. Inferred from `PUBLIC_BASE_URL` host by default (false for localhost).
+- `TRUSTED_PROXY_COUNT` — number of trusted reverse-proxy hops in front of the app; used for rate-limit source IP keys. `0` uses the direct connection, `1` (default) uses the last `X-Forwarded-For` entry.
 
 ## Operations
 

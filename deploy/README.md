@@ -24,9 +24,11 @@ This directory contains [Kamal](https://kamal-deploy.org/) 2.x configuration for
    - `KAMAL_REGISTRY_PASSWORD` and app secrets from a password manager / env file.
    - `kamal secrets` with a 1Password/Bitwarden vault.
 
-   The app secrets are the same 15 env vars documented in `api/README.md` plus `TRUSTED_PROXY_COUNT`.
+   The app secrets are the same env vars documented in `api/README.md` plus `TRUSTED_PROXY_COUNT`.
 
-3. Verify the Kamal config lints:
+3. (Optional) Set up the GitHub Actions workflow in `.github/workflows/deploy.yml`. It runs on pushes to `main` and via `workflow_dispatch`; it requires the same secrets listed above plus `KAMAL_SSH_PRIVATE_KEY` for the VPS.
+
+4. Verify the Kamal config lints:
 
    ```bash
    kamal config
@@ -37,7 +39,7 @@ This directory contains [Kamal](https://kamal-deploy.org/) 2.x configuration for
    - **Path routing:** `kamal-proxy` must route `/api/*` and `/gh/*` to the `api` service and everything else to `web`. Run `kamal config` and inspect the generated proxy config. If your Kamal version does **not** support path_prefix routing to distinct roles on one domain, use `deploy/kamal.fallback.yml` (route all to `web`; Astro proxies `/api` and `/gh` to `api`).
    - **Single-writer deploy:** The `api` service uses `deploy.rolling: false` so the old container stops before the new one starts. Only one `api` container may ever write the SQLite file. Confirm the exact no-overlap option exists in your Kamal version.
 
-5. Deploy:
+5. Deploy (or trigger the GitHub Actions workflow):
 
    ```bash
    kamal setup
@@ -79,6 +81,6 @@ The SQLite DB and mirrored files live on the host at `/var/lib/androidskills/dat
 
 ## Open questions / known risks
 
-- Path-prefix routing to two services on one domain is the intended architecture, but its support depends on the exact Kamal version. Use `deploy/kamal.fallback.yml` if needed.
+- `TRUSTED_PROXY_COUNT` and the path-prefix routing to two services on one domain are the intended architecture, but its support depends on the exact Kamal version. Use `deploy/kamal.fallback.yml` if needed.
 - The `/gh/webhooks` path must reach the `api` service for GitHub webhooks to work.
 - The fallback model (Astro proxies `/api` and `/gh`) requires a stable way for the `web` container to reach the `api` container; the fallback config publishes `api` on `127.0.0.1:8080` for that purpose.
