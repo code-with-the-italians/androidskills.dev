@@ -89,6 +89,17 @@ fun Application.module(config: AppConfig = AppConfig.fromEnv(), oauth: OAuthClie
     // P3-3: surface the resolved cookie posture once at boot — Secure/Domain drive
     // auth correctness and a mis-set SESSION_COOKIE_DOMAIN is a silent footgun.
     log.info(
+        "androidskills {} starting: dataDir={}, db={}, fileStore={}, oauth={}, githubApp={}, llm={}, health={}",
+        config.version,
+        config.fileStoreDir.parent,
+        Database.journalMode(),
+        fileStore.kind,
+        if (resolvedOauth.configured) "configured" else "disabled",
+        if (resolvedGithubApp.configured) "configured" else "disabled",
+        if (llm is dev.androidskills.llm.StubLlmClient) "disabled" else "enabled",
+        "${config.auth.publicBaseUrl}/api/health",
+    )
+    log.info(
         "auth: oauth={}, sessionCookie secure={}, domain={}",
         if (resolvedOauth.configured) "configured" else "disabled",
         config.auth.sessionCookieSecure,
