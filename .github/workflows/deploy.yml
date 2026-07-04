@@ -53,5 +53,4 @@ jobs:
           BOOTSTRAP_ADMIN_GITHUB_ID: ${{ secrets.BOOTSTRAP_ADMIN_GITHUB_ID }}
           SESSION_COOKIE_DOMAIN: ${{ secrets.SESSION_COOKIE_DOMAIN }}
           SESSION_COOKIE_SECURE: ${{ secrets.SESSION_COOKIE_SECURE }}
-          TRUSTED_PROXY_COUNT: ${{ secrets.TRUSTED_PROXY_COUNT }}
         run: kamal deploy
