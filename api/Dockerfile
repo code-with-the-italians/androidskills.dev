@@ -36,4 +36,11 @@ EXPOSE 8080
 
 ENV JAVA_OPTS="-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0"
 
+# Run as a non-root user. The host volume mounted at /data must be writable by
+# UID/GID 1000 (or update the USER line to match the host volume ownership).
+RUN groupadd -r app --gid 1000 && useradd -r -g app --uid 1000 app \
+    && chown -R app:app /app /etc/litestream.yml
+
+USER app
+
 ENTRYPOINT ["/app/entrypoint.sh"]

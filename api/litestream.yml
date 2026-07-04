@@ -1,5 +1,5 @@
 dbs:
-  - path: /data/androidskills.db
+  - path: ${DATA_DIR:-/data}/androidskills.db
     replicas:
       - type: s3
         bucket: ${R2_BUCKET}
