@@ -1,42 +1,17 @@
-# Kamal 2.x configuration for androidskills.dev.
+# Fallback Kamal configuration if kamal-proxy cannot route /api and /gh to the api
+# service while routing everything else to the web service on the same domain.
 #
-# IMPORTANT — verify before first deploy:
-# 1. kamal-proxy on the target Kamal version supports path_prefix routing to
-#    distinct services on the same domain. If it does not, use
-#    deploy/kamal.fallback.yml instead.
-# 2. The SQLite-safe no-overlap deploy option (deploy.rolling: false) exists in
-#    your Kamal version. Only one api container may write the SQLite file.
-# 3. The /gh/webhooks path is also routed to the api service. If kamal-proxy
-#    supports only one prefix per role, use deploy/kamal.fallback.yml.
+# In this model kamal-proxy sends all traffic to the web service, and the Astro
+# Node server proxies /api/* and /gh/* to the api service. The api service is
+# not exposed by kamal-proxy; it must be reachable from the web container (e.g.
+# via a host-published port or the shared Docker network).
+#
+# This file is a reference only; the primary config is deploy/kamal.yml.
 
 service: androidskills
 image: ghcr.io/code-with-the-italians/androidskills
 
 servers:
-  api:
-    hosts:
-      - <%= ENV["KAMAL_HOST"] %>
-    # SQLite single-writer invariant: old container stops before new one starts.
-    deploy:
-      rolling: false
-    # REVIEW: set the stop-grace option for your Kamal version high enough for
-    # Ktor to drain and Litestream to write a final WAL checkpoint before the
-    # new container takes over. Typical values are 10-30s; confirm exact syntax.
-    proxy:
-      # REVIEW: confirm kamal-proxy supports path_prefix to distinct roles on one domain.
-      # If multiple prefixes are needed for /api + /gh, verify the exact syntax.
-      path_prefix: /api
-      healthcheck:
-        path: /api/health
-        interval: 5s
-        timeout: 3s
-      app_port: 8080
-    options:
-      # Persist SQLite and mirrored files on the host outside the container lifecycle.
-      # REVIEW: confirm the volume syntax for your Kamal/Docker version.
-      volume:
-        - /var/lib/androidskills/data:/data
-
   web:
     hosts:
       - <%= ENV["KAMAL_HOST"] %>
@@ -47,6 +22,21 @@ servers:
         interval: 5s
         timeout: 3s
       app_port: 4321
+
+  api:
+    hosts:
+      - <%= ENV["KAMAL_HOST"] %>
+    # SQLite single-writer invariant: old container stops before new one starts.
+    deploy:
+      rolling: false
+    # REVIEW: set stop-grace option high enough for Ktor drain + Litestream final checkpoint.
+    # Not exposed by kamal-proxy; reached internally by the web container.
+    # Publish a host-local port so the web container can proxy to it.
+    options:
+      publish:
+        - 127.0.0.1:8080:8080
+      volume:
+        - /var/lib/androidskills/data:/data
 
 proxy:
   ssl: true

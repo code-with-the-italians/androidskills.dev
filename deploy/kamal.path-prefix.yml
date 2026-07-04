@@ -1,0 +1,89 @@
+# Kamal 2.x configuration for androidskills.dev.
+#
+# IMPORTANT — verify before first deploy:
+# 1. kamal-proxy on the target Kamal version supports path_prefix routing to
+#    distinct services on the same domain. If it does not, use
+#    deploy/kamal.fallback.yml instead.
+# 2. The SQLite-safe no-overlap deploy option (deploy.rolling: false) exists in
+#    your Kamal version. Only one api container may write the SQLite file.
+# 3. The /gh/webhooks path is also routed to the api service. If kamal-proxy
+#    supports only one prefix per role, use deploy/kamal.fallback.yml.
+
+service: androidskills
+image: ghcr.io/code-with-the-italians/androidskills
+
+servers:
+  api:
+    hosts:
+      - <%= ENV["KAMAL_HOST"] %>
+    # SQLite single-writer invariant: old container stops before new one starts.
+    deploy:
+      rolling: false
+    # REVIEW: set the stop-grace option for your Kamal version high enough for
+    # Ktor to drain and Litestream to write a final WAL checkpoint before the
+    # new container takes over. Typical values are 10-30s; confirm exact syntax.
+    proxy:
+      # REVIEW: confirm kamal-proxy supports path_prefix to distinct roles on one domain.
+      # If multiple prefixes are needed for /api + /gh, verify the exact syntax.
+      path_prefix: /api
+      healthcheck:
+        path: /api/health
+        interval: 5s
+        timeout: 3s
+      app_port: 8080
+    options:
+      # Persist SQLite and mirrored files on the host outside the container lifecycle.
+      # REVIEW: confirm the volume syntax for your Kamal/Docker version.
+      volume:
+        - /var/lib/androidskills/data:/data
+
+  web:
+    hosts:
+      - <%= ENV["KAMAL_HOST"] %>
+    proxy:
+      path_prefix: /
+      healthcheck:
+        path: /
+        interval: 5s
+        timeout: 3s
+      app_port: 4321
+
+proxy:
+  ssl: true
+  host: androidskills.dev
+  forward_headers: true
+
+registry:
+  username: <%= ENV["KAMAL_REGISTRY_USERNAME"] %>
+  password: <%= ENV["KAMAL_REGISTRY_PASSWORD"] %>
+
+builder:
+  arch: amd64
+  cache:
+    type: registry
+    image: ghcr.io/code-with-the-italians/androidskills-build-cache
+
+env:
+  clear:
+    APP_VERSION: 0.0.1
+    DATA_DIR: /data
+    PUBLIC_BASE_URL: https://androidskills.dev
+    TRUSTED_PROXY_COUNT: "1"
+  secret:
+    - R2_ACCESS_KEY_ID
+    - R2_SECRET_ACCESS_KEY
+    - R2_BUCKET
+    - R2_ENDPOINT
+    - R2_BACKUP_PATH
+    - GITHUB_OAUTH_CLIENT_ID
+    - GITHUB_OAUTH_CLIENT_SECRET
+    - GITHUB_APP_ID
+    - GITHUB_APP_PRIVATE_KEY
+    - GITHUB_WEBHOOK_SECRET
+    - LLM_BASE_URL
+    - LLM_API_KEY
+    - LLM_MODEL
+    - BOOTSTRAP_ADMIN_GITHUB_ID
+    - SESSION_COOKIE_DOMAIN
+    - SESSION_COOKIE_SECURE
+    - SEED_DEMO
