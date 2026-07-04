@@ -4,7 +4,7 @@
   "version": "0.0.1",
   "scripts": {
     "dev": "astro dev",
-    "start": "astro dev",
+    "start": "node dist/server/entry.mjs",
     "build": "astro build",
     "preview": "astro preview",
     "astro": "astro"
@@ -14,9 +14,6 @@
     "astro": "^5.0.0"
   },
   "devDependencies": {
-    "typescript": "^5.7.0"
-  },
-  "engines": {
-    "node": ">=22.0.0"
+    "@types/node": "^22.0.0"
   }
 }

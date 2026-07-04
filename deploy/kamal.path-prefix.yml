@@ -1,13 +1,16 @@
-# Kamal 2.x configuration for androidskills.dev.
+# Aspirational Kamal 2.x configuration for androidskills.dev.
+#
+# Use this only after you have verified that your Kamal version supports
+# path_prefix routing to distinct services on the same domain. In this model
+# kamal-proxy routes /api/* directly to the api service, while /gh/* falls
+# through to the web service and is proxied to api by the Astro Node server.
+# For a known-working topology today, see deploy/kamal.yml (fallback: all
+# traffic to web, Astro proxies both /api/* and /gh/*).
 #
 # IMPORTANT — verify before first deploy:
-# 1. kamal-proxy on the target Kamal version supports path_prefix routing to
-#    distinct services on the same domain. If it does not, use
-#    deploy/kamal.fallback.yml instead.
-# 2. The SQLite-safe no-overlap deploy option (deploy.rolling: false) exists in
-#    your Kamal version. Only one api container may write the SQLite file.
-# 3. The /gh/webhooks path is also routed to the api service. If kamal-proxy
-#    supports only one prefix per role, use deploy/kamal.fallback.yml.
+# 1. kamal-proxy supports path_prefix routing to distinct roles on one domain.
+# 2. The SQLite-safe no-overlap deploy option (deploy.rolling: false) exists.
+# 3. /gh/webhooks is proxied by the web service to the api service.
 
 service: androidskills
 image: ghcr.io/code-with-the-italians/androidskills
@@ -23,8 +26,6 @@ servers:
     # Ktor to drain and Litestream to write a final WAL checkpoint before the
     # new container takes over. Typical values are 10-30s; confirm exact syntax.
     proxy:
-      # REVIEW: confirm kamal-proxy supports path_prefix to distinct roles on one domain.
-      # If multiple prefixes are needed for /api + /gh, verify the exact syntax.
       path_prefix: /api
       healthcheck:
         path: /api/health
@@ -36,6 +37,10 @@ servers:
       # REVIEW: confirm the volume syntax for your Kamal/Docker version.
       volume:
         - /var/lib/androidskills/data:/data
+      # Expose the api service on a host-local port so the web container can
+      # proxy /gh/* requests to it (kamal-proxy routes /gh/* to web).
+      publish:
+        - 127.0.0.1:8080:8080
 
   web:
     hosts:
@@ -69,6 +74,10 @@ env:
     DATA_DIR: /data
     PUBLIC_BASE_URL: https://androidskills.dev
     TRUSTED_PROXY_COUNT: "1"
+    API_URL: http://127.0.0.1:8080
+    BOOTSTRAP_ADMIN_GITHUB_ID:
+    SESSION_COOKIE_DOMAIN:
+    SESSION_COOKIE_SECURE:
   secret:
     - R2_ACCESS_KEY_ID
     - R2_SECRET_ACCESS_KEY
@@ -83,7 +92,3 @@ env:
     - LLM_BASE_URL
     - LLM_API_KEY
     - LLM_MODEL
-    - BOOTSTRAP_ADMIN_GITHUB_ID
-    - SESSION_COOKIE_DOMAIN
-    - SESSION_COOKIE_SECURE
-    - SEED_DEMO

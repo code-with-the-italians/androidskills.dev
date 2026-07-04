@@ -21,6 +21,11 @@ ENV PORT=4321
 
 COPY --from=builder /app/dist ./dist
 
+RUN addgroup -S app --gid 1000 && adduser -S app -G app --uid 1000 \
+    && chown -R app:app /app
+
+USER app
+
 EXPOSE 4321
 
 CMD ["node", "dist/server/entry.mjs"]

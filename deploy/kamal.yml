@@ -1,12 +1,12 @@
-# Fallback Kamal configuration if kamal-proxy cannot route /api and /gh to the api
-# service while routing everything else to the web service on the same domain.
+# Default Kamal configuration for androidskills.dev.
 #
-# In this model kamal-proxy sends all traffic to the web service, and the Astro
-# Node server proxies /api/* and /gh/* to the api service. The api service is
-# not exposed by kamal-proxy; it must be reachable from the web container (e.g.
-# via a host-published port or the shared Docker network).
+# This is the deployable topology today: kamal-proxy sends all traffic to the
+# Astro web service, and the Astro Node server proxies /api/* and /gh/* to
+# the Ktor api service. The api service is not exposed by kamal-proxy; it is
+# reached from the web container via the host-published port 127.0.0.1:8080.
 #
-# This file is a reference only; the primary config is deploy/kamal.yml.
+# Once kamal-proxy supports path-prefix routing to distinct services on one
+# domain, deploy/kamal.path-prefix.yml can replace this file.
 
 service: androidskills
 image: ghcr.io/code-with-the-italians/androidskills
@@ -58,7 +58,14 @@ env:
     APP_VERSION: 0.0.1
     DATA_DIR: /data
     PUBLIC_BASE_URL: https://androidskills.dev
-    TRUSTED_PROXY_COUNT: "1"
+    # web proxies to api via 127.0.0.1:8080, so there are two trusted hops:
+    # client -> kamal-proxy -> Astro -> Ktor. api ignores this; it reads the
+    # X-Forwarded-For appended by kamal-proxy (one hop, count=1).
+    TRUSTED_PROXY_COUNT: "2"
+    API_URL: http://127.0.0.1:8080
+    BOOTSTRAP_ADMIN_GITHUB_ID:
+    SESSION_COOKIE_DOMAIN:
+    SESSION_COOKIE_SECURE:
   secret:
     - R2_ACCESS_KEY_ID
     - R2_SECRET_ACCESS_KEY
@@ -73,7 +80,3 @@ env:
     - LLM_BASE_URL
     - LLM_API_KEY
     - LLM_MODEL
-    - BOOTSTRAP_ADMIN_GITHUB_ID
-    - SESSION_COOKIE_DOMAIN
-    - SESSION_COOKIE_SECURE
-    - SEED_DEMO
