@@ -19,6 +19,10 @@ servers:
   api:
     hosts:
       - <%= ENV["KAMAL_HOST"] %>
+    env:
+      clear:
+        # kamal-proxy routes /api/* directly to api; only one trusted hop.
+        TRUSTED_PROXY_COUNT: "1"
     # SQLite single-writer invariant: old container stops before new one starts.
     deploy:
       rolling: false
@@ -45,6 +49,10 @@ servers:
   web:
     hosts:
       - <%= ENV["KAMAL_HOST"] %>
+    env:
+      clear:
+        # Two trusted hops: client -> kamal-proxy -> Astro -> Ktor (Astro proxies /gh/*).
+        TRUSTED_PROXY_COUNT: "2"
     proxy:
       path_prefix: /
       healthcheck:
@@ -73,7 +81,6 @@ env:
     APP_VERSION: 0.0.1
     DATA_DIR: /data
     PUBLIC_BASE_URL: https://androidskills.dev
-    TRUSTED_PROXY_COUNT: "1"
     API_URL: http://127.0.0.1:8080
     BOOTSTRAP_ADMIN_GITHUB_ID:
     SESSION_COOKIE_DOMAIN:

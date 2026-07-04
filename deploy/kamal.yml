@@ -15,6 +15,10 @@ servers:
   web:
     hosts:
       - <%= ENV["KAMAL_HOST"] %>
+    env:
+      clear:
+        # Two trusted hops: client -> kamal-proxy -> Astro -> Ktor.
+        TRUSTED_PROXY_COUNT: "2"
     proxy:
       path_prefix: /
       healthcheck:
@@ -26,6 +30,11 @@ servers:
   api:
     hosts:
       - <%= ENV["KAMAL_HOST"] %>
+    env:
+      clear:
+        # api is reached from the web container; the XFF chain is preserved by
+        # the Astro proxy, so it sees the same kamal-proxy hop as the direct path.
+        TRUSTED_PROXY_COUNT: "1"
     # SQLite single-writer invariant: old container stops before new one starts.
     deploy:
       rolling: false
@@ -58,10 +67,6 @@ env:
     APP_VERSION: 0.0.1
     DATA_DIR: /data
     PUBLIC_BASE_URL: https://androidskills.dev
-    # web proxies to api via 127.0.0.1:8080, so there are two trusted hops:
-    # client -> kamal-proxy -> Astro -> Ktor. api ignores this; it reads the
-    # X-Forwarded-For appended by kamal-proxy (one hop, count=1).
-    TRUSTED_PROXY_COUNT: "2"
     API_URL: http://127.0.0.1:8080
     BOOTSTRAP_ADMIN_GITHUB_ID:
     SESSION_COOKIE_DOMAIN:
