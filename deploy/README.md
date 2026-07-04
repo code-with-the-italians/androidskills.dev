@@ -73,7 +73,7 @@ With Litestream as PID 1, the old container must receive a clean SIGTERM so Lite
 
 ## Astro proxy routes
 
-In the default fallback topology, the Astro Node server handles proxying in `web/src/pages/api/[...path].ts` and `web/src/pages/gh/[...path].ts`. These routes forward to the `API_URL` configured in the Kamal env (default `http://127.0.0.1:8080`). Because this adds a proxy hop, the `web` service uses `TRUSTED_PROXY_COUNT=2` while the `api` service continues to use `TRUSTED_PROXY_COUNT=1` (it sees the `X-Forwarded-For` header appended by `kamal-proxy`).
+In the default fallback topology, the Astro Node server handles proxying in `web/src/pages/api/[...path].ts` and `web/src/pages/gh/[...path].ts`. These routes forward to the `API_URL` configured in the Kamal env (default `http://127.0.0.1:8080`). Because the Astro proxy forwards the `X-Forwarded-For` header unchanged, the `api` service uses `TRUSTED_PROXY_COUNT=1` (only kamal-proxy is a trusted hop from Ktor's point of view).
 
 ## SSH / host volume
 
@@ -93,4 +93,4 @@ The SQLite DB and mirrored files live on the host at `/var/lib/androidskills/dat
 
 - The default `deploy/kamal.yml` uses the fallback topology (Astro proxies `/api/*` and `/gh/*`). For direct path-prefix routing, use `deploy/kamal.path-prefix.yml` once you have confirmed your Kamal version supports it.
 - The `/gh/webhooks` path must reach the `api` service for GitHub webhooks to work; it is proxied by Astro in the default topology.
-- If you switch to `deploy/kamal.path-prefix.yml`, the `web` service drops to one proxy hop (`TRUSTED_PROXY_COUNT=1`) because the `api` service is reached directly by `kamal-proxy`.
+- `redirect: 'manual'` in `web/src/lib/proxy.ts` is required for OAuth 302 redirects to reach the client. Confirm this behavior with the Node version in `web/Dockerfile` in a live/compose smoke test; undici versions can vary in whether they return the real 3xx status or status 0.

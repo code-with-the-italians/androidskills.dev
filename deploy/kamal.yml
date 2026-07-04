@@ -15,10 +15,6 @@ servers:
   web:
     hosts:
       - <%= ENV["KAMAL_HOST"] %>
-    env:
-      clear:
-        # Two trusted hops: client -> kamal-proxy -> Astro -> Ktor.
-        TRUSTED_PROXY_COUNT: "2"
     proxy:
       path_prefix: /
       healthcheck:
@@ -32,8 +28,8 @@ servers:
       - <%= ENV["KAMAL_HOST"] %>
     env:
       clear:
-        # api is reached from the web container; the XFF chain is preserved by
-        # the Astro proxy, so it sees the same kamal-proxy hop as the direct path.
+        # The Astro proxy forwards the X-Forwarded-For header unchanged, so from
+        # Ktor's point of view there is exactly one trusted proxy hop (kamal-proxy).
         TRUSTED_PROXY_COUNT: "1"
     # SQLite single-writer invariant: old container stops before new one starts.
     deploy:

@@ -21,7 +21,8 @@ servers:
       - <%= ENV["KAMAL_HOST"] %>
     env:
       clear:
-        # kamal-proxy routes /api/* directly to api; only one trusted hop.
+        # kamal-proxy routes /api/* directly to api; the Astro proxy is not in
+        # this path, so from Ktor's point of view there is exactly one trusted hop.
         TRUSTED_PROXY_COUNT: "1"
     # SQLite single-writer invariant: old container stops before new one starts.
     deploy:
@@ -49,10 +50,6 @@ servers:
   web:
     hosts:
       - <%= ENV["KAMAL_HOST"] %>
-    env:
-      clear:
-        # Two trusted hops: client -> kamal-proxy -> Astro -> Ktor (Astro proxies /gh/*).
-        TRUSTED_PROXY_COUNT: "2"
     proxy:
       path_prefix: /
       healthcheck:

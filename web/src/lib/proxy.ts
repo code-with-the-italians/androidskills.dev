@@ -5,6 +5,9 @@ const API_URL = (process.env.API_URL || 'http://127.0.0.1:8080').replace(/\/$/, 
 export function createProxy(prefix: string): APIRoute {
   return async ({ request, params }) => {
     const path = (params.path as string | undefined) || '';
+    if (path.includes('..') || path.startsWith('/')) {
+      return new Response('Bad request', { status: 400 });
+    }
     const upstream = new URL(prefix + '/' + path, API_URL);
     upstream.search = new URL(request.url).search;
     return proxy(upstream, request);
@@ -13,12 +16,8 @@ export function createProxy(prefix: string): APIRoute {
 
 async function proxy(upstream: URL, request: Request): Promise<Response> {
   const headers = new Headers(request.headers);
-  // Let fetch derive the correct Host for the upstream URL. Preserve the
-  // X-Forwarded-For chain so Ktor's rate-limit key stays the real client IP.
   headers.delete('host');
   headers.delete('cf-connecting-ip');
-  // X-Real-Ip is not used by the API (spoofable), but if a client sends it we
-  // drop it here so the trusted proxy chain remains clean.
   headers.delete('x-real-ip');
 
   const init: RequestInit & { duplex?: 'half' } = {
@@ -32,7 +31,13 @@ async function proxy(upstream: URL, request: Request): Promise<Response> {
     init.duplex = 'half';
   }
 
-  const upstreamResponse = await fetch(upstream.toString(), init);
+  let upstreamResponse: Response;
+  try {
+    upstreamResponse = await fetch(upstream.toString(), init);
+  } catch (err) {
+    console.error('Proxy fetch failed:', err);
+    return new Response('Bad gateway', { status: 502 });
+  }
 
   const responseHeaders = new Headers();
   upstreamResponse.headers.forEach((value, key) => {
