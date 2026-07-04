@@ -53,8 +53,5 @@ jobs:
           BOOTSTRAP_ADMIN_GITHUB_ID: ${{ secrets.BOOTSTRAP_ADMIN_GITHUB_ID }}
           SESSION_COOKIE_DOMAIN: ${{ secrets.SESSION_COOKIE_DOMAIN }}
           SESSION_COOKIE_SECURE: ${{ secrets.SESSION_COOKIE_SECURE }}
-          SEED_DEMO: ${{ secrets.SEED_DEMO }}
           TRUSTED_PROXY_COUNT: ${{ secrets.TRUSTED_PROXY_COUNT }}
-        run: |
-          kamal lock release
-          kamal deploy
+        run: kamal deploy
