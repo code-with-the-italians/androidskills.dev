@@ -4,7 +4,6 @@ import dev.androidskills.auth.GitHubUser
 import dev.androidskills.auth.SessionStore
 import dev.androidskills.auth.UsersRepo
 import dev.androidskills.db.Role
-import dev.androidskills.db.Sessions
 import dev.androidskills.db.UserStatus
 import dev.androidskills.db.Users
 import java.nio.file.Files
@@ -48,15 +47,16 @@ object TestSupport {
     role: Role = Role.member,
     status: UserStatus = UserStatus.active,
   ): SeededSession {
-    val uid = UsersRepo.upsertFromGitHub(
-      GitHubUser(
-        githubId = githubId ?: (System.currentTimeMillis() + handle.hashCode()),
-        handle = handle,
-        name = handle.replaceFirstChar { it.uppercase() },
-        avatarUrl = null,
-      ),
-      bootstrapAdminGithubId = null,
-    )
+    val uid =
+      UsersRepo.upsertFromGitHub(
+        GitHubUser(
+          githubId = githubId ?: (System.currentTimeMillis() + handle.hashCode()),
+          handle = handle,
+          name = handle.replaceFirstChar { it.uppercase() },
+          avatarUrl = null,
+        ),
+        bootstrapAdminGithubId = null,
+      )
     transaction {
       Users.update({ Users.id eq uid }) {
         it[Users.role] = role.name
@@ -64,7 +64,11 @@ object TestSupport {
       }
     }
     val token = SessionStore.create(uid, 3600)
-    return SeededSession(uid, transaction { Users.selectAll().where { Users.id eq uid }.single()[Users.handle] }, token)
+    return SeededSession(
+      uid,
+      transaction { Users.selectAll().where { Users.id eq uid }.single()[Users.handle] },
+      token,
+    )
   }
 
   fun seedAdmin(dir: Path? = null): SeededSession =

@@ -175,7 +175,8 @@ fun Application.module(
           .classLoader
           .getResourceAsStream("openapi-admin.yaml")
           ?.use { it.readAllBytes() }
-          ?.decodeToString() ?: throw IllegalStateException("openapi-admin.yaml missing from classpath")
+          ?.decodeToString()
+          ?: throw IllegalStateException("openapi-admin.yaml missing from classpath")
       call.respondText(spec, ContentType("application", "yaml"))
     }
     publicRoutes(fileStore)
