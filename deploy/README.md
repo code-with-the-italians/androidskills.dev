@@ -63,7 +63,7 @@ The domain currently serves GitHub Pages (`CNAME` at the repo root). Repointing 
 
 ## Disaster recovery
 
-The `api` container entrypoint (`api/entrypoint.sh`) restores the SQLite database from R2 if the file is missing, then starts Ktor under Litestream replication. On a routine redeploy the host volume still contains the DB, so no restore is performed. Restore is only for an empty volume / new host.
+The `api` container entrypoint (`api/entrypoint.sh`) restores the SQLite database from R2 only if a replica is configured and the DB file is missing. On a routine redeploy the host volume still contains the DB, so no restore is performed. Restore is only for an empty volume / new host. If R2 is unconfigured, Ktor starts directly without Litestream — this is the expected pre-production/local state.
 
 Configure `api/litestream.yml` for your object-storage backend (R2 by default). The required env vars are `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET`, `R2_ENDPOINT`, and optionally `R2_BACKUP_PATH`. The `DATA_DIR` env var must match the path in `litestream.yml` (`/data` in the default Kamal deploy).
 

@@ -20,11 +20,12 @@ ENV NODE_ENV=production
 ENV PORT=4321
 
 COPY --from=builder /app/dist ./dist
+COPY package.json package-lock.json ./
 
-RUN addgroup -S app --gid 1000 && adduser -S app -G app --uid 1000 \
-    && chown -R app:app /app
+RUN npm ci --omit=dev \
+    && chown -R node:node /app
 
-USER app
+USER node
 
 EXPOSE 4321
 

@@ -61,7 +61,7 @@ docker run -p 8080:8080 \
   androidskills-api
 ```
 
-The production image includes [Litestream](https://litestream.io/) and uses `api/entrypoint.sh`: it restores the SQLite DB from R2 if the file is missing (and a replica exists), then starts Ktor under Litestream replication. Health is checked by the Kamal proxy hitting `/api/health`; no Docker `HEALTHCHECK` is configured.
+The production image includes [Litestream](https://litestream.io/) and uses `api/entrypoint.sh`. If the R2 replica env vars are present, it restores the SQLite DB from R2 if the file is missing (and a replica exists), then starts Ktor under Litestream replication. If R2 is unconfigured, Ktor runs directly without Litestream — this is the normal pre-production/local state. Health is checked by the Kamal proxy hitting `/api/health`; no Docker `HEALTHCHECK` is configured.
 
 The container runs as UID/GID 1000. The host directory mounted at `/data` must be writable by that user.
 
