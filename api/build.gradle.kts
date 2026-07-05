@@ -2,6 +2,8 @@ plugins {
     alias(libs.plugins.kotlin.jvm)
     alias(libs.plugins.kotlin.serialization)
     alias(ktorLibs.plugins.ktor)
+    alias(libs.plugins.spotless)
+    alias(libs.plugins.detekt)
 }
 
 group = "dev.androidskills"
@@ -40,4 +42,17 @@ dependencies {
     testImplementation(ktorLibs.server.testHost)
     testImplementation(ktorLibs.client.mock)
     testImplementation("org.yaml:snakeyaml:2.2")
+}
+
+spotless {
+    kotlin {
+        ktfmt("0.52").googleStyle()
+        target("src/**/*.kt")
+    }
+}
+
+detekt {
+    buildUponDefaultConfig = true
+    config.from(file("config/detekt/detekt.yml"))
+    baseline = file("config/detekt/baseline.xml")
 }

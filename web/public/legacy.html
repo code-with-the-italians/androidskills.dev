@@ -1,202 +1,236 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>android skills — coming soon</title>
-  
-  <!-- Tailwind CSS CDN -->
-  <script src="https://cdn.tailwindcss.com"></script>
-  
-  <!-- Font Integrations -->
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Space+Grotesk:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>android skills — coming soon</title>
 
-  <script>
-    tailwind.config = {
-      theme: {
-        extend: {
-          fontFamily: {
-            sans: ['Inter', 'sans-serif'],
-            display: ['Space Grotesk', 'sans-serif'],
-            mono: ['JetBrains Mono', 'monospace'],
-          }
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- Font Integrations -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Space+Grotesk:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap"
+      rel="stylesheet"
+    />
+
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            fontFamily: {
+              sans: ['Inter', 'sans-serif'],
+              display: ['Space Grotesk', 'sans-serif'],
+              mono: ['JetBrains Mono', 'monospace'],
+            },
+          },
+        },
+      };
+    </script>
+
+    <style>
+      /* Prevent selection highlight flashes */
+      .no-select {
+        -webkit-touch-callout: none;
+        -webkit-user-select: none;
+        -khtml-user-select: none;
+        -moz-user-select: none;
+        -ms-user-select: none;
+        user-select: none;
+      }
+    </style>
+  </head>
+  <body
+    class="min-h-screen bg-gray-950 text-gray-200 font-sans flex flex-col justify-between selection:bg-emerald-500/30 selection:text-emerald-300 relative overflow-hidden"
+  >
+    <!-- Interactive Chrome Fluid Background Shader Canvas -->
+    <canvas
+      id="organic-blob-canvas"
+      class="absolute inset-0 w-full h-full pointer-events-none select-none z-0"
+    ></canvas>
+
+    <!-- Dummy spacer to preserve layout composition constraints -->
+    <div class="h-12 z-10"></div>
+
+    <!-- Main Focus Landing Stage -->
+    <main
+      class="max-w-xl mx-auto w-full px-6 py-12 flex flex-col justify-center items-center text-center space-y-7 z-10 my-auto"
+    >
+      <!-- Compiling indicator -->
+      <div
+        class="flex items-center space-x-2 bg-emerald-950/20 border border-emerald-500/10 py-1.5 px-3.5 rounded-full text-[9px] font-mono text-[#3DDC84] tracking-widest uppercase no-select"
+      >
+        <span class="relative flex h-1.5 w-1.5">
+          <span
+            class="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#3DDC84] opacity-75"
+          ></span>
+          <span
+            class="relative inline-flex rounded-full h-1.5 w-1.5 bg-[#3DDC84]"
+          ></span>
+        </span>
+        <span>coming soon</span>
+      </div>
+
+      <!-- Primary Title and curated descriptor -->
+      <div class="space-y-4">
+        <h1
+          class="font-display font-light text-6xl sm:text-7xl text-white tracking-tight leading-none uppercase no-select"
+        >
+          android <span class="font-semibold text-[#3DDC84]">skills</span>
+        </h1>
+        <p
+          class="text-[10px] font-mono text-gray-500 leading-relaxed max-w-xs mx-auto uppercase tracking-wider no-select"
+        >
+          curated skills for top-shelf Android slop
+        </p>
+      </div>
+    </main>
+
+    <!-- Footer bar with requested small link -->
+    <footer
+      class="max-w-7xl mx-auto w-full px-6 py-8 border-t border-gray-900/40 text-[10px] text-gray-600 flex flex-col sm:flex-row items-center justify-between gap-3 z-10"
+    >
+      <div>
+        <span class="no-select"
+          >&copy; <span id="current-year"></span> CWTI Ltd.</span
+        >
+      </div>
+      <div class="flex items-center space-x-1 font-mono">
+        <span>curated by</span>
+        <a
+          href="https://codewiththeitalians.it"
+          target="_blank"
+          rel="noopener noreferrer"
+          class="text-gray-400 hover:text-[#3DDC84] underline transition underline-offset-2"
+        >
+          codewiththeitalians.it
+        </a>
+      </div>
+    </footer>
+
+    <!-- Background Fluid Blobs Animation Script -->
+    <script>
+      document.getElementById('current-year').textContent =
+        new Date().getFullYear();
+
+      const canvas = document.getElementById('organic-blob-canvas');
+      if (canvas) {
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          let width = (canvas.width = window.innerWidth);
+          let height = (canvas.height = window.innerHeight);
+
+          // Expressive organic blobs mapping
+          const blobs = [
+            // Android Green
+            {
+              x: width * 0.3,
+              y: height * 0.4,
+              vx: 0.3,
+              vy: 0.25,
+              radius: Math.min(width, height) * 0.35,
+              color: 'rgba(61, 220, 132, 0.12)',
+            },
+            // Lavender
+            {
+              x: width * 0.7,
+              y: height * 0.3,
+              vx: -0.22,
+              vy: 0.35,
+              radius: Math.min(width, height) * 0.4,
+              color: 'rgba(129, 140, 248, 0.08)',
+            },
+            // Gold / Monet Yellow
+            {
+              x: width * 0.5,
+              y: height * 0.7,
+              vx: 0.18,
+              vy: -0.2,
+              radius: Math.min(width, height) * 0.3,
+              color: 'rgba(234, 179, 8, 0.05)',
+            },
+            // Mint / Sage
+            {
+              x: width * 0.2,
+              y: height * 0.8,
+              vx: -0.15,
+              vy: -0.15,
+              radius: Math.min(width, height) * 0.28,
+              color: 'rgba(20, 184, 166, 0.08)',
+            },
+          ];
+
+          const handleResize = () => {
+            width = canvas.width = window.innerWidth;
+            height = canvas.height = window.innerHeight;
+
+            blobs[0].radius = Math.min(width, height) * 0.35;
+            blobs[1].radius = Math.min(width, height) * 0.4;
+            blobs[2].radius = Math.min(width, height) * 0.3;
+            blobs[3].radius = Math.min(width, height) * 0.28;
+          };
+
+          window.addEventListener('resize', handleResize);
+
+          let time = 0;
+          const animate = () => {
+            time += 0.002;
+            ctx.clearRect(0, 0, width, height);
+
+            // Dark background base matching layout
+            ctx.fillStyle = '#030712';
+            ctx.fillRect(0, 0, width, height);
+
+            // Apply modern screen composition mode
+            ctx.save();
+            ctx.globalCompositeOperation = 'screen';
+
+            blobs.forEach((blob, idx) => {
+              blob.x += blob.vx;
+              blob.y += blob.vy;
+
+              // Bounce with offsets
+              if (
+                blob.x - blob.radius < -100 ||
+                blob.x + blob.radius > width + 100
+              )
+                blob.vx *= -1;
+              if (
+                blob.y - blob.radius < -100 ||
+                blob.y + blob.radius > height + 100
+              )
+                blob.vy *= -1;
+
+              const scaleChange = Math.sin(time * 5 + idx) * 15;
+              const currentRadius = Math.max(50, blob.radius + scaleChange);
+
+              const gradient = ctx.createRadialGradient(
+                blob.x,
+                blob.y,
+                0,
+                blob.x,
+                blob.y,
+                currentRadius,
+              );
+              gradient.addColorStop(0, blob.color);
+              gradient.addColorStop(0.5, blob.color.replace('0.1', '0.04'));
+              gradient.addColorStop(1, 'rgba(0,0,0,0)');
+
+              ctx.fillStyle = gradient;
+              ctx.beginPath();
+              ctx.arc(blob.x, blob.y, currentRadius, 0, Math.PI * 2);
+              ctx.fill();
+            });
+
+            ctx.restore();
+            requestAnimationFrame(animate);
+          };
+
+          animate();
         }
       }
-    }
-  </script>
-
-  <style>
-    /* Prevent selection highlight flashes */
-    .no-select {
-      -webkit-touch-callout: none;
-      -webkit-user-select: none;
-      -khtml-user-select: none;
-      -moz-user-select: none;
-      -ms-user-select: none;
-      user-select: none;
-    }
-  </style>
-</head>
-<body class="min-h-screen bg-gray-950 text-gray-200 font-sans flex flex-col justify-between selection:bg-emerald-500/30 selection:text-emerald-300 relative overflow-hidden">
-  
-  <!-- Interactive Chrome Fluid Background Shader Canvas -->
-  <canvas id="organic-blob-canvas" class="absolute inset-0 w-full h-full pointer-events-none select-none z-0"></canvas>
-
-  <!-- Dummy spacer to preserve layout composition constraints -->
-  <div class="h-12 z-10"></div>
-
-  <!-- Main Focus Landing Stage -->
-  <main class="max-w-xl mx-auto w-full px-6 py-12 flex flex-col justify-center items-center text-center space-y-7 z-10 my-auto">
-    
-    <!-- Compiling indicator -->
-    <div class="flex items-center space-x-2 bg-emerald-950/20 border border-emerald-500/10 py-1.5 px-3.5 rounded-full text-[9px] font-mono text-[#3DDC84] tracking-widest uppercase no-select">
-      <span class="relative flex h-1.5 w-1.5">
-        <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#3DDC84] opacity-75"></span>
-        <span class="relative inline-flex rounded-full h-1.5 w-1.5 bg-[#3DDC84]"></span>
-      </span>
-      <span>coming soon</span>
-    </div>
-
-    <!-- Primary Title and curated descriptor -->
-    <div class="space-y-4">
-      <h1 class="font-display font-light text-6xl sm:text-7xl text-white tracking-tight leading-none uppercase no-select">
-        android <span class="font-semibold text-[#3DDC84]">skills</span>
-      </h1>
-      <p class="text-[10px] font-mono text-gray-500 leading-relaxed max-w-xs mx-auto uppercase tracking-wider no-select">
-        curated skills for top-shelf Android slop
-      </p>
-    </div>
-
-  </main>
-
-  <!-- Footer bar with requested small link -->
-  <footer class="max-w-7xl mx-auto w-full px-6 py-8 border-t border-gray-900/40 text-[10px] text-gray-600 flex flex-col sm:flex-row items-center justify-between gap-3 z-10">
-    <div>
-      <span class="no-select">&copy; <span id="current-year"></span> CWTI Ltd.</span>
-    </div>
-    <div class="flex items-center space-x-1 font-mono">
-      <span>curated by</span>
-      <a 
-        href="https://codewiththeitalians.it" 
-        target="_blank" 
-        rel="noopener noreferrer"
-        class="text-gray-400 hover:text-[#3DDC84] underline transition underline-offset-2"
-      >
-        codewiththeitalians.it
-      </a>
-    </div>
-  </footer>
-
-  <!-- Background Fluid Blobs Animation Script -->
-  <script>
-    document.getElementById('current-year').textContent = new Date().getFullYear();
-
-    const canvas = document.getElementById('organic-blob-canvas');
-    if (canvas) {
-      const ctx = canvas.getContext('2d');
-      if (ctx) {
-        let width = (canvas.width = window.innerWidth);
-        let height = (canvas.height = window.innerHeight);
-
-        // Expressive organic blobs mapping
-        const blobs = [
-          // Android Green
-          {
-            x: width * 0.3,
-            y: height * 0.4,
-            vx: 0.3,
-            vy: 0.25,
-            radius: Math.min(width, height) * 0.35,
-            color: 'rgba(61, 220, 132, 0.12)'
-          },
-          // Lavender
-          {
-            x: width * 0.7,
-            y: height * 0.3,
-            vx: -0.22,
-            vy: 0.35,
-            radius: Math.min(width, height) * 0.4,
-            color: 'rgba(129, 140, 248, 0.08)'
-          },
-          // Gold / Monet Yellow
-          {
-            x: width * 0.5,
-            y: height * 0.7,
-            vx: 0.18,
-            vy: -0.2,
-            radius: Math.min(width, height) * 0.3,
-            color: 'rgba(234, 179, 8, 0.05)'
-          },
-          // Mint / Sage
-          {
-            x: width * 0.2,
-            y: height * 0.8,
-            vx: -0.15,
-            vy: -0.15,
-            radius: Math.min(width, height) * 0.28,
-            color: 'rgba(20, 184, 166, 0.08)'
-          }
-        ];
-
-        const handleResize = () => {
-          width = canvas.width = window.innerWidth;
-          height = canvas.height = window.innerHeight;
-          
-          blobs[0].radius = Math.min(width, height) * 0.35;
-          blobs[1].radius = Math.min(width, height) * 0.4;
-          blobs[2].radius = Math.min(width, height) * 0.3;
-          blobs[3].radius = Math.min(width, height) * 0.28;
-        };
-
-        window.addEventListener('resize', handleResize);
-
-        let time = 0;
-        const animate = () => {
-          time += 0.002;
-          ctx.clearRect(0, 0, width, height);
-
-          // Dark background base matching layout
-          ctx.fillStyle = '#030712';
-          ctx.fillRect(0, 0, width, height);
-
-          // Apply modern screen composition mode
-          ctx.save();
-          ctx.globalCompositeOperation = 'screen';
-          
-          blobs.forEach((blob, idx) => {
-            blob.x += blob.vx;
-            blob.y += blob.vy;
-
-            // Bounce with offsets
-            if (blob.x - blob.radius < -100 || blob.x + blob.radius > width + 100) blob.vx *= -1;
-            if (blob.y - blob.radius < -100 || blob.y + blob.radius > height + 100) blob.vy *= -1;
-
-            const scaleChange = Math.sin(time * 5 + idx) * 15;
-            const currentRadius = Math.max(50, blob.radius + scaleChange);
-
-            const gradient = ctx.createRadialGradient(
-              blob.x, blob.y, 0,
-              blob.x, blob.y, currentRadius
-            );
-            gradient.addColorStop(0, blob.color);
-            gradient.addColorStop(0.5, blob.color.replace('0.1', '0.04'));
-            gradient.addColorStop(1, 'rgba(0,0,0,0)');
-
-            ctx.fillStyle = gradient;
-            ctx.beginPath();
-            ctx.arc(blob.x, blob.y, currentRadius, 0, Math.PI * 2);
-            ctx.fill();
-          });
-
-          ctx.restore();
-          requestAnimationFrame(animate);
-        };
-
-        animate();
-      }
-    }
-  </script>
-</body>
+    </script>
+  </body>
 </html>
