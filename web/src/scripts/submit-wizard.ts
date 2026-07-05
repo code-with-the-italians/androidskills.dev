@@ -25,6 +25,21 @@ interface ScanResponse {
 }
 const CHECK =
   '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>';
+
+/**
+ * Escape a string for safe insertion into HTML via template literals.
+ * Exported so the unit test can lock the invariant.
+ */
+export function esc(raw: string | number | null | undefined): string {
+  const s = String(raw ?? '');
+  return s
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 const state = {
   step: 1,
   repo: null as Repo | null,
@@ -34,8 +49,13 @@ const state = {
   checking: null as string | null,
 };
 
-const vsteps = document.getElementById('vsteps') as HTMLElement;
-const steps = Array.from(vsteps.querySelectorAll('.vstep')) as HTMLElement[];
+const vsteps =
+  typeof document !== 'undefined'
+    ? (document.getElementById('vsteps') as HTMLElement)
+    : null;
+const steps = vsteps
+  ? (Array.from(vsteps.querySelectorAll('.vstep')) as HTMLElement[])
+  : [];
 
 async function loadRepos() {
   const res = await fetch('/api/me/repos');
@@ -86,11 +106,11 @@ function renderRepoList() {
   list.innerHTML = repos
     .map(
       (r) => `
-    <div class="repo ${state.repo?.fullName === r.fullName ? ' sel' : ''}" data-repo="${r.fullName}" role="button" tabindex="0">
+    <div class="repo ${state.repo?.fullName === r.fullName ? ' sel' : ''}" data-repo="${esc(r.fullName)}" role="button" tabindex="0">
       <span class="radio"></span>
       <div style="flex:1;min-width:0;">
-        <div style="font-weight:600;font-size:14px;">${r.fullName}</div>
-        <div class="slug" style="font-size:11.5px;">${r.defaultBranch || 'default branch'}</div>
+        <div style="font-weight:600;font-size:14px;">${esc(r.fullName)}</div>
+        <div class="slug" style="font-size:11.5px;">${esc(r.defaultBranch || 'default branch')}</div>
       </div>
     </div>
   `,
@@ -144,19 +164,19 @@ function renderStep2() {
       <div class="acc-h" data-acc-head style="display:flex;align-items:center;gap:12px;padding:13px 14px;cursor:pointer;">
         <input type="checkbox" data-skill-idx="${i}" checked style="width:18px;height:18px;flex:none;">
         <div style="flex:1;min-width:0;">
-          <div class="nm" style="font-weight:600;font-size:14.5px;">${s.name}</div>
-          <div class="sl" style="font-family:var(--mono);font-size:11.5px;color:var(--text-faint);">skills/${s.slug}/</div>
+          <div class="nm" style="font-weight:600;font-size:14.5px;">${esc(s.name)}</div>
+          <div class="sl" style="font-family:var(--mono);font-size:11.5px;color:var(--text-faint);">skills/${esc(s.slug)}/</div>
         </div>
-        <span class="tag" style="flex:none;">${s.tokenUpfront + s.tokenOndemand} tok</span>
+        <span class="tag" style="flex:none;">${esc(s.tokenUpfront + s.tokenOndemand)} tok</span>
         <svg class="chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
       </div>
       <div class="acc-body" style="max-height:0;overflow:hidden;padding:0 14px;border-top:1px solid transparent;">
         <div style="padding:12px 0;">
-          <div class="kv" style="display:grid;grid-template-columns:130px 1fr;gap:12px;padding:10px 0;border-bottom:1px solid var(--border);font-size:14px;"><span class="k" style="font-family:var(--mono);font-size:12px;color:var(--text-faint);">description</span><span class="v">${s.description}</span></div>
-          <div class="kv" style="display:grid;grid-template-columns:130px 1fr;gap:12px;padding:10px 0;border-bottom:1px solid var(--border);font-size:14px;"><span class="k" style="font-family:var(--mono);font-size:12px;color:var(--text-faint);">version</span><span class="v">${s.version}</span></div>
-          <div class="kv" style="display:grid;grid-template-columns:130px 1fr;gap:12px;padding:10px 0;border-bottom:1px solid var(--border);font-size:14px;"><span class="k" style="font-family:var(--mono);font-size:12px;color:var(--text-faint);">license</span><span class="v">${s.license || '—'}</span></div>
-          <div class="kv" style="display:grid;grid-template-columns:130px 1fr;gap:12px;padding:10px 0;border-bottom:1px solid var(--border);font-size:14px;"><span class="k" style="font-family:var(--mono);font-size:12px;color:var(--text-faint);">tags</span><span class="v">${(s.tags || []).map((t) => `<span class="tag">${t}</span>`).join(' ')}</span></div>
-          <div class="kv" style="display:grid;grid-template-columns:130px 1fr;gap:12px;padding:10px 0;font-size:14px;"><span class="k" style="font-family:var(--mono);font-size:12px;color:var(--text-faint);">contents</span><span class="v">${s.fileCount} files · <span style="color:var(--accent-text);">${s.tokenUpfront + s.tokenOndemand} tokens</span></span></div>
+          <div class="kv" style="display:grid;grid-template-columns:130px 1fr;gap:12px;padding:10px 0;border-bottom:1px solid var(--border);font-size:14px;"><span class="k" style="font-family:var(--mono);font-size:12px;color:var(--text-faint);">description</span><span class="v">${esc(s.description)}</span></div>
+          <div class="kv" style="display:grid;grid-template-columns:130px 1fr;gap:12px;padding:10px 0;border-bottom:1px solid var(--border);font-size:14px;"><span class="k" style="font-family:var(--mono);font-size:12px;color:var(--text-faint);">version</span><span class="v">${esc(s.version)}</span></div>
+          <div class="kv" style="display:grid;grid-template-columns:130px 1fr;gap:12px;padding:10px 0;border-bottom:1px solid var(--border);font-size:14px;"><span class="k" style="font-family:var(--mono);font-size:12px;color:var(--text-faint);">license</span><span class="v">${esc(s.license) || '—'}</span></div>
+          <div class="kv" style="display:grid;grid-template-columns:130px 1fr;gap:12px;padding:10px 0;border-bottom:1px solid var(--border);font-size:14px;"><span class="k" style="font-family:var(--mono);font-size:12px;color:var(--text-faint);">tags</span><span class="v">${(s.tags || []).map((t) => `<span class="tag">${esc(t)}</span>`).join(' ')}</span></div>
+          <div class="kv" style="display:grid;grid-template-columns:130px 1fr;gap:12px;padding:10px 0;font-size:14px;"><span class="k" style="font-family:var(--mono);font-size:12px;color:var(--text-faint);">contents</span><span class="v">${esc(s.fileCount)} files · <span style="color:var(--accent-text);">${esc(s.tokenUpfront + s.tokenOndemand)} tokens</span></span></div>
         </div>
       </div>
     </div>
@@ -164,7 +184,7 @@ function renderStep2() {
     )
     .join('');
   container.innerHTML = `
-    <div class="callout" style="margin-bottom:16px;"><svg class="ci" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 16v-4M12 8h.01" stroke-linecap="round"/></svg><div><b>${skills.length} skill${skills.length > 1 ? 's' : ''}</b> found. Everything below is read from each skill's SKILL.md frontmatter.</div></div></div>
+    <div class="callout" style="margin-bottom:16px;"><svg class="ci" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 16v-4M12 8h.01" stroke-linecap="round"/></svg><div><b>${esc(skills.length)} skill${skills.length > 1 ? 's' : ''}</b> found. Everything below is read from each skill's SKILL.md frontmatter.</div></div></div>
     <div class="accs">${items}</div>
     <button class="btn btn-primary" data-continue style="margin-top:18px;">Continue with selected skills</button>
   `;
@@ -178,7 +198,7 @@ function renderStep3() {
     <p class="hint" style="margin-bottom:14px;">On submit, automated checks run and the selected skills enter the review queue. Drafts you save appear under <a href="/submissions" style="color:var(--accent-text);">My submissions</a>.</p>
     <div class="card" style="margin-bottom:16px;">
       <div class="kicker" style="margin-bottom:10px;"><span class="tick">//</span> SELECTED</div>
-      ${skills.map((s) => `<div style="padding:8px 0;border-bottom:1px solid var(--border);"><b>${s.name}</b> <span class="hint">skills/${s.slug}/</span></div>`).join('')}
+      ${skills.map((s) => `<div style="padding:8px 0;border-bottom:1px solid var(--border);"><b>${esc(s.name)}</b> <span class="hint">skills/${esc(s.slug)}/</span></div>`).join('')}
     </div>
     <div class="row" style="gap:10px;">
       <button class="btn btn-ghost" data-save-draft>Save draft</button>
@@ -214,9 +234,9 @@ function render() {
   const status = document.getElementById('repoStatus');
   if (status) {
     if (state.checking)
-      status.innerHTML = `<div class="callout" style="align-items:center;"><span class="spinner" style="width:16px;height:16px;flex:none;"></span><div>Scanning <b>${state.checking}</b> for SKILL.md files…</div></div>`;
+      status.innerHTML = `<div class="callout" style="align-items:center;"><span class="spinner" style="width:16px;height:16px;flex:none;"></span><div>Scanning <b>${esc(state.checking)}</b> for SKILL.md files…</div></div>`;
     else if (state.error)
-      status.innerHTML = `<div class="callout" style="background:var(--danger-soft);border-color:transparent;align-items:flex-start;"><svg class="ci" viewBox="0 0 24 24" fill="none" stroke="var(--danger)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 9v4M12 17h.01M10.3 3.9 2.4 18a2 2 0 0 0 1.7 3h15.8a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg><div><b>${state.error}</b></div></div>`;
+      status.innerHTML = `<div class="callout" style="background:var(--danger-soft);border-color:transparent;align-items:flex-start;"><svg class="ci" viewBox="0 0 24 24" fill="none" stroke="var(--danger)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 9v4M12 17h.01M10.3 3.9 2.4 18a2 2 0 0 0 1.7 3h15.8a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg><div><b>${esc(state.error)}</b></div></div>`;
     else status.innerHTML = '';
   }
 }
@@ -258,47 +278,49 @@ async function createDrafts(submit: boolean) {
   window.location.href = '/submissions';
 }
 
-vsteps.addEventListener('click', (e) => {
-  const target = e.target as HTMLElement;
-  const repo = target.closest('[data-repo]');
-  if (repo && state.repos) {
-    const fullName = repo.getAttribute('data-repo');
-    const r = state.repos.repos.find((x) => x.fullName === fullName);
-    if (r) scanRepo(r);
-    return;
-  }
-  const acc = target.closest('[data-acc-head]');
-  if (acc) {
-    acc.closest('[data-acc]')?.classList.toggle('open');
-    return;
-  }
-  const cont = target.closest('[data-continue]');
-  if (cont) {
-    state.step = 3;
-    render();
-    return;
-  }
-  const save = target.closest('[data-save-draft]');
-  if (save) {
-    createDrafts(false);
-    return;
-  }
-  const sub = target.closest('[data-submit]');
-  if (sub) {
-    createDrafts(true);
-    return;
-  }
-});
-
-vsteps.addEventListener('input', (e) => {
-  const target = e.target as HTMLElement;
-  if (target.id === 'repoFilter') renderRepoList();
-});
-
-loadRepos()
-  .then(render)
-  .catch((e) => {
-    const el = document.getElementById('step1content');
-    if (el)
-      el.innerHTML = `<div class="callout" style="background:var(--danger-soft);border-color:transparent;"><b>Failed to load repositories:</b> ${e.message}</div>`;
+if (vsteps) {
+  vsteps.addEventListener('click', (e) => {
+    const target = e.target as HTMLElement;
+    const repo = target.closest('[data-repo]');
+    if (repo && state.repos) {
+      const fullName = repo.getAttribute('data-repo');
+      const r = state.repos.repos.find((x) => x.fullName === fullName);
+      if (r) scanRepo(r);
+      return;
+    }
+    const acc = target.closest('[data-acc-head]');
+    if (acc) {
+      acc.closest('[data-acc]')?.classList.toggle('open');
+      return;
+    }
+    const cont = target.closest('[data-continue]');
+    if (cont) {
+      state.step = 3;
+      render();
+      return;
+    }
+    const save = target.closest('[data-save-draft]');
+    if (save) {
+      createDrafts(false);
+      return;
+    }
+    const sub = target.closest('[data-submit]');
+    if (sub) {
+      createDrafts(true);
+      return;
+    }
   });
+
+  vsteps.addEventListener('input', (e) => {
+    const target = e.target as HTMLElement;
+    if (target.id === 'repoFilter') renderRepoList();
+  });
+
+  loadRepos()
+    .then(render)
+    .catch((e) => {
+      const el = document.getElementById('step1content');
+      if (el)
+        el.innerHTML = `<div class="callout" style="background:var(--danger-soft);border-color:transparent;"><b>Failed to load repositories:</b> ${esc(e.message)}</div>`;
+    });
+}
