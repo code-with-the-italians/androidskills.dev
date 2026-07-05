@@ -156,8 +156,6 @@ class IngestPipelineTest {
         it[Skills.verified] = true
       }
     }
-    val originalName = skillRow("resync-test")[Skills.name]
-    val originalDesc = skillRow("resync-test")[Skills.description]
     val originalReadme = skillRow("resync-test")[Skills.readmeMd]
 
     // Resync: push new content under a new version.
