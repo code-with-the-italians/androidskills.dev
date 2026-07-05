@@ -12,6 +12,11 @@ COPY settings.gradle.kts .
 COPY build.gradle.kts .
 COPY gradle/libs.versions.toml gradle/libs.versions.toml
 
+# gradlew is committed non-executable (100644), so on a Linux CI runner `./gradlew`
+# fails with exit 126. Docker Desktop on Windows/macOS masks this by auto-adding the
+# exec bit, which is why local builds pass but the GHCR CI build did not.
+RUN chmod +x gradlew
+
 # Download dependencies and plugins before copying source
 RUN ./gradlew --no-daemon --version
 
