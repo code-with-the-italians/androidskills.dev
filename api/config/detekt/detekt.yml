@@ -1,0 +1,6 @@
+# Detekt configuration. Build is configured with buildUponDefaultConfig = true,
+# so only overrides need to live here. Start empty and tighten rules as the
+# codebase matures.
+config:
+  validation: true
+  warningsAsErrors: false

@@ -16,6 +16,16 @@ jobs:
         with:
           java-version: "21"
           distribution: "temurin"
+      - name: Check Kotlin formatting
+        working-directory: ./api
+        run: |
+          chmod +x ./gradlew
+          ./gradlew spotlessCheck --no-daemon
+      - name: Run Detekt
+        working-directory: ./api
+        run: |
+          chmod +x ./gradlew
+          ./gradlew detekt --no-daemon
       - name: Run API tests
         working-directory: ./api
         run: |
@@ -33,6 +43,15 @@ jobs:
       - name: Install dependencies
         working-directory: ./web
         run: npm ci
+      - name: Check formatting
+        working-directory: ./web
+        run: npm run format:check
+      - name: Lint
+        working-directory: ./web
+        run: npm run lint
+      - name: Astro check
+        working-directory: ./web
+        run: npm run check
       - name: Build Astro
         working-directory: ./web
         run: npm run build
