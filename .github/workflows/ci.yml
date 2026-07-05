@@ -18,7 +18,9 @@ jobs:
           distribution: "temurin"
       - name: Run API tests
         working-directory: ./api
-        run: ./gradlew test --no-daemon
+        run: |
+          chmod +x ./gradlew
+          ./gradlew test --no-daemon
 
   web:
     runs-on: ubuntu-latest
