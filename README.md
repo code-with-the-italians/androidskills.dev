@@ -45,13 +45,23 @@ OpenAI-compatible endpoint in prod). Both swap in via configuration, not code.
 
 ### Web (`web/`)
 
-A skeleton Astro app is present. It is not yet connected to the API; that happens
-in the next step.
+An Astro SSR app (`output: 'server'`, `@astrojs/node/standalone`) proxies public and
+authenticated routes to the Ktor API.
 
 ```sh
 npm install --prefix web
 npm run --prefix web build
+npm run --prefix web preview   # serves the production build on :4321
 ```
 
-For local development it can be run with `npm run --prefix web dev`; in
-production it is served behind Kamal as a Node SSR app.
+For local development:
+
+```sh
+npm run --prefix web dev       # dev server on :4321
+```
+
+> **Dev-server note:** `astro dev` can fail to pick up **brand-new route files**
+> added while it is already running, returning 404 for those routes even though the
+> files exist and work after `astro build`. If a route that was present before the
+> server started returns 404, stop and restart `astro dev`. This is a dev-server
+> quirk; production SSR is unaffected.
