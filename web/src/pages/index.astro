@@ -1,12 +1,113 @@
 ---
-import Layout from '../layouts/Layout.astro';
+import BaseLayout from '../layouts/BaseLayout.astro';
+import SkillCard from '../components/SkillCard.astro';
+import { createApiClient, type StatsResponse, type SkillCard as SkillCardType, type CategoryWithCount } from '../lib/api';
+
+const api = createApiClient(Astro.request);
+
+let stats: StatsResponse | null = null;
+let popular: SkillCardType[] = [];
+let categories: CategoryWithCount[] = [];
+
+try {
+  const [s, searchResult, cats] = await Promise.all([
+    api.getStats(),
+    api.searchSkills({ sort: 'installs', pageSize: 6 }),
+    api.getCategories(),
+  ]);
+  stats = s;
+  popular = searchResult.items;
+  categories = cats;
+} catch (e) {
+  // API not reachable — render with empty state
+}
 ---
-<Layout title="androidskills.dev">
-  <main style="text-align: center; padding: 2rem;">
-    <h1>androidskills.dev</h1>
-    <p>Public site coming soon.</p>
-    <p style="font-size: 0.875rem; color: #9ca3af; margin-top: 2rem;">
-      Backend health: <a href="/api/health">/api/health</a>
-    </p>
-  </main>
-</Layout>
+
+<BaseLayout title="androidskills.dev">
+  <!-- Hero -->
+  <section class="section" style="padding-top:48px;">
+    <div class="wrap">
+      <div style="position:relative;">
+        <div class="hero-grid" style="position:absolute;inset:-40px -100px 0;z-index:-1;border-radius:var(--r-xl);"></div>
+        <div style="max-width:680px;padding-block:32px;">
+          <span class="eyebrow">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+            {stats ? `${stats.indexed} skills indexed` : 'Loading…'}
+          </span>
+          <h1 style="font-size:clamp(36px,5vw,56px);font-weight:800;letter-spacing:-.03em;margin-top:16px;line-height:1.05;">
+            The index of AI coding skills<br />for <b style="color:var(--accent-text);">Android & Kotlin</b>
+          </h1>
+          <p class="lede" style="margin-top:16px;max-width:520px;">
+            Community-curated, maintainer-reviewed. Find a skill, inspect its source, and install it in seconds.
+          </p>
+
+          <!-- Hero search -->
+          <form action="/search" method="get" style="margin-top:28px;">
+            <div class="search big">
+              <svg class="ic-search" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="11" cy="11" r="8" /><path d="m21 21-4.3-4.3" />
+              </svg>
+              <input type="text" name="q" placeholder="Search skills, e.g. “compose mvi” or “room migration”…" autocomplete="off" />
+            </div>
+          </form>
+
+          <!-- Quick category chips -->
+          {
+            categories.length > 0 && (
+              <div class="pillbar" style="margin-top:18px;flex-wrap:wrap;gap:8px;">
+                {categories.slice(0, 6).map((cat) => (
+                  <a class="chip" href={`/search?cat=${encodeURIComponent(cat.slug)}`}>{cat.name}</a>
+                ))}
+              </div>
+            )
+          }
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Popular skills -->
+  {
+    popular.length > 0 && (
+      <section class="section" style="padding-top:0;">
+        <div class="wrap">
+          <div class="between" style="margin-bottom:24px;">
+            <h2 style="font-size:26px;">Popular skills</h2>
+            <a class="btn btn-sm btn-outline" href="/search?sort=installs">View all →</a>
+          </div>
+          <div class="grid grid-skills">
+            {popular.map((skill) => (
+              <SkillCard skill={skill} />
+            ))}
+          </div>
+        </div>
+      </section>
+    )
+  }
+
+  <!-- Stats -->
+  {
+    stats && (
+      <section class="section" style="padding-top:0;">
+        <div class="wrap">
+          <div class="card" style="display:flex;gap:48px;flex-wrap:wrap;">
+            <div class="stat">
+              <span class="n">{stats.indexed.toLocaleString()}</span>
+              <span class="l">Skills indexed</span>
+            </div>
+            <div class="stat">
+              <span class="n">{stats.contributors.toLocaleString()}</span>
+              <span class="l">Contributors</span>
+            </div>
+            {stats.lastUpdated && (
+              <div class="stat">
+                <span class="n" style="font-size:14px;">{new Date(stats.lastUpdated).toLocaleDateString()}</span>
+                <span class="l">Last updated</span>
+              </div>
+            )}
+          </div>
+        </div>
+      </section>
+    )
+  }
+</BaseLayout>

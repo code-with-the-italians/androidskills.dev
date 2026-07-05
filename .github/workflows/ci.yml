@@ -52,6 +52,9 @@ jobs:
       - name: Astro check
         working-directory: ./web
         run: npm run check
+      - name: TypeScript check
+        working-directory: ./web
+        run: npx tsc --noEmit
       - name: Build Astro
         working-directory: ./web
         run: npm run build

@@ -1,0 +1,129 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import { createApiClient, type SkillDetail, type FileTreeResponse, type VersionsResponse } from '../../lib/api';
+import { renderMarkdown } from '../../lib/markdown';
+
+const slug = Astro.params.slug!;
+const api = createApiClient(Astro.request);
+
+let skill: SkillDetail | null = null;
+let files: FileTreeResponse | null = null;
+let versions: VersionsResponse | null = null;
+
+try {
+  [skill, files, versions] = await Promise.all([
+    api.getSkill(slug),
+    api.getSkillFiles(slug),
+    api.getSkillVersions(slug),
+  ]);
+} catch (e) {
+  return Astro.redirect('/404');
+}
+
+const readmeHtml = skill.readmeMd ? await renderMarkdown(skill.readmeMd) : '';
+const fileTree = files?.tree ?? [];
+---
+
+<BaseLayout title={`${skill.name} — androidskills.dev`} description={skill.description}>
+  <section class="section" style="padding-top:32px;">
+    <div class="wrap">
+      <!-- Breadcrumb -->
+      <div class="crumb" style="margin-bottom:20px;">
+        <a href="/search">Skills</a>
+        <span class="sep">/</span>
+        <span>{skill.slug}</span>
+      </div>
+
+      <!-- Header -->
+      <div style="display:flex;gap:20px;align-items:flex-start;margin-bottom:32px;">
+        <div class="skill-ico" style="width:56px;height:56px;border-radius:var(--r-lg);">
+          {skill.name.split(/\s+/).slice(0, 2).map((w) => w[0]).join('').toUpperCase()}
+        </div>
+        <div style="flex:1;min-width:0;">
+          <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+            <h1 style="font-size:30px;letter-spacing:-.02em;">{skill.name}</h1>
+            {skill.verified && <span class="badge ok">Verified</span>}
+            {skill.featured && <span class="badge info">Featured</span>}
+          </div>
+          <p class="muted" style="margin-top:6px;">{skill.slug} · v{skill.version}</p>
+          <p style="margin-top:10px;max-width:600px;color:var(--text-dim);">{skill.description}</p>
+
+          <!-- Meta -->
+          <div style="display:flex;gap:20px;margin-top:16px;flex-wrap:wrap;font-family:var(--mono);font-size:12.5px;color:var(--text-faint);">
+            <span>{skill.installs.toLocaleString()} installs</span>
+            <span>· {skill.tokenUpfront + skill.tokenOndemand} tokens ({skill.tokenBand})</span>
+            <span>· {skill.fileCount} files</span>
+            {skill.license && <span>· {skill.license}</span>}
+            <span>· by <a href={`/u/${skill.author.handle}`} style="color:var(--accent-text);">{skill.author.handle}</a></span>
+          </div>
+
+          <!-- Tags -->
+          {skill.tags.length > 0 && (
+            <div class="tags" style="margin-top:12px;">
+              {skill.tags.map((tag) => <span class="tag">{tag}</span>)}
+            </div>
+          )}
+
+          <!-- Actions -->
+          <div style="display:flex;gap:10px;margin-top:20px;">
+            <a class="btn btn-primary" href={`/api/skills/${slug}/download`}>
+              <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+              Download .zip
+            </a>
+          </div>
+        </div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 320px;gap:32px;align-items:start;">
+        <!-- README -->
+        <div>
+          {readmeHtml ? (
+            <div class="card">
+              <div class="prose" set:html={readmeHtml} />
+            </div>
+          ) : (
+            <div class="card">
+              <p class="muted">No README available.</p>
+            </div>
+          )}
+        </div>
+
+        <!-- Sidebar: file tree + versions -->
+        <aside class="stack">
+          {fileTree.length > 0 && (
+            <div class="card" style="padding:0;overflow:hidden;">
+              <div style="padding:14px 18px;border-bottom:1px solid var(--border);">
+                <h4 style="font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--text-faint);">Files</h4>
+              </div>
+              <div style="padding:8px;">
+                {fileTree.map((node) => (
+                  <a
+                    href={node.type === 'file' ? `/skill/${slug}/files/${node.path}` : '#'}
+                    class="file-row"
+                    style={node.type === 'dir' ? 'font-weight:600;' : ''}
+                  >
+                    <span class="nm">{node.name}</span>
+                    {node.type === 'file' && <span class="sz">{node.size}B</span>}
+                  </a>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {versions && versions.versions.length > 0 && (
+            <div class="card">
+              <h4 style="font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--text-faint);margin-bottom:12px;">Versions</h4>
+              {versions.versions.map((v) => (
+                <div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);">
+                  <span style="font-family:var(--mono);font-size:13px;font-weight:600;">v{v.version}</span>
+                  {v.current && <span class="badge ok" style="font-size:10px;">Current</span>}
+                  <span class="faint" style="font-size:11.5px;margin-left:auto;">{new Date(v.createdAt).toLocaleDateString()}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </aside>
+      </div>
+    </div>
+  </section>
+</BaseLayout>

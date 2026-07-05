@@ -15,7 +15,12 @@
   },
   "dependencies": {
     "@astrojs/node": "^9.0.0",
-    "astro": "^5.0.0"
+    "astro": "^5.0.0",
+    "marked": "^18.0.5",
+    "rehype-parse": "^9.0.1",
+    "rehype-sanitize": "^6.0.0",
+    "rehype-stringify": "^10.0.1",
+    "unified": "^11.0.5"
   },
   "devDependencies": {
     "@astrojs/check": "^0.9.9",
@@ -28,6 +33,7 @@
     "eslint": "^10.6.0",
     "eslint-plugin-astro": "^2.1.1",
     "globals": "^17.7.0",
+    "openapi-typescript": "^7.13.0",
     "prettier": "^3.9.4",
     "typescript": "^5.9.3"
   }

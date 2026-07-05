@@ -1,9 +1,18 @@
 ---
-import Layout from '../layouts/Layout.astro';
+import BaseLayout from '../layouts/BaseLayout.astro';
 ---
-<Layout title="Not found — androidskills.dev">
-  <main style="text-align: center; padding: 2rem;">
-    <h1>404 — Not found</h1>
-    <p><a href="/">Go home</a></p>
-  </main>
-</Layout>
+
+<BaseLayout title="404 — androidskills.dev">
+  <section class="section" style="min-height:60vh;display:flex;align-items:center;justify-content:center;">
+    <div class="state">
+      <div class="ico">
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+          <circle cx="12" cy="12" r="10" /><path d="M8 15s1.5-2 4-2 4 2 4 2M9 9h.01M15 9h.01" />
+        </svg>
+      </div>
+      <h1 style="font-size:32px;">404</h1>
+      <p>That page doesn't exist.</p>
+      <a class="btn btn-sm btn-primary" href="/">Go home</a>
+    </div>
+  </section>
+</BaseLayout>

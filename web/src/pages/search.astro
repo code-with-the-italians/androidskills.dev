@@ -1,0 +1,156 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import SkillCard from '../components/SkillCard.astro';
+import { createApiClient, type SkillSearchPage, type CategoryWithCount } from '../lib/api';
+
+const api = createApiClient(Astro.request);
+
+const url = Astro.url;
+const params = url.searchParams;
+
+const q = params.get('q') ?? undefined;
+const cats = params.getAll('cat');
+const tags = params.getAll('tag');
+const size = params.get('size') ?? undefined;
+const sort = params.get('sort') ?? 'relevance';
+const verified = params.get('verified');
+const page = parseInt(params.get('page') ?? '1', 10);
+
+let searchResult: SkillSearchPage | null = null;
+let categories: CategoryWithCount[] = [];
+
+try {
+  [searchResult, categories] = await Promise.all([
+    api.searchSkills({ q, cat: cats, tag: tags, size, sort, page, verified: verified !== 'false' }),
+    api.getCategories(),
+  ]);
+} catch (e) {
+  // API unreachable
+}
+
+const items = searchResult?.items ?? [];
+const total = searchResult?.total ?? 0;
+const totalPages = searchResult?.totalPages ?? 0;
+---
+
+<BaseLayout title={q ? `${q} — Search` : 'Search — androidskills.dev'}>
+  <section class="section" style="padding-top:32px;">
+    <div class="wrap">
+      <!-- Search bar -->
+      <form action="/search" method="get" style="margin-bottom:24px;">
+        <div class="search">
+          <svg class="ic-search" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="11" cy="11" r="8" /><path d="m21 21-4.3-4.3" />
+          </svg>
+          <input type="text" name="q" value={q ?? ''} placeholder="Search skills…" autocomplete="off" />
+        </div>
+      </form>
+
+      <div style="display:grid;grid-template-columns:220px 1fr;gap:32px;align-items:start;">
+        <!-- Filters sidebar -->
+        <aside class="filters">
+          {cats.length > 0 || tags.length > 0 || size || verified === 'false' ? (
+            <a href="/search" class="btn btn-sm btn-ghost" style="margin-bottom:8px;">Clear filters</a>
+          ) : null}
+
+          <div class="filter-grp">
+            <h4>Sort</h4>
+            <div class="seg">
+              {['relevance', 'installs', 'updated', 'tokens'].map((s) => (
+                <a href={`/search?${new URLSearchParams({ ...Object.fromEntries(params), sort: s }).toString()}`}>
+                  <button aria-pressed={sort === s}>{s}</button>
+                </a>
+              ))}
+            </div>
+          </div>
+
+          {categories.length > 0 && (
+            <div class="filter-grp">
+              <h4>Categories</h4>
+              {categories.map((cat) => {
+                const active = cats.includes(cat.slug);
+                const newCats = active ? cats.filter((c) => c !== cat.slug) : [...cats, cat.slug];
+                const qs = new URLSearchParams({ ...Object.fromEntries(params.entries()) });
+                qs.delete('cat');
+                newCats.forEach((c) => qs.append('cat', c));
+                return (
+                  <a class="check" href={`/search?${qs.toString()}`}>
+                    <span class="box" style={active ? 'background:var(--accent);border-color:var(--accent);' : ''}>
+                      {active && <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>}
+                    </span>
+                    {cat.name}
+                    <span class="ct">{cat.count}</span>
+                  </a>
+                );
+              })}
+            </div>
+          )}
+
+          <div class="filter-grp">
+            <h4>Token size</h4>
+            {['<2k', '2-5k', '5k+'].map((s) => {
+              const active = size === s;
+              const qs = new URLSearchParams({ ...Object.fromEntries(params.entries()) });
+              if (active) qs.delete('size'); else qs.set('size', s);
+              return (
+                <a class="check" href={`/search?${qs.toString()}`}>
+                  <span class="box" style={active ? 'background:var(--accent);border-color:var(--accent);' : ''}>
+                    {active && <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>}
+                  </span>
+                  {s}
+                </a>
+              );
+            })}
+          </div>
+        </aside>
+
+        <!-- Results -->
+        <div>
+          {total > 0 && (
+            <div class="between" style="margin-bottom:16px;">
+              <span class="muted" style="font-size:13.5px;">
+                {total} skill{total !== 1 ? 's' : ''}
+                {q && <> for “<strong>{q}</strong>”</>}
+              </span>
+            </div>
+          )}
+
+          {items.length > 0 ? (
+            <div class="grid grid-skills">
+              {items.map((skill) => (
+                <SkillCard skill={skill} />
+              ))}
+            </div>
+          ) : (
+            <div class="state">
+              <div class="ico">
+                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                  <circle cx="11" cy="11" r="8" /><path d="m21 21-4.3-4.3" />
+                </svg>
+              </div>
+              <h3>No skills found</h3>
+              <p>{q ? `No results for “${q}”. Try a different query or clear filters.` : 'Try adjusting your filters or search query.'}</p>
+              <a class="btn btn-sm btn-outline" href="/search">Clear filters</a>
+            </div>
+          )}
+
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <div style="display:flex;justify-content:center;margin-top:32px;">
+              <div class="pager">
+                {page > 1 && (
+                  <a href={`/search?${new URLSearchParams({ ...Object.fromEntries(params), page: String(page - 1) }).toString()}`}>←</a>
+                )}
+                <span class="cur">{page}</span>
+                <span class="faint">/ {totalPages}</span>
+                {page < totalPages && (
+                  <a href={`/search?${new URLSearchParams({ ...Object.fromEntries(params), page: String(page + 1) }).toString()}`}>→</a>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  </section>
+</BaseLayout>
