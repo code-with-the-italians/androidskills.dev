@@ -4,6 +4,9 @@ import tsParser from '@typescript-eslint/parser';
 import globals from 'globals';
 
 export default [
+  {
+    ignores: ['.astro/**', 'dist/**', 'node_modules/**'],
+  },
   js.configs.recommended,
   {
     languageOptions: {
