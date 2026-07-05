@@ -18,19 +18,21 @@ const entries = await api.getAudit({ action, target, page });
 
 <AdminLayout title="Audit log" me={me}>
   <div class="row" style="gap: 10px; margin-bottom: 16px; flex-wrap: wrap;">
-    <form class="search search-sm" method="get" style="max-width: 260px; flex: 1;">
-      <svg class="ic-search" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <circle cx="11" cy="11" r="7"></circle>
-        <path d="m20 20-3.2-3.2" stroke-linecap="round"></path>
-      </svg>
-      <input name="action" type="search" value={action} placeholder="Filter by action…">
-    </form>
-    <form class="search search-sm" method="get" style="max-width: 260px; flex: 1;">
-      <svg class="ic-search" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <circle cx="11" cy="11" r="7"></circle>
-        <path d="m20 20-3.2-3.2" stroke-linecap="round"></path>
-      </svg>
-      <input name="target" type="search" value={target} placeholder="Filter by target…">
+    <form id="auditFilter" class="row" method="get" style="gap: 10px; flex-wrap: wrap; flex: 1; align-items: center;">
+      <div class="search search-sm" style="max-width: 260px; flex: 1;">
+        <svg class="ic-search" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="11" cy="11" r="7"></circle>
+          <path d="m20 20-3.2-3.2" stroke-linecap="round"></path>
+        </svg>
+        <input name="action" type="search" value={action} placeholder="Filter by action…">
+      </div>
+      <div class="search search-sm" style="max-width: 260px; flex: 1;">
+        <svg class="ic-search" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="11" cy="11" r="7"></circle>
+          <path d="m20 20-3.2-3.2" stroke-linecap="round"></path>
+        </svg>
+        <input name="target" type="search" value={target} placeholder="Filter by target…">
+      </div>
     </form>
   </div>
 

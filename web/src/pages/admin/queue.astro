@@ -117,6 +117,10 @@ const detail = selectedId ? await api.getQueueDetail(selectedId).catch(() => nul
         const params = new URLSearchParams();
         if (currentFilter !== 'all') params.set('filter', currentFilter);
         const res = await fetch(`/api/admin/queue?${params.toString()}`);
+        if (!res.ok) {
+          if (list) list.innerHTML = '<div class="state"><p class="muted">Failed to load queue.</p></div>';
+          return;
+        }
         const items = (await res.json()) as Array<{
           id: string;
           slug: string;
