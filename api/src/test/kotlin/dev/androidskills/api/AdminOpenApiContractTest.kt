@@ -12,11 +12,8 @@ import kotlin.test.Test
 import kotlin.test.assertContains
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
-import kotlinx.serialization.json.Json
 
 class AdminOpenApiContractTest {
-  private val json = Json { ignoreUnknownKeys = true }
-
   private fun withDir(block: (Path) -> Unit) {
     val dir = TestSupport.tempDir()
     try {
