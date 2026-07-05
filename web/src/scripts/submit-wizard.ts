@@ -23,7 +23,8 @@ interface ScanResponse {
   commitSha: string;
   skills: DetectedSkill[];
 }
-const CHECK = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>';
+const CHECK =
+  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>';
 const state = {
   step: 1,
   repo: null as Repo | null,
@@ -46,12 +47,14 @@ function renderStep1() {
   const container = document.getElementById('step1content') as HTMLElement;
   if (!container) return;
   if (!state.repos) {
-    container.innerHTML = '<div class="state"><span class="spinner"></span><p>Loading repositories...</p></div>';
+    container.innerHTML =
+      '<div class="state"><span class="spinner"></span><p>Loading repositories...</p></div>';
     return;
   }
   const repos = state.repos.repos || [];
   if (repos.length === 0) {
-    container.innerHTML = '<div class="state"><p class="muted">No repositories found. Install the GitHub App and grant access to a repo with a top-level <code>skills/</code> directory.</p></div>';
+    container.innerHTML =
+      '<div class="state"><p class="muted">No repositories found. Install the GitHub App and grant access to a repo with a top-level <code>skills/</code> directory.</p></div>';
     return;
   }
   container.innerHTML = `
@@ -71,12 +74,18 @@ function renderStep1() {
 }
 
 function renderRepoList() {
-  const input = document.getElementById('repoFilter') as HTMLInputElement | null;
+  const input = document.getElementById(
+    'repoFilter',
+  ) as HTMLInputElement | null;
   const filter = input?.value?.toLowerCase() || '';
   const list = document.getElementById('repoList') as HTMLElement;
   if (!list || !state.repos) return;
-  const repos = state.repos.repos.filter((r) => (r.fullName + ' ' + (r.defaultBranch || '')).toLowerCase().includes(filter));
-  list.innerHTML = repos.map((r) => `
+  const repos = state.repos.repos.filter((r) =>
+    (r.fullName + ' ' + (r.defaultBranch || '')).toLowerCase().includes(filter),
+  );
+  list.innerHTML = repos
+    .map(
+      (r) => `
     <div class="repo ${state.repo?.fullName === r.fullName ? ' sel' : ''}" data-repo="${r.fullName}" role="button" tabindex="0">
       <span class="radio"></span>
       <div style="flex:1;min-width:0;">
@@ -84,9 +93,12 @@ function renderRepoList() {
         <div class="slug" style="font-size:11.5px;">${r.defaultBranch || 'default branch'}</div>
       </div>
     </div>
-  `).join('');
+  `,
+    )
+    .join('');
   if (repos.length === 0) {
-    list.innerHTML = '<div class="state" style="padding:20px;"><p class="muted">No repositories match.</p></div>';
+    list.innerHTML =
+      '<div class="state" style="padding:20px;"><p class="muted">No repositories match.</p></div>';
   }
 }
 
@@ -96,7 +108,10 @@ async function scanRepo(repo: Repo) {
   state.checking = repo.fullName;
   renderStep1();
   try {
-    const res = await fetch(`/api/me/repos/${encodeURIComponent(repo.owner)}/${encodeURIComponent(repo.name)}/scan`, { method: 'POST' });
+    const res = await fetch(
+      `/api/me/repos/${encodeURIComponent(repo.owner)}/${encodeURIComponent(repo.name)}/scan`,
+      { method: 'POST' },
+    );
     if (!res.ok) throw new Error(await res.text());
     state.scan = (await res.json()) as ScanResponse;
     state.step = 2;
@@ -112,15 +127,19 @@ function renderStep2() {
   const container = document.getElementById('step2content') as HTMLElement;
   if (!container) return;
   if (!state.scan) {
-    container.innerHTML = '<div class="state"><p class="muted">Select a repository to detect skills.</p></div>';
+    container.innerHTML =
+      '<div class="state"><p class="muted">Select a repository to detect skills.</p></div>';
     return;
   }
   const skills = state.scan.skills || [];
   if (skills.length === 0) {
-    container.innerHTML = '<div class="callout" style="background:var(--danger-soft);border-color:transparent;align-items:flex-start;"><svg class="ci" viewBox="0 0 24 24" fill="none" stroke="var(--danger)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 9v4M12 17h.01M10.3 3.9 2.4 18a2 2 0 0 0 1.7 3h15.8a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg><div><b>No skill found.</b> A skill is a folder containing a SKILL.md inside a top-level skills/ directory.</div></div></div>';
+    container.innerHTML =
+      '<div class="callout" style="background:var(--danger-soft);border-color:transparent;align-items:flex-start;"><svg class="ci" viewBox="0 0 24 24" fill="none" stroke="var(--danger)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 9v4M12 17h.01M10.3 3.9 2.4 18a2 2 0 0 0 1.7 3h15.8a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg><div><b>No skill found.</b> A skill is a folder containing a SKILL.md inside a top-level skills/ directory.</div></div></div>';
     return;
   }
-  const items = skills.map((s, i) => `
+  const items = skills
+    .map(
+      (s, i) => `
     <div class="acc" data-acc>
       <div class="acc-h" data-acc-head style="display:flex;align-items:center;gap:12px;padding:13px 14px;cursor:pointer;">
         <input type="checkbox" data-skill-idx="${i}" checked style="width:18px;height:18px;flex:none;">
@@ -141,7 +160,9 @@ function renderStep2() {
         </div>
       </div>
     </div>
-  `).join('');
+  `,
+    )
+    .join('');
   container.innerHTML = `
     <div class="callout" style="margin-bottom:16px;"><svg class="ci" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 16v-4M12 8h.01" stroke-linecap="round"/></svg><div><b>${skills.length} skill${skills.length > 1 ? 's' : ''}</b> found. Everything below is read from each skill's SKILL.md frontmatter.</div></div></div>
     <div class="accs">${items}</div>
@@ -169,8 +190,12 @@ function renderStep3() {
 
 function selectedSkills(): DetectedSkill[] {
   if (!state.scan) return [];
-  const checked = Array.from(document.querySelectorAll('[data-skill-idx]:checked')) as HTMLInputElement[];
-  return checked.map((cb) => state.scan!.skills[Number(cb.getAttribute('data-skill-idx'))]).filter(Boolean);
+  const checked = Array.from(
+    document.querySelectorAll('[data-skill-idx]:checked'),
+  ) as HTMLInputElement[];
+  return checked
+    .map((cb) => state.scan!.skills[Number(cb.getAttribute('data-skill-idx'))])
+    .filter(Boolean);
 }
 
 function render() {
@@ -180,15 +205,18 @@ function render() {
   steps.forEach((el) => {
     const n = Number(el.getAttribute('data-step'));
     el.classList.remove('done', 'active', 'upcoming');
-    const cls = n < state.step ? 'done' : (n === state.step ? 'active' : 'upcoming');
+    const cls =
+      n < state.step ? 'done' : n === state.step ? 'active' : 'upcoming';
     el.classList.add(cls);
     const no = el.querySelector('.vno') as HTMLElement;
-    no.innerHTML = (cls === 'done') ? CHECK : String(n);
+    no.innerHTML = cls === 'done' ? CHECK : String(n);
   });
   const status = document.getElementById('repoStatus');
   if (status) {
-    if (state.checking) status.innerHTML = `<div class="callout" style="align-items:center;"><span class="spinner" style="width:16px;height:16px;flex:none;"></span><div>Scanning <b>${state.checking}</b> for SKILL.md files…</div></div>`;
-    else if (state.error) status.innerHTML = `<div class="callout" style="background:var(--danger-soft);border-color:transparent;align-items:flex-start;"><svg class="ci" viewBox="0 0 24 24" fill="none" stroke="var(--danger)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 9v4M12 17h.01M10.3 3.9 2.4 18a2 2 0 0 0 1.7 3h15.8a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg><div><b>${state.error}</b></div></div>`;
+    if (state.checking)
+      status.innerHTML = `<div class="callout" style="align-items:center;"><span class="spinner" style="width:16px;height:16px;flex:none;"></span><div>Scanning <b>${state.checking}</b> for SKILL.md files…</div></div>`;
+    else if (state.error)
+      status.innerHTML = `<div class="callout" style="background:var(--danger-soft);border-color:transparent;align-items:flex-start;"><svg class="ci" viewBox="0 0 24 24" fill="none" stroke="var(--danger)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 9v4M12 17h.01M10.3 3.9 2.4 18a2 2 0 0 0 1.7 3h15.8a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg><div><b>${state.error}</b></div></div>`;
     else status.innerHTML = '';
   }
 }
@@ -202,15 +230,28 @@ async function createDrafts(submit: boolean) {
     repoOwner: state.repo.owner,
     repoName: state.repo.name,
     ref: state.scan.commitSha,
-    skills: skills.map((s) => ({ slug: s.slug, name: s.name, description: s.description, license: s.license || '', tags: s.tags || [], version: s.version })),
+    skills: skills.map((s) => ({
+      slug: s.slug,
+      name: s.name,
+      description: s.description,
+      license: s.license || '',
+      tags: s.tags || [],
+      version: s.version,
+    })),
   };
-  const res = await fetch('/api/me/submissions', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+  const res = await fetch('/api/me/submissions', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
   if (!res.ok) throw new Error(await res.text());
   const { submissionIds } = (await res.json()) as { submissionIds: string[] };
   if (submit) {
     if (status) status.textContent = 'Submitting for review…';
     for (const id of submissionIds) {
-      const r = await fetch(`/api/me/submissions/${id}/submit`, { method: 'POST' });
+      const r = await fetch(`/api/me/submissions/${id}/submit`, {
+        method: 'POST',
+      });
       if (!r.ok) throw new Error(await r.text());
     }
   }
@@ -227,13 +268,26 @@ vsteps.addEventListener('click', (e) => {
     return;
   }
   const acc = target.closest('[data-acc-head]');
-  if (acc) { acc.closest('[data-acc]')?.classList.toggle('open'); return; }
+  if (acc) {
+    acc.closest('[data-acc]')?.classList.toggle('open');
+    return;
+  }
   const cont = target.closest('[data-continue]');
-  if (cont) { state.step = 3; render(); return; }
+  if (cont) {
+    state.step = 3;
+    render();
+    return;
+  }
   const save = target.closest('[data-save-draft]');
-  if (save) { createDrafts(false); return; }
+  if (save) {
+    createDrafts(false);
+    return;
+  }
   const sub = target.closest('[data-submit]');
-  if (sub) { createDrafts(true); return; }
+  if (sub) {
+    createDrafts(true);
+    return;
+  }
 });
 
 vsteps.addEventListener('input', (e) => {
@@ -241,7 +295,10 @@ vsteps.addEventListener('input', (e) => {
   if (target.id === 'repoFilter') renderRepoList();
 });
 
-loadRepos().then(render).catch((e) => {
-  const el = document.getElementById('step1content');
-  if (el) el.innerHTML = `<div class="callout" style="background:var(--danger-soft);border-color:transparent;"><b>Failed to load repositories:</b> ${e.message}</div>`;
-});
+loadRepos()
+  .then(render)
+  .catch((e) => {
+    const el = document.getElementById('step1content');
+    if (el)
+      el.innerHTML = `<div class="callout" style="background:var(--danger-soft);border-color:transparent;"><b>Failed to load repositories:</b> ${e.message}</div>`;
+  });
