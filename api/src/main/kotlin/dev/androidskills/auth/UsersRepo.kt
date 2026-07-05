@@ -32,9 +32,10 @@ data class GitHubUser(
  */
 object UsersRepo {
   /**
-   * Upsert with a bounded retry for the one realistic race: two concurrent logins resolving the
-   * same recycled handle both pass check-then-insert and the second violates `uq_users_handle`. On
-   * that specific error we retry — the next [uniqueHandle] call sees the winner's row. (P2-2b.)
+   * Upsert with a bounded retry for the realistic concurrency races under WAL: another writer wins
+   * the commit (SQLITE_BUSY / SQLITE_BUSY_SNAPSHOT) or two logins resolve the same recycled handle
+   * and the second violates `uq_users_handle`. On those specific errors we retry — the next
+   * [uniqueHandle] call sees the winner's row. (P2-2b.)
    */
   fun upsertFromGitHub(user: GitHubUser, bootstrapAdminGithubId: Long?): String {
     var attempt = 0
@@ -42,16 +43,18 @@ object UsersRepo {
       try {
         return upsertOnce(user, bootstrapAdminGithubId)
       } catch (e: org.jetbrains.exposed.exceptions.ExposedSQLException) {
-        if (++attempt > MAX_HANDLE_RETRIES || !isUniqueHandleViolation(e)) throw e
+        if (++attempt > MAX_HANDLE_RETRIES || !isRetryableConcurrencyError(e)) throw e
       }
     }
   }
 
   private const val MAX_HANDLE_RETRIES = 3
 
-  private fun isUniqueHandleViolation(
+  private fun isRetryableConcurrencyError(
     e: org.jetbrains.exposed.exceptions.ExposedSQLException
   ): Boolean {
+    val errorCode = (e.cause as? java.sql.SQLException)?.errorCode
+    if (errorCode == 5 || errorCode == 261) return true // SQLITE_BUSY, SQLITE_BUSY_SNAPSHOT
     val text = buildString {
       append(e.message)
       append(' ')

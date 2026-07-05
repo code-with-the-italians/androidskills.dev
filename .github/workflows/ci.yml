@@ -55,6 +55,9 @@ jobs:
       - name: TypeScript check
         working-directory: ./web
         run: npx tsc --noEmit
+      - name: Run markdown sanitizer tests
+        working-directory: ./web
+        run: npm test
       - name: Build Astro
         working-directory: ./web
         run: npm run build

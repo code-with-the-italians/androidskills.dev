@@ -1,0 +1,75 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+---
+
+<BaseLayout title="Contact — androidskills.dev" description="Get in touch — questions, takedown requests, partnership ideas, or feedback.">
+  <section class="section" style="padding-top:48px;">
+    <div class="wrap wrap-narrow">
+      <div class="kicker"><span class="tick">//</span> contact</div>
+      <h1 style="font-size:36px;margin-top:8px;">Get in touch</h1>
+      <p class="lede" style="margin-top:16px;">
+        Questions, takedown requests, partnership ideas, or feedback on a review — drop us a line.
+      </p>
+
+      <div style="display:grid;grid-template-columns:1fr 280px;gap:32px;margin-top:32px;align-items:start;">
+        <!-- Form (front-end only — not wired to a backend yet) -->
+        <div>
+          <div class="callout info" style="margin-bottom:20px;">
+            <svg class="ci" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>
+            <span>This form is not yet live. For now, reach us via the channels on the right.</span>
+          </div>
+          <fieldset disabled style="border:0;padding:0;display:flex;flex-direction:column;gap:16px;">
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+              <div class="field">
+                <label for="name">Name</label>
+                <input class="input" type="text" id="name" placeholder="Your name" />
+              </div>
+              <div class="field">
+                <label for="email">Email</label>
+                <input class="input" type="email" id="email" placeholder="you@example.com" />
+              </div>
+            </div>
+            <div class="field">
+              <label for="topic">Topic</label>
+              <select class="select" id="topic">
+                <option>General question</option>
+                <option>Report a skill</option>
+                <option>Takedown / DMCA</option>
+                <option>Review appeal</option>
+                <option>Partnership</option>
+                <option>Bug report</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="message">Message</label>
+              <textarea class="textarea" id="message" rows="5" placeholder="Don't include secrets or credentials."></textarea>
+            </div>
+            <label class="check">
+              <input type="checkbox" />
+              <span class="box"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></span>
+              I agree to the privacy policy.
+            </label>
+            <button class="btn btn-primary" type="button" disabled>Send message</button>
+          </fieldset>
+        </div>
+
+        <!-- Channels -->
+        <aside class="stack">
+          <div class="card">
+            <h4 style="font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--text-faint);margin-bottom:14px;">Channels</h4>
+            <div class="stack" style="gap:14px;">
+              <div>
+                <div class="faint" style="font-size:12px;font-family:var(--mono);">Email</div>
+                <a href="mailto:hello@androidskills.dev" style="color:var(--accent-text);font-size:14px;">hello@androidskills.dev</a>
+              </div>
+              <div>
+                <div class="faint" style="font-size:12px;font-family:var(--mono);">Issues</div>
+                <a href="https://github.com/code-with-the-italians/androidskills.dev/issues" target="_blank" rel="noopener" style="color:var(--accent-text);font-size:14px;">GitHub Issues</a>
+              </div>
+            </div>
+          </div>
+        </aside>
+      </div>
+    </div>
+  </section>
+</BaseLayout>
