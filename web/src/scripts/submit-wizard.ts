@@ -1,3 +1,5 @@
+import { esc } from '../lib/escape';
+
 interface Repo {
   owner: string;
   name: string;
@@ -27,19 +29,9 @@ const CHECK =
   '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>';
 
 /**
- * Escape a string for safe insertion into HTML via template literals.
- * Exported so the unit test can lock the invariant.
+ * Escape helper is imported from ../lib/escape so there is one source of truth
+ * across client-side scripts.
  */
-export function esc(raw: string | number | null | undefined): string {
-  const s = String(raw ?? '');
-  return s
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
-}
-
 const state = {
   step: 1,
   repo: null as Repo | null,

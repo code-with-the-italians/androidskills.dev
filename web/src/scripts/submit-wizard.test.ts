@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { esc } from './submit-wizard';
+import { esc } from '../lib/escape';
 
 describe('submit-wizard esc()', () => {
   it('escapes HTML metacharacters', () => {

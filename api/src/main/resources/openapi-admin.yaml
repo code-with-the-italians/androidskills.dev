@@ -1,0 +1,881 @@
+openapi: 3.0.3
+info:
+  title: androidskills.dev Admin API
+  description: Administrative backend contract for the Android/Kotlin AI skills index. This spec is separate from the public spec and intentionally omitted from public documentation.
+  version: 0.0.1
+  contact:
+    name: androidskills.dev
+servers:
+- url: http://localhost:8080
+- url: https://androidskills.dev
+paths:
+  /api/admin/stats:
+    get:
+      tags:
+      - admin
+      summary: Dashboard aggregate counts.
+      responses:
+        '200':
+          description: Counts
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminStatsResponse'
+        '404':
+          description: Not found (non-admin or anonymous)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /api/admin/queue:
+    get:
+      tags:
+      - admin
+      summary: List active review queue items.
+      parameters:
+      - name: filter
+        in: query
+        schema:
+          type: string
+          enum:
+          - all
+          - in_review
+          - changes_requested
+      - name: q
+        in: query
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Queue items
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AdminQueueItem'
+        '404':
+          description: Not found (non-admin or anonymous)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /api/admin/queue/{id}:
+    get:
+      tags:
+      - admin
+      summary: Queue item detail.
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Queue detail
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminQueueDetail'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /api/admin/queue/{id}/decision:
+    post:
+      tags:
+      - admin
+      summary: Approve, request changes, reject, or skip a submission.
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdminDecisionRequest'
+      responses:
+        '200':
+          description: Decision recorded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OkResponse'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Conflict (e.g., duplicate skill)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /api/admin/skills:
+    get:
+      tags:
+      - admin
+      summary: List skills for administration.
+      parameters:
+      - name: filter
+        in: query
+        schema:
+          type: string
+          enum:
+          - published
+          - unlisted
+          - flagged
+      - name: q
+        in: query
+        schema:
+          type: string
+      - name: sort
+        in: query
+        schema:
+          type: string
+          enum:
+          - updated
+          - installs
+          - created
+          - name
+          default: updated
+      - name: page
+        in: query
+        schema:
+          type: integer
+          default: 1
+      responses:
+        '200':
+          description: Skill list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AdminSkillListItem'
+        '404':
+          description: Not found (non-admin or anonymous)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /api/admin/skills/{id}:
+    patch:
+      tags:
+      - admin
+      summary: Patch a skill's admin-only fields.
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdminSkillPatch'
+      responses:
+        '200':
+          description: Patched
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OkResponse'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /api/admin/skills/bulk:
+    post:
+      tags:
+      - admin
+      summary: Bulk feature/unlist/delete skills.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdminBulkActionRequest'
+      responses:
+        '200':
+          description: Bulk results
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminBulkActionResponse'
+        '404':
+          description: Not found (non-admin or anonymous)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /api/admin/users:
+    get:
+      tags:
+      - admin
+      summary: List users for administration.
+      parameters:
+      - name: filter
+        in: query
+        schema:
+          type: string
+          enum:
+          - active
+          - suspended
+      - name: q
+        in: query
+        schema:
+          type: string
+      - name: page
+        in: query
+        schema:
+          type: integer
+          default: 1
+      responses:
+        '200':
+          description: User list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AdminUserListItem'
+        '404':
+          description: Not found (non-admin or anonymous)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /api/admin/users/export:
+    get:
+      tags:
+      - admin
+      summary: Export users as CSV.
+      parameters:
+      - name: filter
+        in: query
+        schema:
+          type: string
+          enum:
+          - active
+          - suspended
+      - name: q
+        in: query
+        schema:
+          type: string
+      responses:
+        '200':
+          description: CSV download
+          content:
+            text/csv:
+              schema:
+                type: string
+        '404':
+          description: Not found (non-admin or anonymous)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /api/admin/users/{id}:
+    patch:
+      tags:
+      - admin
+      summary: Patch a user's role or status.
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdminUserPatch'
+      responses:
+        '200':
+          description: Patched
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OkResponse'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Conflict (self-guard or last admin)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /api/admin/categories:
+    get:
+      tags:
+      - admin
+      summary: List categories.
+      responses:
+        '200':
+          description: Categories
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AdminCategoryDto'
+        '404':
+          description: Not found (non-admin or anonymous)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    post:
+      tags:
+      - admin
+      summary: Create a category.
+      parameters:
+      - name: slug
+        in: query
+        required: true
+        schema:
+          type: string
+      - name: name
+        in: query
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Created category
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminCategoryDto'
+        '404':
+          description: Not found (non-admin or anonymous)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Duplicate slug
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /api/admin/categories/{slug}:
+    patch:
+      tags:
+      - admin
+      summary: Rename a category.
+      parameters:
+      - name: slug
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdminCategoryRenameRequest'
+      responses:
+        '200':
+          description: Renamed category
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminCategoryDto'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Duplicate slug
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /api/admin/categories/{slug}/merge:
+    post:
+      tags:
+      - admin
+      summary: Merge a category into another.
+      parameters:
+      - name: slug
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: to
+        in: query
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Merged
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OkResponse'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Cannot merge into self
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /api/admin/settings:
+    get:
+      tags:
+      - admin
+      summary: Get platform settings.
+      responses:
+        '200':
+          description: Platform settings
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminPlatformSettings'
+        '404':
+          description: Not found (non-admin or anonymous)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    put:
+      tags:
+      - admin
+      summary: Update platform settings.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdminPlatformSettings'
+      responses:
+        '200':
+          description: Updated settings
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminPlatformSettings'
+        '404':
+          description: Not found (non-admin or anonymous)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /api/admin/audit:
+    get:
+      tags:
+      - admin
+      summary: List audit log entries.
+      parameters:
+      - name: action
+        in: query
+        schema:
+          type: string
+      - name: target
+        in: query
+        schema:
+          type: string
+      - name: page
+        in: query
+        schema:
+          type: integer
+          default: 1
+      responses:
+        '200':
+          description: Audit log entries
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AuditLogEntry'
+        '404':
+          description: Not found (non-admin or anonymous)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+components:
+  schemas:
+    AdminStatsResponse:
+      type: object
+      required:
+      - users
+      - contributors
+      - newUsers30d
+      - suspended
+      - skills
+      - queue
+      properties:
+        users:
+          type: integer
+          description: Total number of users.
+        contributors:
+          type: integer
+          description: Users with role contributor.
+        newUsers30d:
+          type: integer
+          description: Users created in the last 30 days.
+        suspended:
+          type: integer
+          description: Users with status suspended.
+        skills:
+          type: integer
+          description: Total number of skills.
+        queue:
+          type: integer
+          description: Active submissions in in_review or changes_requested.
+    AdminQueueItem:
+      type: object
+      required:
+      - id
+      - slug
+      - state
+      - submitterHandle
+      - createdAt
+      - updatedAt
+      properties:
+        id:
+          type: string
+        slug:
+          type: string
+        state:
+          type: string
+        submitterHandle:
+          type: string
+        lintScore:
+          type: integer
+          nullable: true
+        review:
+          $ref: '#/components/schemas/ReviewOutputPayload'
+          nullable: true
+        staged:
+          $ref: '#/components/schemas/StagedPayload'
+          nullable: true
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+    AdminQueueDetail:
+      type: object
+      required:
+      - id
+      - slug
+      - state
+      - submitterHandle
+      - files
+      - provenance
+      - sourceRef
+      - reviewIsMetadataOnly
+      - createdAt
+      - updatedAt
+      properties:
+        id:
+          type: string
+        slug:
+          type: string
+        state:
+          type: string
+        submitterHandle:
+          type: string
+        lintScore:
+          type: integer
+          nullable: true
+        note:
+          type: string
+          nullable: true
+        payload:
+          $ref: '#/components/schemas/SubmissionPayload'
+          nullable: true
+        files:
+          type: array
+          items:
+            $ref: '#/components/schemas/AdminSkillFileSummary'
+        provenance:
+          type: string
+        sourceRef:
+          type: string
+        reviewIsMetadataOnly:
+          type: boolean
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+    AdminSkillFileSummary:
+      type: object
+      required:
+      - path
+      - size
+      - isBinary
+      properties:
+        path:
+          type: string
+        size:
+          type: integer
+        isBinary:
+          type: boolean
+    AdminDecisionRequest:
+      type: object
+      required:
+      - decision
+      properties:
+        decision:
+          type: string
+          enum:
+          - approve
+          - request_changes
+          - reject
+          - skip
+        note:
+          type: string
+          nullable: true
+    AdminSkillListItem:
+      type: object
+      required:
+      - id
+      - slug
+      - name
+      - status
+      - verified
+      - featured
+      - installs
+      - updatedAt
+      properties:
+        id:
+          type: string
+        slug:
+          type: string
+        name:
+          type: string
+        status:
+          type: string
+        verified:
+          type: boolean
+        featured:
+          type: boolean
+        categoryId:
+          type: string
+          nullable: true
+        categorySlug:
+          type: string
+          nullable: true
+        installs:
+          type: integer
+        updatedAt:
+          type: string
+    AdminSkillPatch:
+      type: object
+      properties:
+        featured:
+          type: boolean
+          nullable: true
+        status:
+          type: string
+          enum:
+          - published
+          - unlisted
+          - flagged
+          nullable: true
+        categoryId:
+          type: string
+          nullable: true
+    AdminBulkActionRequest:
+      type: object
+      required:
+      - ids
+      - action
+      properties:
+        ids:
+          type: array
+          items:
+            type: string
+        action:
+          type: string
+          enum:
+          - feature
+          - unlist
+          - delete
+    AdminBulkActionResponse:
+      type: object
+      required:
+      - results
+      - failed
+      properties:
+        results:
+          type: object
+          additionalProperties:
+            type: boolean
+        failed:
+          type: object
+          additionalProperties:
+            type: string
+    AdminUserListItem:
+      type: object
+      required:
+      - id
+      - handle
+      - role
+      - status
+      - skillCount
+      - createdAt
+      properties:
+        id:
+          type: string
+        handle:
+          type: string
+        role:
+          type: string
+        status:
+          type: string
+        skillCount:
+          type: integer
+        createdAt:
+          type: string
+    AdminUserPatch:
+      type: object
+      properties:
+        role:
+          type: string
+          enum:
+          - member
+          - contributor
+          - admin
+          nullable: true
+        status:
+          type: string
+          enum:
+          - active
+          - suspended
+          nullable: true
+    AdminCategoryDto:
+      type: object
+      required:
+      - id
+      - slug
+      - name
+      properties:
+        id:
+          type: string
+        slug:
+          type: string
+        name:
+          type: string
+    AdminCategoryRenameRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          nullable: true
+        slug:
+          type: string
+          nullable: true
+    AdminPlatformSettings:
+      type: object
+      required:
+      - reviewPolicy
+      - tokenSoftCap
+      - llmEnabled
+      properties:
+        reviewPolicy:
+          type: string
+          enum:
+          - manual
+          - auto
+          default: manual
+        tokenSoftCap:
+          type: integer
+          default: 1000
+        llmEnabled:
+          type: boolean
+          default: false
+    AuditLogEntry:
+      type: object
+      required:
+      - id
+      - actorHandle
+      - action
+      - target
+      - createdAt
+      properties:
+        id:
+          type: string
+        actorHandle:
+          type: string
+        action:
+          type: string
+        target:
+          type: string
+        meta:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+    ReviewOutputPayload:
+      type: object
+      description: Opaque review payload produced by the ingest pipeline.
+      additionalProperties: true
+    StagedPayload:
+      type: object
+      description: Opaque staged payload produced by the ingest pipeline.
+      additionalProperties: true
+    SubmissionPayload:
+      type: object
+      description: Opaque submission payload produced by the ingest pipeline.
+      additionalProperties: true
+    OkResponse:
+      type: object
+      required:
+      - ok
+      properties:
+        ok:
+          type: boolean
+    ErrorResponse:
+      type: object
+      required:
+      - error
+      properties:
+        error:
+          type: object
+          required:
+          - code
+          - message
+          properties:
+            code:
+              type: string
+            message:
+              type: string
+            fields:
+              type: object
+              nullable: true
+              additionalProperties:
+                type: string

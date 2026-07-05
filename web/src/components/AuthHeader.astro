@@ -36,6 +36,9 @@ try {
         <a class="btn btn-ghost btn-block" style="justify-content:flex-start;" href="/settings">Settings</a>
         <a class="btn btn-ghost btn-block" style="justify-content:flex-start;" href="/submissions">My submissions</a>
         <a class="btn btn-ghost btn-block" style="justify-content:flex-start;" href="/starred">Starred skills</a>
+        {me.role === 'admin' && (
+          <a class="btn btn-ghost btn-block" style="justify-content:flex-start;" href="/admin">Admin</a>
+        )}
         <div style="border-top:1px solid var(--border);margin:4px 0;" />
         <button class="btn btn-ghost btn-block" data-logout style="justify-content:flex-start;color:var(--danger);" type="button">Sign out</button>
       </div>
