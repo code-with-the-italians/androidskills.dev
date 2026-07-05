@@ -1,5 +1,6 @@
 ---
 import ThemeInit from '../components/ThemeInit.astro';
+import AuthHeader from '../components/AuthHeader.astro';
 import '../styles/global.css';
 
 interface Props {
@@ -63,7 +64,7 @@ function navActive(href: string): boolean {
                 </svg>
               </button>
               <a class="btn btn-sm btn-outline hide-sm" href="/submit">Submit a skill</a>
-              <a class="btn btn-sm btn-primary" href="/auth">Sign in</a>
+              <AuthHeader />
               <button class="icon-btn menu-btn" data-menu-open aria-label="Open menu">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
                   <path d="M3 6h18M3 12h18M3 18h18" />

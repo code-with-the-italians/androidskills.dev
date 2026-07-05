@@ -16,6 +16,22 @@ export type FileContentResponse = Schemas['FileContentResponse'];
 export type VersionsResponse = Schemas['VersionsResponse'];
 export type ReportResponse = Schemas['ReportResponse'];
 export type MeResponse = Schemas['MeResponse'];
+
+/** Settings actually persisted by the backend (only two keys; everything else is localStorage). */
+export interface UserSettings {
+  emailNotifications?: boolean;
+  publicProfile?: boolean;
+}
+
+export type RepoDto = Schemas['RepoDto'];
+export type ReposResponse = Schemas['ReposResponse'];
+export type ScanResponse = Schemas['ScanResponse'];
+export type DetectedSkillDto = Schemas['DetectedSkillDto'];
+export type CreateDraftsRequest = Schemas['CreateDraftsRequest'];
+export type CreateDraftsResponse = Schemas['CreateDraftsResponse'];
+export type GroupedSubmissions = Schemas['GroupedSubmissions'];
+export type SubmissionSummary = Schemas['SubmissionSummary'];
+export type SubmissionDetail = Schemas['SubmissionDetail'];
 export type BundleDetail = Schemas['BundleDetail'];
 export type PageOfBundleSummary = Schemas['PageOfBundleSummary'];
 export type AuthorProfile = Schemas['AuthorProfile'];
@@ -186,6 +202,79 @@ export class ApiClient {
 
   getMe(): Promise<MeResponse> {
     return this.fetchJson('/api/me');
+  }
+
+  deleteAccount(): Promise<void> {
+    return this.fetchJson('/api/me', { method: 'DELETE' });
+  }
+
+  logout(): Promise<{ ok: boolean }> {
+    return this.fetchJson('/api/auth/logout', { method: 'POST' });
+  }
+
+  // ---- Settings ----
+
+  getSettings(): Promise<UserSettings> {
+    return this.fetchJson('/api/me/settings');
+  }
+
+  putSettings(settings: UserSettings): Promise<{ ok: boolean }> {
+    return this.fetchJson('/api/me/settings', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(settings),
+    });
+  }
+
+  // ---- Repos / scan ----
+
+  getRepos(): Promise<ReposResponse> {
+    return this.fetchJson('/api/me/repos');
+  }
+
+  scanRepo(owner: string, repo: string): Promise<ScanResponse> {
+    return this.fetchJson(
+      `/api/me/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/scan`,
+      { method: 'POST' },
+    );
+  }
+
+  // ---- Submissions ----
+
+  getSubmissions(): Promise<GroupedSubmissions[]> {
+    return this.fetchJson('/api/me/submissions');
+  }
+
+  createDrafts(request: CreateDraftsRequest): Promise<CreateDraftsResponse> {
+    return this.fetchJson('/api/me/submissions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(request),
+    });
+  }
+
+  getSubmission(id: string): Promise<SubmissionDetail> {
+    return this.fetchJson(`/api/me/submissions/${encodeURIComponent(id)}`);
+  }
+
+  deleteSubmission(id: string): Promise<void> {
+    return this.fetchJson(`/api/me/submissions/${encodeURIComponent(id)}`, {
+      method: 'DELETE',
+    });
+  }
+
+  submitDraft(id: string): Promise<{ ok: boolean }> {
+    return this.fetchJson(
+      `/api/me/submissions/${encodeURIComponent(id)}/submit`,
+      { method: 'POST' },
+    );
+  }
+
+  withdrawSubmission(id: string): Promise<{ ok: boolean }> {
+    return this.fetchJson(
+      `/api/me/submissions/${encodeURIComponent(id)}/withdraw`,
+      { method: 'POST' },
+    );
   }
 
   // ---- Starred ----
