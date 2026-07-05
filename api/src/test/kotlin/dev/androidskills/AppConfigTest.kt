@@ -50,6 +50,28 @@ class AppConfigTest {
     }
 
     @Test
+    fun `public base url requires scheme`() {
+        val env = base + mapOf("PUBLIC_BASE_URL" to "androidskills.dev")
+        val ex = assertFailsWith<IllegalStateException> { AppConfig.fromMap(env).validate() }
+        assertTrue(ex.message!!.contains("http://") || ex.message!!.contains("https://"))
+    }
+
+    @Test
+    fun `public base url rejects path`() {
+        val env = base + mapOf("PUBLIC_BASE_URL" to "https://androidskills.dev/api")
+        val ex = assertFailsWith<IllegalStateException> { AppConfig.fromMap(env).validate() }
+        assertTrue(ex.message!!.contains("path"))
+    }
+
+    @Test
+    fun `public base url with port is allowed`() {
+        val env = base + mapOf("PUBLIC_BASE_URL" to "https://androidskills.dev:8443")
+        val cfg = AppConfig.fromMap(env)
+        cfg.validate()
+        assertEquals("https://androidskills.dev:8443", cfg.auth.publicBaseUrl)
+    }
+
+    @Test
     fun `data dir that is not a directory throws`() {
         val file = Files.createTempFile("as-config", ".txt")
         val env = base + mapOf("DATA_DIR" to file.toString())

@@ -2,21 +2,21 @@
 
 A searchable index of AI coding skills for Android & Kotlin development.
 
-> **Branch model:** [`main`](https://github.com/CWTI-Ltd/androidskills.dev/tree/main)
-> serves the public landing page (GitHub Pages). All product development happens on
-> [`develop`](https://github.com/CWTI-Ltd/androidskills.dev/tree/develop) until the app
-> is ready to go live.
+> **Branch model:** all development targets `develop`. `main` is reserved for
+> the production site once Kamal is live.
 
 ## Repository layout
 
 ```
-api/    Kotlin/Ktor backend — REST API, SQLite (WAL), skill-review worker
-web/    Astro frontend — static public pages + SSR for admin/auth   (coming next)
-docs/   Architecture & design records
+api/      Kotlin/Ktor backend — REST API, SQLite (WAL), skill-review worker
+web/      Astro frontend — static public pages + SSR for admin/auth
+deploy/   Kamal 2.x deployment config + secrets templates
+docs/     Architecture & design records
 ```
 
 The full stack, hosting and data-model decisions live in
-**[docs/architecture.md](docs/architecture.md)**.
+**[docs/architecture.md](docs/architecture.md)**. Deploy instructions live in
+**[deploy/README.md](deploy/README.md)**.
 
 ## Local development
 
@@ -45,4 +45,13 @@ OpenAI-compatible endpoint in prod). Both swap in via configuration, not code.
 
 ### Web (`web/`)
 
-Coming next — an Astro app reusing the design system, with a dev proxy to the API.
+A skeleton Astro app is present. It is not yet connected to the API; that happens
+in the next step.
+
+```sh
+npm install --prefix web
+npm run --prefix web build
+```
+
+For local development it can be run with `npm run --prefix web dev`; in
+production it is served behind Kamal as a Node SSR app.
