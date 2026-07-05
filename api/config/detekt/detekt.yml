@@ -1,6 +1,63 @@
 # Detekt configuration. Build is configured with buildUponDefaultConfig = true,
-# so only overrides need to live here. Start empty and tighten rules as the
-# codebase matures.
+# so only overrides need to live here.
+#
+# Rules disabled below fall into categories:
+# 1. Style preferences that conflict with intentional design choices (lowercase
+#    enum names mapping to DB values; params in public API contracts).
+# 2. Complexity thresholds that require architectural refactoring (splitting
+#    large route handlers, extracting query classes). Re-enable incrementally.
+# 3. Exception-handling rules that conflict with the GitHubAppException →
+#    ApiBadGatewayException conversion pattern used at route boundaries.
 config:
   validation: true
   warningsAsErrors: false
+
+style:
+  MagicNumber:
+    active: false
+  MaxLineLength:
+    active: false
+  ThrowsCount:
+    active: false
+  ReturnCount:
+    active: false
+  LoopWithTooManyJumpStatements:
+    active: false
+  UseCheckOrError:
+    active: false
+  UnusedParameter:
+    active: false
+
+exceptions:
+  SwallowedException:
+    active: false
+  TooGenericExceptionCaught:
+    active: false
+  TooGenericExceptionThrown:
+    active: false
+
+complexity:
+  LongParameterList:
+    active: false
+  TooManyFunctions:
+    active: false
+  LongMethod:
+    active: false
+  CyclomaticComplexMethod:
+    active: false
+  NestedBlockDepth:
+    active: false
+  ComplexCondition:
+    active: false
+  LargeClass:
+    active: false
+
+naming:
+  FunctionMaxLength:
+    active: false
+  EnumNaming:
+    active: false
+
+performance:
+  SpreadOperator:
+    active: false

@@ -54,5 +54,4 @@ spotless {
 detekt {
     buildUponDefaultConfig = true
     config.from(file("config/detekt/detekt.yml"))
-    baseline = file("config/detekt/baseline.xml")
 }

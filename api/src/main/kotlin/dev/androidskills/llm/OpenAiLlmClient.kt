@@ -130,7 +130,8 @@ class OpenAiLlmClient(
         ChatMessage(
           "system",
           "Respond with ONLY a JSON object matching this schema, no markdown: " +
-            "{\"category\":\"string\",\"tagsValidated\":[\"string\"],\"security\":{\"passed\":bool,\"findings\":[\"string\"]},\"lintScore\":int}",
+            "{\"category\":\"string\",\"tagsValidated\":[\"string\"]," +
+            "\"security\":{\"passed\":bool,\"findings\":[\"string\"]},\"lintScore\":int}",
         )
     val resp = chat(buildRequestBody(withInstruction))
     val content = resp.content()

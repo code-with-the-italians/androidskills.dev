@@ -63,7 +63,8 @@ object DemoData {
         slug = "jetpack-compose-mvi",
         name = "Jetpack Compose MVI Scaffold",
         description =
-          "A predictable Model-View-Intent baseline for Compose apps with unidirectional data flow and side-effect handling.",
+          "A predictable Model-View-Intent baseline for Compose apps with " +
+            "unidirectional data flow and side-effect handling.",
         license = "Apache-2.0",
         tags = listOf("android", "compose", "mvi", "architecture"),
         category = "jetpack-compose",

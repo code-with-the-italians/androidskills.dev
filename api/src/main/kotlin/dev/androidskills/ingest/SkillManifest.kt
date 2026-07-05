@@ -37,8 +37,6 @@ data class FieldError(val field: String, val reason: String)
 
 object SkillManifestParser {
 
-  private val DELIM = Regex("""-{3,}\s*""")
-
   /**
    * Splits `content` into frontmatter fields + the markdown body. Never throws on a
    * malformed/missing manifest — it returns empty fields and leaves validation to

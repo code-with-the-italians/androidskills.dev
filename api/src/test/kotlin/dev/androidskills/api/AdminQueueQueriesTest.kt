@@ -2,11 +2,7 @@ package dev.androidskills.api
 
 import dev.androidskills.Database
 import dev.androidskills.TestSupport
-import dev.androidskills.auth.GitHubUser
-import dev.androidskills.auth.SessionStore
-import dev.androidskills.auth.UsersRepo
 import dev.androidskills.db.Bundles
-import dev.androidskills.db.Role
 import dev.androidskills.db.Skills
 import dev.androidskills.db.Submissions
 import dev.androidskills.db.Users
@@ -35,12 +31,6 @@ class AdminQueueQueriesTest {
 
   private fun setupDb() {
     Database.init(TestSupport.newConfig(dir))
-  }
-
-  private fun makeAdmin(githubId: Long = 1L, handle: String = "admin-alice"): String {
-    val uid = UsersRepo.upsertFromGitHub(GitHubUser(githubId, handle, handle, null), null)
-    transaction { Users.update({ Users.id eq uid }) { it[Users.role] = Role.admin.name } }
-    return SessionStore.create(uid, 3600)
   }
 
   private fun insertInReviewSubmission(slug: String = "queued-skill"): String {
