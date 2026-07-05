@@ -1,6 +1,9 @@
 # Local runtime data (sqlite db + local file store) — never committed
 /data/
 
+# Staging secrets (tunnel token + GitHub App creds); only the .example is committed
+deploy/staging/.env.staging
+
 # Node / Astro
 web/node_modules/
 web/dist/
