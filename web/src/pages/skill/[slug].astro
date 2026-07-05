@@ -1,5 +1,6 @@
 ---
 import BaseLayout from '../../layouts/BaseLayout.astro';
+import StarButton from '../../components/StarButton.astro';
 import { createApiClient, type SkillDetail, type FileTreeResponse, type VersionsResponse } from '../../lib/api';
 import { renderMarkdown } from '../../lib/markdown';
 
@@ -9,6 +10,8 @@ const api = createApiClient(Astro.request);
 let skill: SkillDetail | null = null;
 let files: FileTreeResponse | null = null;
 let versions: VersionsResponse | null = null;
+let anonymous = true;
+let starred = false;
 
 try {
   [skill, files, versions] = await Promise.all([
@@ -16,6 +19,13 @@ try {
     api.getSkillFiles(slug),
     api.getSkillVersions(slug),
   ]);
+  try {
+    const stars = await api.getStars();
+    anonymous = false;
+    starred = stars.some((s) => s.slug === slug);
+  } catch {
+    anonymous = true;
+  }
 } catch (e) {
   return Astro.redirect('/404');
 }
@@ -70,6 +80,7 @@ const fileTree = files?.tree ?? [];
               <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
               Download .zip
             </a>
+            <StarButton slug={slug} anonymous={anonymous} starred={starred} size="md" />
           </div>
         </div>
       </div>

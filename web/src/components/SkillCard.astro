@@ -1,11 +1,13 @@
 ---
+import StarButton from './StarButton.astro';
 import type { SkillCard as SkillCardType } from '../lib/api';
 
 interface Props {
   skill: SkillCardType;
+  anonymous?: boolean;
 }
 
-const { skill } = Astro.props;
+const { skill, anonymous = false } = Astro.props;
 
 const initials = skill.name
   .split(/\s+/)
@@ -15,7 +17,9 @@ const initials = skill.name
   .toUpperCase();
 ---
 
-<a class="card card-link skill-card" href={`/skill/${skill.slug}`}>
+<div class="card skill-card" style="position:relative;">
+  <a class="card-link" href={`/skill/${skill.slug}`} style="position:absolute;inset:0;z-index:1;"
+></a>
   <div class="top">
     <div class="skill-ico">{initials}</div>
     <div style="flex:1;min-width:0;">
@@ -45,4 +49,7 @@ const initials = skill.name
       </>
     )}
   </div>
-</a>
+  <div style="position:relative;z-index:2;margin-top:12px;display:inline-flex;">
+    <StarButton slug={skill.slug} anonymous={anonymous} />
+  </div>
+</div>

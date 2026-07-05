@@ -9,7 +9,7 @@
     "preview": "astro preview",
     "astro": "astro",
     "check": "astro check",
-    "test": "node --test --import tsx src/lib/markdown.test.ts",
+    "test": "node --test --import tsx src/lib/markdown.test.ts src/scripts/submit-wizard.test.ts",
     "lint": "eslint .",
     "format": "prettier --write .",
     "format:check": "prettier --check ."

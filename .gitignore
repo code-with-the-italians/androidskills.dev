@@ -12,6 +12,7 @@ npm-debug.log*
 
 # Gradle / Ktor
 api/.gradle/
+api/.kotlin/
 api/build/
 .gradle/
 

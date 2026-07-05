@@ -1,0 +1,43 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import SkillCard from '../components/SkillCard.astro';
+import { createApiClient } from '../lib/api';
+
+const api = createApiClient(Astro.request);
+
+let stars: Awaited<ReturnType<typeof api.getStars>> | null = null;
+let anonymous = false;
+
+try {
+  stars = await api.getStars();
+} catch {
+  anonymous = true;
+}
+---
+
+<BaseLayout title="Starred skills — androidskills.dev" description="Your starred skills.">
+  <section class="section" style="padding-top:32px;">
+    <div class="wrap">
+      <div class="kicker"><span class="tick">//</span> LIBRARY</div>
+      <h1 style="font-size:30px;margin-top:8px;">Starred skills</h1>
+
+      {anonymous ? (
+        <div class="state" style="margin-top:24px;">
+          <h3>Sign in to see your stars</h3>
+          <p class="muted">Your starred skills are saved to your account.</p>
+          <a class="btn btn-primary" href="/signin" style="margin-top:12px;">Sign in</a>
+        </div>
+      ) : stars && stars.length > 0 ? (
+        <div class="grid grid-skills" style="margin-top:24px;">
+          {stars.map((skill) => <SkillCard skill={skill} />)}
+        </div>
+      ) : (
+        <div class="state" style="margin-top:24px;">
+          <h3>No starred skills yet</h3>
+          <p class="muted">Browse skills and click the star to save them here.</p>
+          <a class="btn btn-primary" href="/search" style="margin-top:12px;">Browse skills</a>
+        </div>
+      )}
+    </div>
+  </section>
+</BaseLayout>

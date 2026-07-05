@@ -1,5 +1,6 @@
 ---
 import ThemeInit from '../components/ThemeInit.astro';
+import AuthHeader from '../components/AuthHeader.astro';
 import '../styles/global.css';
 
 interface Props {
@@ -63,7 +64,7 @@ function navActive(href: string): boolean {
                 </svg>
               </button>
               <a class="btn btn-sm btn-outline hide-sm" href="/submit">Submit a skill</a>
-              <a class="btn btn-sm btn-primary" href="/auth">Sign in</a>
+              <AuthHeader />
               <button class="icon-btn menu-btn" data-menu-open aria-label="Open menu">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
                   <path d="M3 6h18M3 12h18M3 18h18" />
@@ -100,7 +101,7 @@ function navActive(href: string): boolean {
               <div>
                 <h5>Contribute</h5>
                 <a href="/submit">Submit a skill</a>
-                <a href="/auth">Sign in</a>
+                <a href="/signin">Sign in</a>
                 <a href="/about">Guidelines</a>
                 <a href="/contact">Contact</a>
               </div>
@@ -119,7 +120,7 @@ function navActive(href: string): boolean {
       )
     }
 
-    <!-- Theme toggle script -->
+    <!-- Theme / accent / density script -->
     <script is:inline>
       (function () {
         function getSettings() {
@@ -133,6 +134,17 @@ function navActive(href: string): boolean {
           var s = getSettings();
           Object.assign(s, partial);
           localStorage.setItem('androidskills', JSON.stringify(s));
+          applySettings();
+        }
+        function applySettings() {
+          var s = getSettings();
+          var r = document.documentElement;
+          if (s.theme && s.theme !== 'system') r.setAttribute('data-theme', s.theme);
+          else r.removeAttribute('data-theme');
+          if (s.accent && s.accent !== 'green') r.setAttribute('data-accent', s.accent);
+          else r.removeAttribute('data-accent');
+          if (s.density && s.density !== 'regular') r.setAttribute('data-density', s.density);
+          else r.removeAttribute('data-density');
         }
         function resolvedDark() {
           var s = getSettings();
@@ -149,14 +161,15 @@ function navActive(href: string): boolean {
         document.querySelectorAll('[data-theme-toggle]').forEach(function (btn) {
           btn.addEventListener('click', function () {
             saveSettings({ theme: resolvedDark() ? 'light' : 'dark' });
-            var s = getSettings();
-            var r = document.documentElement;
-            if (s.theme === 'system') r.removeAttribute('data-theme');
-            else r.setAttribute('data-theme', s.theme);
             syncToggles();
           });
         });
+        document.addEventListener('prefs:apply', function () {
+          syncToggles();
+          applySettings();
+        });
         syncToggles();
+        applySettings();
       })();
     </script>
   </body>
