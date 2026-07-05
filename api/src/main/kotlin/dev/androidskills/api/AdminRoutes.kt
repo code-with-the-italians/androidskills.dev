@@ -21,6 +21,7 @@ import io.ktor.server.routing.route
 fun Route.adminRoutes(fileStore: FileStore, githubApp: GitHubAppClient) {
   rateLimit(RateLimitName("admin")) {
     route("api/admin") {
+      route("stats") { get { stats(call) } }
       route("queue") {
         get { listQueue(call) }
         get("{id}") { queueDetail(call) }
@@ -49,6 +50,11 @@ fun Route.adminRoutes(fileStore: FileStore, githubApp: GitHubAppClient) {
       route("audit") { get { listAudit(call) } }
     }
   }
+}
+
+private suspend fun stats(call: ApplicationCall) {
+  call.requireAdmin()
+  call.respond(AdminStatsQueries.get())
 }
 
 private suspend fun listQueue(call: ApplicationCall) {

@@ -168,6 +168,17 @@ fun Application.module(
           ?.decodeToString() ?: throw IllegalStateException("openapi.yaml missing from classpath")
       call.respondText(spec, ContentType("application", "yaml"))
     }
+    get("/api/openapi-admin.yaml") {
+      val spec =
+        this::class
+          .java
+          .classLoader
+          .getResourceAsStream("openapi-admin.yaml")
+          ?.use { it.readAllBytes() }
+          ?.decodeToString()
+          ?: throw IllegalStateException("openapi-admin.yaml missing from classpath")
+      call.respondText(spec, ContentType("application", "yaml"))
+    }
     publicRoutes(fileStore)
     authRoutes(config, resolvedOauth)
     contributorRoutes(resolvedGithubApp)

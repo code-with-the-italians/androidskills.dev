@@ -1,0 +1,166 @@
+---
+import AdminLayout from '../../layouts/AdminLayout.astro';
+import { requireAdmin } from '../../lib/api';
+import { createAdminApiClient } from '../../lib/admin-api';
+
+const me = await requireAdmin(Astro.request).catch(() => null);
+if (!me) return new Response(null, { status: 404 });
+
+const api = createAdminApiClient(Astro.request);
+
+const categories = await api.getCategories();
+---
+
+<AdminLayout title="Categories" me={me}>
+  <div class="between" style="margin-bottom: 16px; flex-wrap: wrap; gap: 12px;">
+    <div class="callout info" style="font-size: 13px; align-items: flex-start; max-width: 640px;">
+      <svg class="ci" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <circle cx="12" cy="12" r="9"></circle>
+        <path d="M12 16v-4M12 8h.01" stroke-linecap="round"></path>
+      </svg>
+      <div>Renaming or merging a category re-tags every skill in it.</div>
+    </div>
+    <button class="btn btn-sm btn-primary" data-modal-open="#addCat">Add category</button>
+  </div>
+
+  <div class="tbl-wrap">
+    <div class="scroll">
+      <table class="tbl">
+        <thead>
+          <tr>
+            <th>Category</th>
+            <th>Slug</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {categories.map((cat) => (
+            <tr data-category-slug={cat.slug}>
+              <td>
+                <div class="row" style="gap: 10px;">
+                  <span class="cat-sw" style="background: var(--accent);"></span>
+                  <span style="font-weight: 600;">{cat.name}</span>
+                </div>
+              </td>
+              <td class="slug" style="font-size: 12.5px;">{cat.slug}</td>
+              <td>
+                <button class="btn btn-sm btn-outline" data-rename={cat.slug} data-name={cat.name}>Rename</button>
+                <button class="btn btn-sm btn-danger" data-delete={cat.slug}>Merge</button>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="scrim" id="addCat" style="display: none;">
+    <div class="modal" style="max-width: 440px;">
+      <div class="mhd">
+        <b style="font-size: 16px;">Add a category</b>
+        <button class="icon-btn" data-modal-close aria-label="Close">×</button>
+      </div>
+      <div class="mbd stack" style="gap: 14px;">
+        <div class="field">
+          <label>Name</label>
+          <input class="input" id="ncName" placeholder="e.g. Background Work" autocomplete="off">
+        </div>
+        <div class="field">
+          <label>Slug</label>
+          <input class="input" id="ncSlug" placeholder="background-work" style="font-family: var(--mono); font-size: 13px;" autocomplete="off">
+        </div>
+      </div>
+      <div class="mft">
+        <button class="btn btn-ghost" data-modal-close>Cancel</button>
+        <button class="btn btn-primary" data-add-cat>Add category</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="scrim" id="renameCat" style="display: none;">
+    <div class="modal" style="max-width: 440px;">
+      <div class="mhd">
+        <b style="font-size: 16px;">Rename category</b>
+        <button class="icon-btn" data-modal-close aria-label="Close">×</button>
+      </div>
+      <div class="mbd stack" style="gap: 14px;">
+        <input type="hidden" id="rcOldSlug">
+        <div class="field">
+          <label>New name</label>
+          <input class="input" id="rcName" placeholder="New name" autocomplete="off">
+        </div>
+        <div class="field">
+          <label>New slug</label>
+          <input class="input" id="rcSlug" placeholder="new-slug" style="font-family: var(--mono); font-size: 13px;" autocomplete="off">
+        </div>
+      </div>
+      <div class="mft">
+        <button class="btn btn-ghost" data-modal-close>Cancel</button>
+        <button class="btn btn-primary" data-rename-cat>Save</button>
+      </div>
+    </div>
+  </div>
+</AdminLayout>
+
+<script>
+  document.querySelectorAll('[data-modal-open]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const id = btn.getAttribute('data-modal-open');
+      const scrim = id ? document.querySelector(id) : null;
+      if (scrim) (scrim as HTMLElement).style.display = 'flex';
+    });
+  });
+
+  document.querySelectorAll('[data-modal-close]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const scrim = btn.closest('.scrim') as HTMLElement | null;
+      if (scrim) scrim.style.display = 'none';
+    });
+  });
+
+  document.querySelector('[data-add-cat]')?.addEventListener('click', async () => {
+    const name = (document.getElementById('ncName') as HTMLInputElement | null)?.value;
+    const slug = (document.getElementById('ncSlug') as HTMLInputElement | null)?.value;
+    if (!name || !slug) return;
+    const res = await fetch(`/api/admin/categories?slug=${encodeURIComponent(slug)}&name=${encodeURIComponent(name)}`, { method: 'POST' });
+    if (res.ok) window.location.reload();
+  });
+
+  document.querySelectorAll('[data-rename]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const slug = btn.getAttribute('data-rename')!;
+      const name = btn.getAttribute('data-name') || '';
+      (document.getElementById('rcOldSlug') as HTMLInputElement | null)!.value = slug;
+      (document.getElementById('rcName') as HTMLInputElement | null)!.value = name;
+      (document.getElementById('rcSlug') as HTMLInputElement | null)!.value = slug;
+      const scrim = document.getElementById('renameCat');
+      if (scrim) scrim.style.display = 'flex';
+    });
+  });
+
+  document.querySelector('[data-rename-cat]')?.addEventListener('click', async () => {
+    const oldSlug = (document.getElementById('rcOldSlug') as HTMLInputElement | null)?.value;
+    const name = (document.getElementById('rcName') as HTMLInputElement | null)?.value;
+    const slug = (document.getElementById('rcSlug') as HTMLInputElement | null)?.value;
+    if (!oldSlug) return;
+    const body: Record<string, string | null> = {};
+    if (name) body.name = name;
+    if (slug) body.slug = slug;
+    const res = await fetch(`/api/admin/categories/${encodeURIComponent(oldSlug)}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    if (res.ok) window.location.reload();
+  });
+
+  document.querySelectorAll('[data-delete]').forEach((btn) => {
+    btn.addEventListener('click', async () => {
+      const from = btn.getAttribute('data-delete')!;
+      const to = prompt(`Merge category "${from}" into which slug?`);
+      if (!to) return;
+      const res = await fetch(`/api/admin/categories/${encodeURIComponent(from)}/merge?to=${encodeURIComponent(to)}`, { method: 'POST' });
+      if (res.ok) window.location.reload();
+    });
+  });
+</script>

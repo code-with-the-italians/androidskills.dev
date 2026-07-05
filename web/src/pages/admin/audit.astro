@@ -1,0 +1,79 @@
+---
+import AdminLayout from '../../layouts/AdminLayout.astro';
+import { requireAdmin } from '../../lib/api';
+import { createAdminApiClient } from '../../lib/admin-api';
+
+const me = await requireAdmin(Astro.request).catch(() => null);
+if (!me) return new Response(null, { status: 404 });
+
+const api = createAdminApiClient(Astro.request);
+
+const url = Astro.url;
+const action = url.searchParams.get('action') || undefined;
+const target = url.searchParams.get('target') || undefined;
+const page = parseInt(url.searchParams.get('page') || '1', 10) || 1;
+
+const entries = await api.getAudit({ action, target, page });
+---
+
+<AdminLayout title="Audit log" me={me}>
+  <div class="row" style="gap: 10px; margin-bottom: 16px; flex-wrap: wrap;">
+    <form id="auditFilter" class="row" method="get" style="gap: 10px; flex-wrap: wrap; flex: 1; align-items: center;">
+      <div class="search search-sm" style="max-width: 260px; flex: 1;">
+        <svg class="ic-search" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="11" cy="11" r="7"></circle>
+          <path d="m20 20-3.2-3.2" stroke-linecap="round"></path>
+        </svg>
+        <input name="action" type="search" value={action} placeholder="Filter by action…">
+      </div>
+      <div class="search search-sm" style="max-width: 260px; flex: 1;">
+        <svg class="ic-search" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="11" cy="11" r="7"></circle>
+          <path d="m20 20-3.2-3.2" stroke-linecap="round"></path>
+        </svg>
+        <input name="target" type="search" value={target} placeholder="Filter by target…">
+      </div>
+    </form>
+  </div>
+
+  <div class="tbl-wrap">
+    <div class="scroll">
+      <table class="tbl">
+        <thead>
+          <tr>
+            <th>Actor</th>
+            <th>Action</th>
+            <th>Target</th>
+            <th>Meta</th>
+            <th>When</th>
+          </tr>
+        </thead>
+        <tbody>
+          {entries.length === 0 ? (
+            <tr>
+              <td colspan="5" class="muted">No audit entries.</td>
+            </tr>
+          ) : (
+            entries.map((entry) => (
+              <tr>
+                <td>{entry.actorHandle}</td>
+                <td>{entry.action}</td>
+                <td>{entry.target}</td>
+                <td class="faint" style="font-size: 12px; max-width: 300px; overflow: hidden; text-overflow: ellipsis;">{entry.meta || '—'}</td>
+                <td class="faint" style="font-size: 12.5px;">{entry.createdAt}</td>
+              </tr>
+            ))
+          )}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="between" style="margin-top: 18px;">
+    <span class="faint" style="font-family: var(--mono); font-size: 12px;">Page {page}</span>
+    <div class="pager">
+      <a href={`?page=${Math.max(1, page - 1)}${action ? `&action=${action}` : ''}${target ? `&target=${target}` : ''}`} aria-label="Previous">←</a>
+      <a href={`?page=${page + 1}${action ? `&action=${action}` : ''}${target ? `&target=${target}` : ''}`}>→</a>
+    </div>
+  </div>
+</AdminLayout>

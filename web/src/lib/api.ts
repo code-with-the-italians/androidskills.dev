@@ -72,7 +72,7 @@ interface ClientConfig {
   cookie?: string;
 }
 
-function buildQueryString(params: Record<string, unknown>): string {
+export function buildQueryString(params: Record<string, unknown>): string {
   const sp = new URLSearchParams();
   for (const [key, value] of Object.entries(params)) {
     if (value === undefined || value === null) continue;
@@ -313,6 +313,20 @@ export function createApiClient(request?: Request): ApiClient {
     process.env.API_URL?.replace(/\/$/, '') || 'http://127.0.0.1:8080';
   const cookie = request?.headers.get('cookie') ?? undefined;
   return new ApiClient({ baseUrl, cookie });
+}
+
+/**
+ * Require an admin session. Returns the caller on success; throws ApiError(404) if the caller is
+ * not an admin or is anonymous. This mirrors the API's `requireAdmin()` behavior on the web side
+ * so admin pages do not leak their existence.
+ */
+export async function requireAdmin(request: Request): Promise<MeResponse> {
+  const api = createApiClient(request);
+  const me = await api.getMe();
+  if (me.role !== 'admin') {
+    throw new ApiError(404, 'not_found', 'Not found');
+  }
+  return me;
 }
 
 /**

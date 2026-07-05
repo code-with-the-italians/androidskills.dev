@@ -1,0 +1,279 @@
+---
+import AdminLayout from '../../layouts/AdminLayout.astro';
+import { requireAdmin } from '../../lib/api';
+import { createAdminApiClient } from '../../lib/admin-api';
+
+const me = await requireAdmin(Astro.request).catch(() => null);
+if (!me) return new Response(null, { status: 404 });
+
+const api = createAdminApiClient(Astro.request);
+
+const queue = await api.getQueue('all');
+const selectedId = queue.length > 0 ? queue[0].id : null;
+const detail = selectedId ? await api.getQueueDetail(selectedId).catch(() => null) : null;
+---
+
+<AdminLayout title="Review queue" me={me}>
+  <div class="between" style="margin-bottom: 18px; flex-wrap: wrap; gap: 12px;">
+    <div class="tabs" style="border: 0; gap: 6px;" data-queue-tabs>
+      <button data-filter="all" aria-selected="true" class="queue-tab">All</button>
+      <button data-filter="in_review" class="queue-tab">Pending</button>
+      <button data-filter="changes_requested" class="queue-tab">Changes requested</button>
+    </div>
+    <form class="search search-sm" onsubmit="return false;" style="max-width: 260px;">
+      <svg class="ic-search" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <circle cx="11" cy="11" r="7"></circle>
+        <path d="m20 20-3.2-3.2" stroke-linecap="round"></path>
+      </svg>
+      <input id="queueSearch" type="search" placeholder="Search queue…">
+    </form>
+  </div>
+
+  <div class="admin-split" data-queue-shell>
+    <div class="queue-list" data-queue-list>
+      {queue.map((item) => (
+        <div class="queue-item" data-queue-id={item.id} data-state={item.state} data-slug={item.slug} data-submitter={item.submitterHandle}>
+          <span class="avatar sm" style="color: var(--accent-text);">{item.submitterHandle.slice(0, 2).toUpperCase()}</span>
+          <div style="flex: 1; min-width: 0;">
+            <div class="between">
+              <b style="font-size: 14px;">{item.slug}</b>
+              <span class="faint" style="font-family: var(--mono); font-size: 11px;">{item.state}</span>
+            </div>
+            <div class="slug" style="font-size: 11.5px;">@{item.submitterHandle}</div>
+          </div>
+        </div>
+      ))}
+    </div>
+
+    <div class="queue-detail" data-queue-detail>
+      {detail ? (
+        <div data-detail-id={detail.id}>
+          <div class="between" style="flex-wrap: wrap; gap: 12px;">
+            <div>
+              <h2 style="font-size: 22px;">{detail.slug}</h2>
+              <div class="slug" style="margin-top: 4px;">submitted by @{detail.submitterHandle} · {detail.state}</div>
+            </div>
+            <a class="btn btn-sm btn-outline" href={`/skill/${detail.slug}`} target="_blank" rel="noopener">Preview</a>
+          </div>
+
+          <div class="grid" style="grid-template-columns: repeat(4, 1fr); gap: 14px; margin: 22px 0;">
+            <div class="stat"><span class="n">{detail.lintScore ?? '—'}</span><span class="l">Lint score</span></div>
+            <div class="stat"><span class="n">{detail.files.length}</span><span class="l">Files</span></div>
+            <div class="stat"><span class="n">{detail.provenance}</span><span class="l">Source</span></div>
+            <div class="stat"><span class="n">{detail.sourceRef.slice(0, 7)}</span><span class="l">Ref</span></div>
+          </div>
+
+          <h4 style="font-family: var(--mono); font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--text-faint); margin-bottom: 10px;">Files</h4>
+          <div class="tbl-wrap" style="margin-bottom: 24px;">
+            <div class="scroll">
+              <table class="tbl">
+                <tbody>
+                  {detail.files.map((file) => (
+                    <tr>
+                      <td><span class="row" style="gap: 8px; font-family: var(--mono); font-size: 12.5px;">{file.path}</span></td>
+                      <td class="num faint">{file.size}</td>
+                      <td>{file.isBinary ? 'binary' : 'text'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="card" style="background: var(--surface-2);">
+            <h4 style="font-size: 15px; margin-bottom: 12px;">Decision</h4>
+            <textarea class="textarea" data-decision-note style="min-height: 84px; background: var(--surface);" placeholder="Optional note to the author…"></textarea>
+            <div class="row" style="gap: 10px; margin-top: 14px; flex-wrap: wrap;">
+              <button class="btn btn-primary" data-decision="approve">Approve &amp; publish</button>
+              <button class="btn btn-outline" data-decision="request_changes">Request changes</button>
+              <button class="btn btn-danger" data-decision="reject">Reject</button>
+              <button class="btn btn-ghost" style="margin-left: auto;" data-decision="skip">Skip</button>
+            </div>
+          </div>
+        </div>
+      ) : (
+        <div class="state"><p class="muted">No submissions in the queue.</p></div>
+      )}
+    </div>
+  </div>
+</AdminLayout>
+
+<script>
+  import { esc } from '../../lib/escape';
+
+  const shell = document.querySelector('[data-queue-shell]');
+  if (shell) {
+    (async () => {
+      const list = shell.querySelector('[data-queue-list]');
+      const detail = shell.querySelector('[data-queue-detail]');
+      const tabs = document.querySelector('[data-queue-tabs]');
+      const search = document.querySelector('#queueSearch') as HTMLInputElement | null;
+
+      let currentFilter = 'all';
+      let currentSearch = '';
+      let selectedId: string | null = null;
+
+      async function loadQueue() {
+        const params = new URLSearchParams();
+        if (currentFilter !== 'all') params.set('filter', currentFilter);
+        const res = await fetch(`/api/admin/queue?${params.toString()}`);
+        if (!res.ok) {
+          if (list) list.innerHTML = '<div class="state"><p class="muted">Failed to load queue.</p></div>';
+          return;
+        }
+        const items = (await res.json()) as Array<{
+          id: string;
+          slug: string;
+          state: string;
+          submitterHandle: string;
+        }>;
+        renderList(items);
+      }
+
+      function renderList(items: Array<{ id: string; slug: string; state: string; submitterHandle: string }>) {
+        if (!list) return;
+        const filtered = items.filter(
+          (i) =>
+            i.slug.toLowerCase().includes(currentSearch) ||
+            i.submitterHandle.toLowerCase().includes(currentSearch),
+        );
+        list.innerHTML = filtered
+          .map(
+            (item) => `
+              <div class="queue-item ${selectedId === item.id ? 'active' : ''}" data-queue-id="${esc(item.id)}" data-state="${esc(item.state)}" data-slug="${esc(item.slug)}" data-submitter="${esc(item.submitterHandle)}" role="button" tabindex="0">
+                <span class="avatar sm" style="color: var(--accent-text);">${esc(item.submitterHandle.slice(0, 2).toUpperCase())}</span>
+                <div style="flex: 1; min-width: 0;">
+                  <div class="between">
+                    <b style="font-size: 14px;">${esc(item.slug)}</b>
+                    <span class="faint" style="font-family: var(--mono); font-size: 11px;">${esc(item.state)}</span>
+                  </div>
+                  <div class="slug" style="font-size: 11.5px;">@${esc(item.submitterHandle)}</div>
+                </div>
+              </div>
+            `,
+          )
+          .join('');
+      }
+
+      async function loadDetail(id: string) {
+        selectedId = id;
+        const res = await fetch(`/api/admin/queue/${encodeURIComponent(id)}`);
+        if (!res.ok) {
+          if (detail) detail.innerHTML = '<div class="state"><p class="muted">Failed to load detail.</p></div>';
+          return;
+        }
+        const d = (await res.json()) as {
+          id: string;
+          slug: string;
+          state: string;
+          submitterHandle: string;
+          lintScore: number | null;
+          files: Array<{ path: string; size: number; isBinary: boolean }>;
+          provenance: string;
+          sourceRef: string;
+        };
+        if (detail) {
+          detail.innerHTML = `
+            <div data-detail-id="${esc(d.id)}">
+              <div class="between" style="flex-wrap: wrap; gap: 12px;">
+                <div>
+                  <h2 style="font-size: 22px;">${esc(d.slug)}</h2>
+                  <div class="slug" style="margin-top: 4px;">submitted by @${esc(d.submitterHandle)} · ${esc(d.state)}</div>
+                </div>
+                <a class="btn btn-sm btn-outline" href="/skill/${esc(d.slug)}" target="_blank" rel="noopener">Preview</a>
+              </div>
+              <div class="grid" style="grid-template-columns: repeat(4, 1fr); gap: 14px; margin: 22px 0;">
+                <div class="stat"><span class="n">${esc(d.lintScore ?? '—')}</span><span class="l">Lint score</span></div>
+                <div class="stat"><span class="n">${esc(d.files.length)}</span><span class="l">Files</span></div>
+                <div class="stat"><span class="n">${esc(d.provenance)}</span><span class="l">Source</span></div>
+                <div class="stat"><span class="n">${esc(d.sourceRef.slice(0, 7))}</span><span class="l">Ref</span></div>
+              </div>
+              <h4 style="font-family: var(--mono); font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--text-faint); margin-bottom: 10px;">Files</h4>
+              <div class="tbl-wrap" style="margin-bottom: 24px;">
+                <div class="scroll">
+                  <table class="tbl">
+                    <tbody>
+                      ${d.files
+                        .map(
+                          (f) => `
+                            <tr>
+                              <td><span class="row" style="gap: 8px; font-family: var(--mono); font-size: 12.5px;">${esc(f.path)}</span></td>
+                              <td class="num faint">${esc(f.size)}</td>
+                              <td>${f.isBinary ? 'binary' : 'text'}</td>
+                            </tr>
+                          `,
+                        )
+                        .join('')}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+              <div class="card" style="background: var(--surface-2);">
+                <h4 style="font-size: 15px; margin-bottom: 12px;">Decision</h4>
+                <textarea class="textarea" data-decision-note style="min-height: 84px; background: var(--surface);" placeholder="Optional note to the author…"></textarea>
+                <div class="row" style="gap: 10px; margin-top: 14px; flex-wrap: wrap;">
+                  <button class="btn btn-primary" data-decision="approve">Approve & publish</button>
+                  <button class="btn btn-outline" data-decision="request_changes">Request changes</button>
+                  <button class="btn btn-danger" data-decision="reject">Reject</button>
+                  <button class="btn btn-ghost" style="margin-left: auto;" data-decision="skip">Skip</button>
+                </div>
+              </div>
+            </div>
+          `;
+        }
+        renderList(Array.from(document.querySelectorAll('[data-queue-id]')).map((el) => ({
+          id: el.getAttribute('data-queue-id')!,
+          slug: el.getAttribute('data-slug')!,
+          state: el.getAttribute('data-state')!,
+          submitterHandle: el.getAttribute('data-submitter')!,
+        })));
+      }
+
+      list?.addEventListener('click', (e) => {
+        const item = (e.target as HTMLElement).closest('[data-queue-id]');
+        if (!item) return;
+        const id = item.getAttribute('data-queue-id');
+        if (id) loadDetail(id);
+      });
+
+      tabs?.addEventListener('click', (e) => {
+        const btn = (e.target as HTMLElement).closest('[data-filter]');
+        if (!btn) return;
+        tabs.querySelectorAll('[data-filter]').forEach((b) => b.setAttribute('aria-selected', 'false'));
+        btn.setAttribute('aria-selected', 'true');
+        currentFilter = btn.getAttribute('data-filter') || 'all';
+        loadQueue();
+      });
+
+      search?.addEventListener('input', () => {
+        currentSearch = search.value.toLowerCase();
+        const items = Array.from(document.querySelectorAll('[data-queue-id]')).map((el) => ({
+          id: el.getAttribute('data-queue-id')!,
+          slug: el.getAttribute('data-slug')!,
+          state: el.getAttribute('data-state')!,
+          submitterHandle: el.getAttribute('data-submitter')!,
+        }));
+        renderList(items);
+      });
+
+      detail?.addEventListener('click', async (e) => {
+        const btn = (e.target as HTMLElement).closest('[data-decision]');
+        if (!btn) return;
+        const decision = btn.getAttribute('data-decision')!;
+        const note = (detail.querySelector('[data-decision-note]') as HTMLTextAreaElement | null)?.value;
+        const id = detail.querySelector('[data-detail-id]')?.getAttribute('data-detail-id');
+        if (!id) return;
+        const res = await fetch(`/api/admin/queue/${encodeURIComponent(id)}/decision`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ decision, note }),
+        });
+        if (res.ok) {
+          window.location.reload();
+        } else {
+          alert('Decision failed');
+        }
+      });
+    })();
+  }
+</script>
