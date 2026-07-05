@@ -1,0 +1,14 @@
+---
+interface Props {
+  src?: string;
+  name: string;
+  size?: 'sm' | 'lg';
+}
+const { src, name, size } = Astro.props;
+const initials = name.split(/\s+/).slice(0, 2).map((w) => w[0]).join('').toUpperCase();
+---
+{src ? (
+  <img class={`avatar ${size ?? ''}`} src={src} alt={name} />
+) : (
+  <div class={`avatar ${size ?? ''}`}>{initials}</div>
+)}

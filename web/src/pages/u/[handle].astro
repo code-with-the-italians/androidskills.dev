@@ -1,0 +1,59 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import SkillCard from '../../components/SkillCard.astro';
+import Avatar from '../../components/Avatar.astro';
+import { createApiClient, type AuthorProfile } from '../../lib/api';
+
+const handle = Astro.params.handle!;
+const api = createApiClient(Astro.request);
+
+let author: AuthorProfile | null = null;
+try {
+  author = await api.getAuthor(handle);
+} catch (e) {
+  return Astro.redirect('/404');
+}
+---
+
+<BaseLayout title={`${author.name ?? author.handle} — Author`} description={`Skills by ${author.handle}`}>
+  <section class="section" style="padding-top:32px;">
+    <div class="wrap wrap-narrow">
+      <div class="crumb" style="margin-bottom:20px;">
+        <a href="/search">Skills</a>
+        <span class="sep">/</span>
+        <span>Authors</span>
+        <span class="sep">/</span>
+        <span>{author.handle}</span>
+      </div>
+
+      <div style="display:flex;gap:20px;align-items:center;margin-bottom:32px;">
+        <Avatar name={author.name ?? author.handle} src={author.avatarUrl ?? undefined} size="lg" />
+        <div>
+          <h1 style="font-size:28px;">{author.name ?? author.handle}</h1>
+          <div style="font-family:var(--mono);font-size:13px;color:var(--text-faint);margin-top:4px;">@{author.handle}</div>
+          <div style="display:flex;gap:24px;margin-top:10px;">
+            <div class="stat">
+              <span class="n" style="font-size:18px;">{author.skillCount}</span>
+              <span class="l">Skills</span>
+            </div>
+            <div class="stat">
+              <span class="n" style="font-size:18px;">{author.totalInstalls.toLocaleString()}</span>
+              <span class="l">Installs</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {author.skills.length > 0 ? (
+        <div class="grid grid-skills">
+          {author.skills.map((skill) => <SkillCard skill={skill} />)}
+        </div>
+      ) : (
+        <div class="state">
+          <h3>No published skills</h3>
+          <p>This author hasn't published any skills yet.</p>
+        </div>
+      )}
+    </div>
+  </section>
+</BaseLayout>
