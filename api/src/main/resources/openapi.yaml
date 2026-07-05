@@ -671,24 +671,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/OkResponse'
-  /gh/webhooks:
-    post:
-      tags:
-      - github
-      summary: GitHub App webhook receiver.
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-      responses:
-        '202':
-          description: Webhook accepted
-          content:
-            application/json:
-              schema:
-                type: object
 components:
   schemas:
     HealthResponse:
