@@ -2,6 +2,7 @@
 import BaseLayout from '../../layouts/BaseLayout.astro';
 import SkillCard from '../../components/SkillCard.astro';
 import Avatar from '../../components/Avatar.astro';
+import EmptyState from '../../components/EmptyState.astro';
 import { createApiClient, type AuthorProfile } from '../../lib/api';
 
 const handle = Astro.params.handle!;
@@ -15,7 +16,7 @@ try {
 }
 ---
 
-<BaseLayout title={`${author.name ?? author.handle} — Author`} description={`Skills by ${author.handle}`}>
+<BaseLayout title={author.name ?? author.handle} description={`Skills by ${author.handle}`}>
   <section class="section" style="padding-top:32px;">
     <div class="wrap wrap-narrow">
       <div class="crumb" style="margin-bottom:20px;">
@@ -49,10 +50,7 @@ try {
           {author.skills.map((skill) => <SkillCard skill={skill} />)}
         </div>
       ) : (
-        <div class="state">
-          <h3>No published skills</h3>
-          <p>This author hasn't published any skills yet.</p>
-        </div>
+        <EmptyState title="No published skills" body="This author hasn't published any skills yet." />
       )}
     </div>
   </section>

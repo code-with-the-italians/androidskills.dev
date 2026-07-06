@@ -15,17 +15,17 @@ const detail = selectedId ? await api.getQueueDetail(selectedId).catch(() => nul
 
 <AdminLayout title="Review queue" me={me}>
   <div class="between" style="margin-bottom: 18px; flex-wrap: wrap; gap: 12px;">
-    <div class="tabs" style="border: 0; gap: 6px;" data-queue-tabs>
-      <button data-filter="all" aria-selected="true" class="queue-tab">All</button>
-      <button data-filter="in_review" class="queue-tab">Pending</button>
-      <button data-filter="changes_requested" class="queue-tab">Changes requested</button>
+    <div class="tabs" style="border: 0; gap: 6px;" data-queue-tabs role="tablist" aria-label="Queue filter">
+      <button data-filter="all" aria-selected="true" role="tab" class="queue-tab">All</button>
+      <button data-filter="in_review" role="tab" class="queue-tab">Pending</button>
+      <button data-filter="changes_requested" role="tab" class="queue-tab">Changes requested</button>
     </div>
-    <form class="search search-sm" onsubmit="return false;" style="max-width: 260px;">
+    <form class="search search-sm" onsubmit="return false;" role="search" style="max-width: 260px;">
       <svg class="ic-search" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <circle cx="11" cy="11" r="7"></circle>
         <path d="m20 20-3.2-3.2" stroke-linecap="round"></path>
       </svg>
-      <input id="queueSearch" type="search" placeholder="Search queue…">
+      <input id="queueSearch" type="search" placeholder="Search queue…" aria-label="Search queue">
     </form>
   </div>
 
@@ -100,6 +100,7 @@ const detail = selectedId ? await api.getQueueDetail(selectedId).catch(() => nul
 
 <script>
   import { esc } from '../../lib/escape';
+  import { showToast, showError } from '../../scripts/toast';
 
   const shell = document.querySelector('[data-queue-shell]');
   if (shell) {
@@ -269,9 +270,11 @@ const detail = selectedId ? await api.getQueueDetail(selectedId).catch(() => nul
           body: JSON.stringify({ decision, note }),
         });
         if (res.ok) {
+          showToast(`Decision: ${decision}`);
           window.location.reload();
         } else {
-          alert('Decision failed');
+          const msg = await res.text().catch(() => 'Decision failed');
+          showError(msg);
         }
       });
     })();

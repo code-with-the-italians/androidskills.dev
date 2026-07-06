@@ -2,20 +2,23 @@
 import BaseLayout from '../layouts/BaseLayout.astro';
 import StatTile from '../components/StatTile.astro';
 import BarChart from '../components/BarChart.astro';
+import EmptyState from '../components/EmptyState.astro';
+import ErrorState from '../components/ErrorState.astro';
 import { createApiClient, type TrendsResponse, type StatsResponse } from '../lib/api';
 
 const api = createApiClient(Astro.request);
 
 let trends: TrendsResponse | null = null;
 let stats: StatsResponse | null = null;
+let error = false;
 try {
   [trends, stats] = await Promise.all([api.getTrends(), api.getStats()]);
 } catch (e) {
-  // API unreachable
+  error = true;
 }
 ---
 
-<BaseLayout title="Trends — androidskills.dev" description="The state of Android AI coding skills: themes, security, and complexity figures.">
+<BaseLayout title="Trends" description="The state of Android AI coding skills: themes, security, and complexity figures.">
   <section class="section" style="padding-top:32px;">
     <div class="wrap">
       <div style="margin-bottom:32px;">
@@ -24,8 +27,11 @@ try {
         <p class="lede" style="margin-top:8px;">What the index looks like right now — themes, security and complexity figures extracted during the automated review.</p>
       </div>
 
-      <!-- Stat tiles -->
-      {stats && (
+      {error && (
+        <ErrorState title="Couldn’t load trends" retryHref="/trends" />
+      )}
+
+      {!error && stats && (
         <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:16px;margin-bottom:40px;">
           <div class="card" style="text-align:center;">
             <StatTile value={stats.indexed} label="Skills indexed" />
@@ -46,8 +52,7 @@ try {
         </div>
       )}
 
-      <!-- Charts -->
-      {trends && (
+      {!error && trends && (
         <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(360px,1fr));gap:24px;">
           {trends.categories.length > 0 && (
             <BarChart title="By category" data={trends.categories} />
@@ -61,11 +66,8 @@ try {
         </div>
       )}
 
-      {!trends && !stats && (
-        <div class="state">
-          <h3>Trends unavailable</h3>
-          <p>Couldn't load trend data right now.</p>
-        </div>
+      {!error && !trends && !stats && (
+        <EmptyState title="Trends unavailable" body="No trend data is available yet." />
       )}
     </div>
   </section>

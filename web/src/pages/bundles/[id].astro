@@ -1,6 +1,7 @@
 ---
 import BaseLayout from '../../layouts/BaseLayout.astro';
 import SkillCard from '../../components/SkillCard.astro';
+import EmptyState from '../../components/EmptyState.astro';
 import { createApiClient, type BundleDetail } from '../../lib/api';
 
 const id = Astro.params.id!;
@@ -14,7 +15,7 @@ try {
 }
 ---
 
-<BaseLayout title={`${bundle.provenance} — Bundle`} description={`Skills in ${bundle.provenance}`}>
+<BaseLayout title={bundle.provenance} description={`Skills in ${bundle.provenance}`}>
   <section class="section" style="padding-top:32px;">
     <div class="wrap">
       <div class="crumb" style="margin-bottom:20px;">
@@ -50,10 +51,7 @@ try {
           {bundle.skills.map((skill) => <SkillCard skill={skill} />)}
         </div>
       ) : (
-        <div class="state">
-          <h3>No skills yet</h3>
-          <p>This bundle has no published skills.</p>
-        </div>
+        <EmptyState title="No skills yet" body="This bundle has no published skills." />
       )}
     </div>
   </section>
