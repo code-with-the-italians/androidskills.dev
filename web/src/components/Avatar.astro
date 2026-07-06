@@ -6,9 +6,10 @@ interface Props {
 }
 const { src, name, size } = Astro.props;
 const initials = name.split(/\s+/).slice(0, 2).map((w) => w[0]).join('').toUpperCase();
+const sizePx = size === 'sm' ? 28 : size === 'lg' ? 64 : 38;
 ---
 {src ? (
-  <img class={`avatar ${size ?? ''}`} src={src} alt={name} />
+  <img class={`avatar ${size ?? ''}`} src={src} alt={name} width={sizePx} height={sizePx} loading="lazy" />
 ) : (
   <div class={`avatar ${size ?? ''}`}>{initials}</div>
 )}

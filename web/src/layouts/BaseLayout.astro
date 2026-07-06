@@ -36,6 +36,14 @@ const pageTitle = title === 'androidskills.dev' ? title : `${title} · androidsk
     <meta name="description" content={description} />
     <title>{pageTitle}</title>
     <link rel="canonical" href={canonicalUrl} />
+    <meta property="og:title" content={pageTitle} />
+    <meta property="og:description" content={description} />
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content={canonicalUrl} />
+    <meta property="og:site_name" content="androidskills.dev" />
+    <meta name="twitter:card" content="summary" />
+    <meta name="twitter:title" content={pageTitle} />
+    <meta name="twitter:description" content={description} />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="stylesheet" href="/fonts/fonts.css" />
     <ThemeInit />
