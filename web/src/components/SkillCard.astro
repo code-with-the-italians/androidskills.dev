@@ -18,7 +18,7 @@ const initials = skill.name
 ---
 
 <div class="card skill-card" style="position:relative;">
-  <a class="card-link" href={`/skill/${skill.slug}`} style="position:absolute;inset:0;z-index:1;"
+  <a class="card-link" href={`/skill/${skill.slug}`} aria-label={skill.name || skill.slug} style="position:absolute;inset:0;z-index:1;"
 ></a>
   <div class="top">
     <div class="skill-ico">{initials}</div>

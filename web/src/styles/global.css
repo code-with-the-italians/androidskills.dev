@@ -1547,13 +1547,14 @@ kbd,
   gap: 40px;
   padding-block: 48px;
 }
-.site-foot h5 {
+.site-foot .foot-title {
   font-family: var(--mono);
   font-size: 11px;
   letter-spacing: 0.1em;
   text-transform: uppercase;
   color: var(--text-faint);
   margin-bottom: 14px;
+  font-weight: 600;
 }
 .site-foot a {
   display: block;
@@ -2016,7 +2017,7 @@ kbd,
     grid-template-columns: 1fr;
     gap: 8px;
   }
-  .site-foot h5 {
+  .site-foot .foot-title {
     margin-top: 18px;
   }
   .search input {
