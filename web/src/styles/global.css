@@ -72,6 +72,16 @@
     0 20px 60px -12px rgba(0, 0, 0, 0.7)
   );
 
+  /* Motion */
+  --t-micro: 120ms;
+  --t-base: 200ms;
+  --t-entrance: 320ms;
+  --t-slow: 440ms;
+  --e-standard: cubic-bezier(0.2, 0, 0, 1);
+  --e-decelerate: cubic-bezier(0, 0, 0, 1);
+  --e-accelerate: cubic-bezier(0.4, 0, 1, 1);
+  --e-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+
   --maxw: 1200px;
 }
 :root[data-theme='light'] {
@@ -118,6 +128,162 @@
   --gap: 22px;
   --fs-base: 16px;
   --section-y: 84px;
+}
+
+/* Reduced motion: collapse durations to 0 */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --t-micro: 0ms;
+    --t-base: 0ms;
+    --t-entrance: 0ms;
+    --t-slow: 0ms;
+  }
+}
+
+/* ---------- Motion utilities ---------- */
+@keyframes m-rise {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes m-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes m-slide-r {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: none;
+  }
+}
+@keyframes m-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.92) translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes m-toast {
+  0% {
+    opacity: 0;
+    transform: translateX(-50%) translateY(14px);
+  }
+  10% {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+  85% {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+  100% {
+    opacity: 0;
+    transform: translateX(-50%) translateY(8px);
+  }
+}
+
+.anim-rise {
+  animation: m-rise var(--t-entrance) var(--e-decelerate) both;
+}
+.anim-fade {
+  animation: m-fade var(--t-base) var(--e-standard) both;
+}
+.anim-slide-r {
+  animation: m-slide-r var(--t-slow) var(--e-standard) both;
+}
+.anim-pop {
+  animation: m-pop var(--t-entrance) var(--e-spring) both;
+}
+.anim-toast {
+  animation: m-toast 2200ms var(--e-standard) both;
+}
+
+/* Stagger children */
+.stagger > *:nth-child(1) {
+  animation-delay: 0ms;
+}
+.stagger > *:nth-child(2) {
+  animation-delay: 45ms;
+}
+.stagger > *:nth-child(3) {
+  animation-delay: 90ms;
+}
+.stagger > *:nth-child(4) {
+  animation-delay: 135ms;
+}
+.stagger > *:nth-child(5) {
+  animation-delay: 180ms;
+}
+.stagger > *:nth-child(6) {
+  animation-delay: 225ms;
+}
+
+/* Skeleton -> content swap */
+.skeleton-swap {
+  position: relative;
+}
+.skeleton-swap .swap-real {
+  opacity: 0;
+  transition: opacity var(--t-base) var(--e-standard);
+}
+.skeleton-swap.loaded .swap-real {
+  opacity: 1;
+}
+.skeleton-swap.loaded .swap-skeleton {
+  opacity: 0;
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  transition: opacity var(--t-base) var(--e-standard);
+}
+
+/* Micro interactions */
+.press-btn {
+  transition: transform var(--t-micro) var(--e-standard);
+}
+.press-btn:active {
+  transform: scale(0.95);
+}
+.lift-card {
+  transition:
+    transform var(--t-base) var(--e-standard),
+    box-shadow var(--t-base) var(--e-standard),
+    border-color var(--t-base) var(--e-standard);
+}
+.lift-card:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--shadow-2);
+  border-color: var(--border-2);
+}
+
+/* Reduced motion: disable animations that are not collapsed by zero duration */
+@media (prefers-reduced-motion: reduce) {
+  .anim-rise,
+  .anim-fade,
+  .anim-slide-r,
+  .anim-pop,
+  .anim-toast,
+  .lift-card {
+    animation: none;
+    transition: none;
+  }
+  .lift-card:hover {
+    transform: none;
+  }
 }
 
 /* ---------- Reset / base ---------- */
@@ -1234,6 +1400,115 @@ kbd,
   to {
     transform: rotate(360deg);
   }
+}
+
+/* Reduced motion: stop shimmer/spin */
+@media (prefers-reduced-motion: reduce) {
+  .skeleton {
+    animation: none;
+  }
+  .spinner {
+    animation: none;
+  }
+}
+
+/* ---------- Mobile drawer ---------- */
+.drawer-backdrop {
+  position: fixed;
+  inset: 0;
+  background: color-mix(in oklab, #000 42%, transparent);
+  z-index: 200;
+  opacity: 0;
+  visibility: hidden;
+  transition:
+    opacity var(--t-base) var(--e-standard),
+    visibility var(--t-base) var(--e-standard);
+}
+.drawer-backdrop.open {
+  opacity: 1;
+  visibility: visible;
+}
+.drawer-panel {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: min(85vw, 320px);
+  background: var(--surface);
+  border-left: 1px solid var(--border);
+  box-shadow: var(--shadow-pop);
+  z-index: 201;
+  transform: translateX(100%);
+  transition: transform var(--t-slow) var(--e-standard);
+  display: flex;
+  flex-direction: column;
+  padding: 16px;
+  gap: 8px;
+}
+.drawer-panel.open {
+  transform: translateX(0);
+}
+.drawer-panel a,
+.drawer-panel button {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: var(--r-md);
+  font-size: 14px;
+  font-weight: 500;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  color: var(--text);
+}
+.drawer-panel a:hover,
+.drawer-panel button:hover {
+  background: var(--surface-2);
+}
+.drawer-panel .close {
+  margin-left: auto;
+  padding: 8px;
+}
+
+/* ---------- Toast ---------- */
+.toast-region {
+  position: fixed;
+  left: 50%;
+  bottom: 22px;
+  transform: translateX(-50%);
+  z-index: 300;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: center;
+  pointer-events: none;
+}
+.toast {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--text);
+  color: var(--bg);
+  border-radius: 999px;
+  padding: 9px 15px;
+  font-size: 12.5px;
+  font-weight: 600;
+  box-shadow: var(--shadow-pop);
+  pointer-events: auto;
+}
+.toast.success {
+  background: var(--ok);
+  color: var(--accent-ink);
+}
+.toast.error {
+  background: var(--danger);
+  color: #fff;
+}
+.toast.warn {
+  background: var(--warn);
+  color: #1a1200;
 }
 
 /* ---------- Banner / callout ---------- */

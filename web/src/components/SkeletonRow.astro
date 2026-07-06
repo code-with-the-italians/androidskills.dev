@@ -1,0 +1,45 @@
+---
+interface Props {
+  columns?: number;
+  rows?: number;
+  class?: string;
+}
+
+const { columns = 4, rows = 3, class: className = '' } = Astro.props;
+---
+
+<div class={`skeleton-rows ${className}`} aria-hidden="true">
+  {
+    Array.from({ length: rows }).map(() => (
+      <div class="row" style={`grid-template-columns: repeat(${columns}, 1fr);`}>
+        {Array.from({ length: columns }).map((_, i) => (
+          <div class="cell" style={i === 0 ? 'flex:1;' : ''}>
+            <div class="skeleton" style="height:12px;width:100%;"></div>
+          </div>
+        ))}
+      </div>
+    ))
+  }
+</div>
+
+<style>
+  .skeleton-rows {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .skeleton-rows .row {
+    display: grid;
+    gap: 12px;
+    padding: 10px 12px;
+    border-radius: var(--r-md);
+    background: var(--surface);
+    border: 1px solid var(--border);
+  }
+  .skeleton-rows .cell {
+    min-width: 0;
+  }
+  .skeleton-rows .cell:first-child .skeleton {
+    width: 70%;
+  }
+</style>
