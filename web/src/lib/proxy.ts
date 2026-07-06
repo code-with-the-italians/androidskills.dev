@@ -20,8 +20,18 @@ export function createProxy(prefix: string): APIRoute {
 async function proxy(upstream: URL, request: Request): Promise<Response> {
   const headers = new Headers(request.headers);
   headers.delete('host');
+
+  // The edge proxy (Cloudflare) tells us the real client IP. If we trust it,
+  // rewrite X-Forwarded-For so the API can't be spoofed by a client-supplied
+  // header. Keep this in sync with the API's TRUSTED_PROXY_COUNT for the
+  // actual CF -> kamal -> web -> api hop chain.
+  const trustedIp = headers.get('cf-connecting-ip') || headers.get('x-real-ip');
   headers.delete('cf-connecting-ip');
   headers.delete('x-real-ip');
+  if (trustedIp) {
+    headers.set('x-forwarded-for', trustedIp);
+    headers.set('x-real-ip', trustedIp);
+  }
 
   const init: RequestInit & { duplex?: 'half' } = {
     method: request.method,
