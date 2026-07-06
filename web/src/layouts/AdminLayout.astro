@@ -1,6 +1,7 @@
 ---
 import BaseLayout from './BaseLayout.astro';
 import AdminNav from '../components/AdminNav.astro';
+import Toast from '../components/Toast.astro';
 import { requireAdmin, type MeResponse } from '../lib/api';
 
 interface Props {
@@ -64,6 +65,7 @@ function navActive(href: string): boolean {
       </div>
     </div>
   </div>
+  <Toast />
 </BaseLayout>
 
 <script>

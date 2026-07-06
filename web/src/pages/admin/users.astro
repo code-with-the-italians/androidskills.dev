@@ -1,5 +1,7 @@
 ---
 import AdminLayout from '../../layouts/AdminLayout.astro';
+import EmptyState from '../../components/EmptyState.astro';
+import ErrorState from '../../components/ErrorState.astro';
 import { requireAdmin } from '../../lib/api';
 import { createAdminApiClient } from '../../lib/admin-api';
 
@@ -13,7 +15,15 @@ const filter = url.searchParams.get('filter') || undefined;
 const q = url.searchParams.get('q') || undefined;
 const page = parseInt(url.searchParams.get('page') || '1', 10) || 1;
 
-const users = await api.getUsers({ filter, q, page });
+let users: Awaited<ReturnType<typeof api.getUsers>> | null = null;
+let error = false;
+try {
+  users = await api.getUsers({ filter, q, page });
+} catch (e) {
+  error = true;
+}
+
+const items = users ?? [];
 ---
 
 <AdminLayout title="Users" me={me}>
@@ -35,69 +45,87 @@ const users = await api.getUsers({ filter, q, page });
     <a class="btn btn-sm btn-outline" href={`/api/admin/users/export${filter ? `?filter=${filter}` : ''}${q ? `${filter ? '&' : '?'}q=${q}` : ''}`}>Export CSV</a>
   </div>
 
-  <div class="tbl-wrap">
-    <div class="scroll">
-      <table class="tbl">
-        <thead>
-          <tr>
-            <th>User</th>
-            <th>Role</th>
-            <th>Skills</th>
-            <th>Joined</th>
-            <th>Status</th>
-            <th></th>
-          </tr>
-        </thead>
-        <tbody>
-          {users.map((user) => (
-            <tr data-user-id={user.id}>
-              <td>
-                <div class="row" style="gap: 11px;">
-                  <span class="avatar sm" style="color: var(--accent-text);">{user.handle.slice(0, 2).toUpperCase()}</span>
-                  <div>
-                    <div style="font-weight: 600;">{user.handle}</div>
-                    <div class="slug" style="font-size: 11px;">@{user.handle}</div>
-                  </div>
-                </div>
-              </td>
-              <td>
-                <span class={`badge ${user.role === 'admin' ? 'danger' : user.role === 'contributor' ? 'ok' : 'neutral'}`}>{user.role}</span>
-              </td>
-              <td class="num">{user.skillCount}</td>
-              <td class="faint" style="font-size: 12.5px;">{user.createdAt}</td>
-              <td>
-                <span class={`row ${user.status === 'suspended' ? 'danger' : ''}`} style="gap: 6px; font-size: 13px;">
-                  <span class="pill-dot" style={user.status === 'suspended' ? 'background: var(--danger);' : ''}></span>
-                  {user.status}
-                </span>
-              </td>
-              <td>
-                <select class="select select-sm" data-user-action style="width: auto; height: 32px; font-size: 13px;">
-                  <option value="">Actions</option>
-                  <option value={`role:${user.id}:admin`}>Make admin</option>
-                  <option value={`role:${user.id}:contributor`}>Make contributor</option>
-                  <option value={`role:${user.id}:member`}>Make member</option>
-                  <option value={`status:${user.id}:suspended`}>Suspend</option>
-                  <option value={`status:${user.id}:active`}>Activate</option>
-                </select>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  </div>
+  {error && (
+    <ErrorState title="Couldn’t load users" body="The users table failed to load." />
+  )}
 
-  <div class="between" style="margin-top: 18px;">
-    <span class="faint" style="font-family: var(--mono); font-size: 12px;">Page {page}</span>
-    <div class="pager">
-      <a href={`?page=${Math.max(1, page - 1)}${filter ? `&filter=${filter}` : ''}${q ? `&q=${q}` : ''}`} aria-label="Previous">←</a>
-      <a href={`?page=${page + 1}${filter ? `&filter=${filter}` : ''}${q ? `&q=${q}` : ''}`}>→</a>
+  {!error && (
+    <div class="tbl-wrap">
+      <div class="scroll">
+        <table class="tbl">
+          <thead>
+            <tr>
+              <th scope="col">User</th>
+              <th scope="col">Role</th>
+              <th scope="col">Skills</th>
+              <th scope="col">Joined</th>
+              <th scope="col">Status</th>
+              <th scope="col"></th>
+            </tr>
+          </thead>
+          <tbody>
+            {items.length === 0 ? (
+              <tr>
+                <td colspan="6">
+                  <EmptyState title="No users found" body={q ? 'Try a different search term.' : 'No users match the selected filter.'} />
+                </td>
+              </tr>
+            ) : (
+              items.map((user) => (
+                <tr data-user-id={user.id}>
+                  <td>
+                    <div class="row" style="gap: 11px;">
+                      <span class="avatar sm" style="color: var(--accent-text);">{user.handle.slice(0, 2).toUpperCase()}</span>
+                      <div>
+                        <div style="font-weight: 600;">{user.handle}</div>
+                        <div class="slug" style="font-size: 11px;">@{user.handle}</div>
+                      </div>
+                    </div>
+                  </td>
+                  <td>
+                    <span class={`badge ${user.role === 'admin' ? 'danger' : user.role === 'contributor' ? 'ok' : 'neutral'}`}>{user.role}</span>
+                  </td>
+                  <td class="num">{user.skillCount}</td>
+                  <td class="faint" style="font-size: 12.5px;">{user.createdAt}</td>
+                  <td>
+                    <span class={`row ${user.status === 'suspended' ? 'danger' : ''}`} style="gap: 6px; font-size: 13px;">
+                      <span class="pill-dot" style={user.status === 'suspended' ? 'background: var(--danger);' : ''}></span>
+                      {user.status}
+                    </span>
+                  </td>
+                  <td>
+                    <select class="select select-sm" data-user-action style="width: auto; height: 32px; font-size: 13px;" aria-label={`Actions for ${user.handle}`}>
+                      <option value="">Actions</option>
+                      <option value={`role:${user.id}:admin`}>Make admin</option>
+                      <option value={`role:${user.id}:contributor`}>Make contributor</option>
+                      <option value={`role:${user.id}:member`}>Make member</option>
+                      <option value={`status:${user.id}:suspended`}>Suspend</option>
+                      <option value={`status:${user.id}:active`}>Activate</option>
+                    </select>
+                  </td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
     </div>
-  </div>
+  )}
+
+  {!error && items.length > 0 && (
+    <div class="between" style="margin-top: 18px;">
+      <span class="faint" style="font-family: var(--mono); font-size: 12px;">Page {page}</span>
+      <div class="pager">
+        <a href={`?page=${Math.max(1, page - 1)}${filter ? `&filter=${filter}` : ''}${q ? `&q=${q}` : ''}`} aria-label="Previous">←</a>
+        <a href={`?page=${page + 1}${filter ? `&filter=${filter}` : ''}${q ? `&q=${q}` : ''}`}>→</a>
+      </div>
+    </div>
+  )}
 </AdminLayout>
 
 <script>
+  import { showToast, showError } from '../../scripts/toast';
+
   document.querySelectorAll('[data-user-action]').forEach((select) => {
     select.addEventListener('change', async () => {
       const value = (select as HTMLSelectElement).value;
@@ -105,12 +133,19 @@ const users = await api.getUsers({ filter, q, page });
       (select as HTMLSelectElement).value = '';
       const [kind, id, target] = value.split(':');
       const body = kind === 'role' ? { role: target } : { status: target };
-      await fetch(`/api/admin/users/${encodeURIComponent(id)}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-      });
-      window.location.reload();
+      try {
+        const res = await fetch(`/api/admin/users/${encodeURIComponent(id)}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        });
+        if (!res.ok) throw new Error(await res.text());
+        showToast(`${kind === 'role' ? 'Role' : 'Status'} updated`);
+        window.location.reload();
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : 'Update failed';
+        showError(msg);
+      }
     });
   });
 </script>

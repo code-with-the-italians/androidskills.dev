@@ -1,5 +1,7 @@
 ---
 import AdminLayout from '../../layouts/AdminLayout.astro';
+import EmptyState from '../../components/EmptyState.astro';
+import ErrorState from '../../components/ErrorState.astro';
 import { requireAdmin } from '../../lib/api';
 import { createAdminApiClient } from '../../lib/admin-api';
 
@@ -14,7 +16,15 @@ const q = url.searchParams.get('q') || undefined;
 const sort = url.searchParams.get('sort') || 'updated';
 const page = parseInt(url.searchParams.get('page') || '1', 10) || 1;
 
-const skills = await api.getSkills({ filter, q, sort, page });
+let skills: Awaited<ReturnType<typeof api.getSkills>> | null = null;
+let error = false;
+try {
+  skills = await api.getSkills({ filter, q, sort, page });
+} catch (e) {
+  error = true;
+}
+
+const items = skills ?? [];
 ---
 
 <AdminLayout title="Skills" me={me}>
@@ -42,69 +52,87 @@ const skills = await api.getSkills({ filter, q, sort, page });
     </form>
   </div>
 
-  <div class="tbl-wrap">
-    <div class="scroll">
-      <table class="tbl">
-        <thead>
-          <tr>
-            <th>Skill</th>
-            <th>Category</th>
-            <th>Installs</th>
-            <th>Status</th>
-            <th>Featured</th>
-            <th>Updated</th>
-            <th></th>
-          </tr>
-        </thead>
-        <tbody>
-          {skills.map((skill) => (
-            <tr data-skill-id={skill.id}>
-              <td>
-                <div class="row" style="gap: 10px;">
-                  <span class="skill-ico" style="width: 30px; height: 30px; border-radius: 8px;">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" width="16" height="16">
-                      <rect x="3" y="3" width="7" height="7" rx="1.5"></rect>
-                      <rect x="14" y="3" width="7" height="7" rx="1.5"></rect>
-                      <rect x="3" y="14" width="7" height="7" rx="1.5"></rect>
-                      <rect x="14" y="14" width="7" height="7" rx="1.5"></rect>
-                    </svg>
-                  </span>
-                  <div>
-                    <div style="font-weight: 600;">{skill.name}</div>
-                    <div class="slug" style="font-size: 11px;">{skill.slug}</div>
-                  </div>
-                </div>
-              </td>
-              <td>{skill.categorySlug ? <span class="tag">{skill.categorySlug}</span> : '—'}</td>
-              <td class="num">{skill.installs.toLocaleString()}</td>
-              <td><span class={`badge ${skill.status === 'published' ? 'ok' : skill.status === 'flagged' ? 'danger' : 'neutral'}`}>{skill.status}</span></td>
-              <td>{skill.featured ? '★' : '—'}</td>
-              <td class="faint" style="font-size: 12.5px;">{skill.updatedAt}</td>
-              <td>
-                <select class="select select-sm" data-action style="width: auto; height: 32px; font-size: 13px;">
-                  <option value="">Actions</option>
-                  <option value={`feature:${skill.id}`}>{skill.featured ? 'Unfeature' : 'Feature'}</option>
-                  <option value={`unlist:${skill.id}`}>{skill.status === 'unlisted' ? 'Publish' : 'Unlist'}</option>
-                  <option value={`delete:${skill.id}`}>Delete</option>
-                </select>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  </div>
+  {error && (
+    <ErrorState title="Couldn’t load skills" body="The skills table failed to load." />
+  )}
 
-  <div class="between" style="margin-top: 18px;">
-    <span class="faint" style="font-family: var(--mono); font-size: 12px;">Page {page}</span>
-    <div class="pager">
-      <a href={`?page=${Math.max(1, page - 1)}${filter ? `&filter=${filter}` : ''}${q ? `&q=${q}` : ''}${sort ? `&sort=${sort}` : ''}`} aria-label="Previous">←</a>
-      <a href={`?page=${page + 1}${filter ? `&filter=${filter}` : ''}${q ? `&q=${q}` : ''}${sort ? `&sort=${sort}` : ''}`}>→</a>
+  {!error && (
+    <div class="tbl-wrap">
+      <div class="scroll">
+        <table class="tbl">
+          <thead>
+            <tr>
+              <th scope="col">Skill</th>
+              <th scope="col">Category</th>
+              <th scope="col">Installs</th>
+              <th scope="col">Status</th>
+              <th scope="col">Featured</th>
+              <th scope="col">Updated</th>
+              <th scope="col"></th>
+            </tr>
+          </thead>
+          <tbody>
+            {items.length === 0 ? (
+              <tr>
+                <td colspan="7">
+                  <EmptyState title="No skills found" body={q ? 'Try a different search term.' : 'No skills match the selected filter.'} />
+                </td>
+              </tr>
+            ) : (
+              items.map((skill) => (
+                <tr data-skill-id={skill.id}>
+                  <td>
+                    <div class="row" style="gap: 10px;">
+                      <span class="skill-ico" style="width: 30px; height: 30px; border-radius: 8px;">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" width="16" height="16">
+                          <rect x="3" y="3" width="7" height="7" rx="1.5"></rect>
+                          <rect x="14" y="3" width="7" height="7" rx="1.5"></rect>
+                          <rect x="3" y="14" width="7" height="7" rx="1.5"></rect>
+                          <rect x="14" y="14" width="7" height="7" rx="1.5"></rect>
+                        </svg>
+                      </span>
+                      <div>
+                        <div style="font-weight: 600;">{skill.name}</div>
+                        <div class="slug" style="font-size: 11px;">{skill.slug}</div>
+                      </div>
+                    </div>
+                  </td>
+                  <td>{skill.categorySlug ? <span class="tag">{skill.categorySlug}</span> : '—'}</td>
+                  <td class="num">{skill.installs.toLocaleString()}</td>
+                  <td><span class={`badge ${skill.status === 'published' ? 'ok' : skill.status === 'flagged' ? 'danger' : 'neutral'}`}>{skill.status}</span></td>
+                  <td>{skill.featured ? '★' : '—'}</td>
+                  <td class="faint" style="font-size: 12.5px;">{skill.updatedAt}</td>
+                  <td>
+                    <select class="select select-sm" data-action style="width: auto; height: 32px; font-size: 13px;" aria-label={`Actions for ${skill.name}`}>
+                      <option value="">Actions</option>
+                      <option value={`feature:${skill.id}`}>{skill.featured ? 'Unfeature' : 'Feature'}</option>
+                      <option value={`unlist:${skill.id}`}>{skill.status === 'unlisted' ? 'Publish' : 'Unlist'}</option>
+                      <option value={`delete:${skill.id}`}>Delete</option>
+                    </select>
+                  </td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
     </div>
-  </div>
+  )}
+
+  {!error && items.length > 0 && (
+    <div class="between" style="margin-top: 18px;">
+      <span class="faint" style="font-family: var(--mono); font-size: 12px;">Page {page}</span>
+      <div class="pager">
+        <a href={`?page=${Math.max(1, page - 1)}${filter ? `&filter=${filter}` : ''}${q ? `&q=${q}` : ''}${sort ? `&sort=${sort}` : ''}`} aria-label="Previous">←</a>
+        <a href={`?page=${page + 1}${filter ? `&filter=${filter}` : ''}${q ? `&q=${q}` : ''}${sort ? `&sort=${sort}` : ''}`}>→</a>
+      </div>
+    </div>
+  )}
 </AdminLayout>
 
 <script>
+  import { showToast, showError } from '../../scripts/toast';
+
   document.querySelectorAll('[data-action]').forEach((select) => {
     select.addEventListener('change', async () => {
       const value = (select as HTMLSelectElement).value;
@@ -113,30 +141,40 @@ const skills = await api.getSkills({ filter, q, sort, page });
       const [action, id] = value.split(':');
       const confirmed = action === 'delete' ? confirm('Delete this skill?') : true;
       if (!confirmed) return;
-      if (action === 'feature') {
-        const tr = select.closest('tr');
-        const featured = tr?.querySelector('.badge')?.textContent === 'featured' ||
-          tr?.querySelector('td:nth-child(5)')?.textContent?.includes('★');
-        await fetch(`/api/admin/skills/${encodeURIComponent(id)}`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ featured: !featured }),
-        });
-      } else if (action === 'unlist') {
-        const currentStatus = select.closest('tr')?.querySelector('.badge')?.textContent;
-        await fetch(`/api/admin/skills/${encodeURIComponent(id)}`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ status: currentStatus === 'unlisted' ? 'published' : 'unlisted' }),
-        });
-      } else if (action === 'delete') {
-        await fetch('/api/admin/skills/bulk', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ ids: [id], action: 'delete' }),
-        });
+      try {
+        if (action === 'feature') {
+          const tr = select.closest('tr');
+          const featured = tr?.querySelector('td:nth-child(5)')?.textContent?.includes('★');
+          const res = await fetch(`/api/admin/skills/${encodeURIComponent(id)}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ featured: !featured }),
+          });
+          if (!res.ok) throw new Error(await res.text());
+          showToast(featured ? 'Unfeatured' : 'Featured');
+        } else if (action === 'unlist') {
+          const currentStatus = select.closest('tr')?.querySelector('.badge')?.textContent;
+          const res = await fetch(`/api/admin/skills/${encodeURIComponent(id)}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ status: currentStatus === 'unlisted' ? 'published' : 'unlisted' }),
+          });
+          if (!res.ok) throw new Error(await res.text());
+          showToast(currentStatus === 'unlisted' ? 'Published' : 'Unlisted');
+        } else if (action === 'delete') {
+          const res = await fetch('/api/admin/skills/bulk', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ids: [id], action: 'delete' }),
+          });
+          if (!res.ok) throw new Error(await res.text());
+          showToast('Deleted');
+        }
+        window.location.reload();
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : 'Action failed';
+        showError(msg);
       }
-      window.location.reload();
     });
   });
 </script>

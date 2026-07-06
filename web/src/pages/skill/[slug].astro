@@ -65,9 +65,7 @@ const fileTree = files?.tree ?? [];
               </svg>
               <div style="font-size:12.5px;">
                 Not yet maintainer-reviewed. Inspect the source before adding it to an autonomous agent.
-                <form action={`/api/skills/${slug}/report`} method="post" style="display:inline;" data-report-form>
-                  <button class="btn btn-ghost" type="submit" style="padding:0;color:var(--warn);font-weight:600;">Report</button>
-                </form>
+                <button class="btn btn-ghost" data-report style="padding:0;color:var(--warn);font-weight:600;" type="button">Report</button>
               </div>
             </div>
           )}
@@ -89,11 +87,15 @@ const fileTree = files?.tree ?? [];
           )}
 
           <!-- Actions -->
-          <div style="display:flex;gap:10px;margin-top:20px;">
+          <div class="row" style="gap:10px;margin-top:20px;">
             <a class="btn btn-primary" href={`/api/skills/${slug}/download`}>
               <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
               Download .zip
             </a>
+            <button class="btn btn-outline" data-copy-cmd type="button">
+              <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+              Copy command
+            </button>
             <StarButton slug={slug} anonymous={anonymous} starred={starred} size="md" />
           </div>
         </div>
@@ -101,16 +103,8 @@ const fileTree = files?.tree ?? [];
 
       <div style="display:grid;grid-template-columns:1fr 320px;gap:32px;align-items:start;">
         <!-- README -->
-        <div>
-          {readmeHtml ? (
-            <div class="card">
-              <div class="prose" set:html={readmeHtml} />
-            </div>
-          ) : (
-            <div class="card">
-              <p class="muted">No README available.</p>
-            </div>
-          )}
+        <div class="card">
+          <div class="prose" set:html={readmeHtml} />
         </div>
 
         <!-- Sidebar: file tree + versions -->
@@ -151,4 +145,31 @@ const fileTree = files?.tree ?? [];
       </div>
     </div>
   </section>
+
+  <script>
+    import { showToast, showError } from '../../scripts/toast';
+
+    document.querySelector('[data-report]')?.addEventListener('click', async () => {
+      const reason = prompt('Why are you reporting this skill?');
+      if (!reason) return;
+      try {
+        const res = await fetch(`/api/skills/${location.pathname.split('/').pop()}/report`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ reason }),
+        });
+        if (!res.ok) throw new Error(await res.text());
+        showToast('Reported');
+      } catch (e) {
+        showError(e instanceof Error ? e.message : 'Report failed');
+      }
+    });
+
+    document.querySelector('[data-copy-cmd]')?.addEventListener('click', async () => {
+      const slug = location.pathname.split('/').pop();
+      const cmd = `androidskills add ${slug}`;
+      await navigator.clipboard.writeText(cmd);
+      showToast('Command copied');
+    });
+  </script>
 </BaseLayout>

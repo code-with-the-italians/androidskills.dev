@@ -1,5 +1,7 @@
 ---
 import AdminLayout from '../../layouts/AdminLayout.astro';
+import EmptyState from '../../components/EmptyState.astro';
+import ErrorState from '../../components/ErrorState.astro';
 import { requireAdmin } from '../../lib/api';
 import { createAdminApiClient } from '../../lib/admin-api';
 
@@ -13,7 +15,15 @@ const action = url.searchParams.get('action') || undefined;
 const target = url.searchParams.get('target') || undefined;
 const page = parseInt(url.searchParams.get('page') || '1', 10) || 1;
 
-const entries = await api.getAudit({ action, target, page });
+let entries: Awaited<ReturnType<typeof api.getAudit>> | null = null;
+let error = false;
+try {
+  entries = await api.getAudit({ action, target, page });
+} catch (e) {
+  error = true;
+}
+
+const items = entries ?? [];
 ---
 
 <AdminLayout title="Audit log" me={me}>
@@ -36,44 +46,54 @@ const entries = await api.getAudit({ action, target, page });
     </form>
   </div>
 
-  <div class="tbl-wrap">
-    <div class="scroll">
-      <table class="tbl">
-        <thead>
-          <tr>
-            <th>Actor</th>
-            <th>Action</th>
-            <th>Target</th>
-            <th>Meta</th>
-            <th>When</th>
-          </tr>
-        </thead>
-        <tbody>
-          {entries.length === 0 ? (
-            <tr>
-              <td colspan="5" class="muted">No audit entries.</td>
-            </tr>
-          ) : (
-            entries.map((entry) => (
-              <tr>
-                <td>{entry.actorHandle}</td>
-                <td>{entry.action}</td>
-                <td>{entry.target}</td>
-                <td class="faint" style="font-size: 12px; max-width: 300px; overflow: hidden; text-overflow: ellipsis;">{entry.meta || '—'}</td>
-                <td class="faint" style="font-size: 12.5px;">{entry.createdAt}</td>
-              </tr>
-            ))
-          )}
-        </tbody>
-      </table>
-    </div>
-  </div>
+  {error && (
+    <ErrorState title="Couldn’t load audit log" body="The audit table failed to load." />
+  )}
 
-  <div class="between" style="margin-top: 18px;">
-    <span class="faint" style="font-family: var(--mono); font-size: 12px;">Page {page}</span>
-    <div class="pager">
-      <a href={`?page=${Math.max(1, page - 1)}${action ? `&action=${action}` : ''}${target ? `&target=${target}` : ''}`} aria-label="Previous">←</a>
-      <a href={`?page=${page + 1}${action ? `&action=${action}` : ''}${target ? `&target=${target}` : ''}`}>→</a>
+  {!error && (
+    <div class="tbl-wrap">
+      <div class="scroll">
+        <table class="tbl">
+          <thead>
+            <tr>
+              <th scope="col">Actor</th>
+              <th scope="col">Action</th>
+              <th scope="col">Target</th>
+              <th scope="col">Meta</th>
+              <th scope="col">When</th>
+            </tr>
+          </thead>
+          <tbody>
+            {items.length === 0 ? (
+              <tr>
+                <td colspan="5">
+                  <EmptyState title="No audit entries" body="Events will be logged here when admins take actions." />
+                </td>
+              </tr>
+            ) : (
+              items.map((entry) => (
+                <tr>
+                  <td>{entry.actorHandle}</td>
+                  <td>{entry.action}</td>
+                  <td>{entry.target}</td>
+                  <td class="faint" style="font-size: 12px; max-width: 300px; overflow: hidden; text-overflow: ellipsis;">{entry.meta || '—'}</td>
+                  <td class="faint" style="font-size: 12.5px;">{entry.createdAt}</td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
     </div>
-  </div>
+  )}
+
+  {!error && items.length > 0 && (
+    <div class="between" style="margin-top: 18px;">
+      <span class="faint" style="font-family: var(--mono); font-size: 12px;">Page {page}</span>
+      <div class="pager">
+        <a href={`?page=${Math.max(1, page - 1)}${action ? `&action=${action}` : ''}${target ? `&target=${target}` : ''}`} aria-label="Previous">←</a>
+        <a href={`?page=${page + 1}${action ? `&action=${action}` : ''}${target ? `&target=${target}` : ''}`}>→</a>
+      </div>
+    </div>
+  )}
 </AdminLayout>
