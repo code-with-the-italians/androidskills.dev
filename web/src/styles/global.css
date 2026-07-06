@@ -19,13 +19,13 @@
   --border-2: light-dark(#d8dade, #343a44);
   --text: light-dark(#15171c, #f1f3f6);
   --text-dim: light-dark(#565c67, #a6adb8);
-  --text-faint: light-dark(#878d99, #69707c);
+  --text-faint: light-dark(#6b7280, #69707c);
 
   /* Accent — green (default) */
   --accent: #34d27e;
   --accent-strong: light-dark(#1f9d5b, #5be39a);
   --accent-soft: light-dark(#e7f8ee, #112318);
-  --accent-text: light-dark(#0c8c4d, #46e08f);
+  --accent-text: light-dark(#0b7a43, #46e08f);
   --accent-ink: #04130a;
 
   /* Status */
