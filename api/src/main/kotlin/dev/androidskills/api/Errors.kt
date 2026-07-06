@@ -113,6 +113,9 @@ fun Application.installApiErrorMapping() {
         ErrorResponse(ErrorBody(ex.code, ex.message ?: "Bad gateway")),
       )
     }
+    status(HttpStatusCode.NotFound) { call, _ ->
+      call.respond(HttpStatusCode.NotFound, ErrorResponse(ErrorBody("not_found", "Not found")))
+    }
     status(HttpStatusCode.TooManyRequests) { call, status ->
       val retryAfter = call.response.headers["Retry-After"] ?: "60"
       if (!call.response.headers.contains("Retry-After")) {

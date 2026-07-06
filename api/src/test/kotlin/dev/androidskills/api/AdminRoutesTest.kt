@@ -50,6 +50,17 @@ class AdminRoutesTest {
     }
 
   @Test
+  fun `unknown admin route returns 404 identical to gated real route`() = testApplication {
+    val token = setupUser(Role.member)
+    application { module(TestSupport.newConfig(dir), oauth = fakeOAuth()) }
+    val real = client.get("/api/admin/queue") { header("Cookie", "as_session=$token") }
+    val unknown = client.get("/api/admin/xxx") { header("Cookie", "as_session=$token") }
+    assertEquals(HttpStatusCode.NotFound, real.status)
+    assertEquals(HttpStatusCode.NotFound, unknown.status)
+    assertEquals(real.bodyAsText(), unknown.bodyAsText())
+  }
+
+  @Test
   fun `admin queue returns 404 for non admin`() = testApplication {
     val token = setupUser(Role.member)
     application { module(TestSupport.newConfig(dir), oauth = fakeOAuth()) }
