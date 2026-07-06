@@ -26,13 +26,6 @@ function applySettings() {
   syncToggles();
 }
 
-function resolvedDark() {
-  const s = getSettings();
-  if (s.theme === 'dark') return true;
-  if (s.theme === 'light') return false;
-  return window.matchMedia('(prefers-color-scheme: dark)').matches;
-}
-
 function syncToggles() {
   const s = getSettings();
   document
@@ -52,13 +45,6 @@ function initTweaks() {
         saveSettings({ [key]: input.value });
       });
     });
-
-  document.querySelectorAll('[data-theme-toggle]').forEach((btn) => {
-    btn.addEventListener('click', () => {
-      const next = resolvedDark() ? 'light' : 'dark';
-      saveSettings({ theme: next });
-    });
-  });
 
   applySettings();
 }
