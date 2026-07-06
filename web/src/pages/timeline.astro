@@ -1,16 +1,19 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
 import TimelineEvent from '../components/TimelineEvent.astro';
+import EmptyState from '../components/EmptyState.astro';
+import ErrorState from '../components/ErrorState.astro';
 import { createApiClient, type TimelinePage } from '../lib/api';
 
 const page = parseInt(Astro.url.searchParams.get('page') ?? '1', 10);
 const api = createApiClient(Astro.request);
 
 let result: TimelinePage | null = null;
+let error = false;
 try {
   result = await api.getTimeline(page, 20);
 } catch (e) {
-  // API unreachable
+  error = true;
 }
 
 const items = result?.items ?? [];
@@ -18,7 +21,7 @@ const total = result?.total ?? 0;
 const totalPages = result?.totalPages ?? 0;
 ---
 
-<BaseLayout title="Timeline — androidskills.dev" description="Every publish, version bump and re-sync, newest first.">
+<BaseLayout title="Timeline" description="Every publish, version bump and re-sync, newest first.">
   <section class="section" style="padding-top:32px;">
     <div class="wrap wrap-narrow">
       <div style="margin-bottom:28px;">
@@ -27,7 +30,11 @@ const totalPages = result?.totalPages ?? 0;
         <p class="lede" style="margin-top:8px;">Every publish, version bump and re-sync — traced back to the skill it came from.</p>
       </div>
 
-      {items.length > 0 ? (
+      {error && (
+        <ErrorState title="Couldn’t load timeline" retryHref={`/timeline?page=${page}`} />
+      )}
+
+      {!error && items.length > 0 && (
         <>
           <div style="font-size:13px;color:var(--text-faint);margin-bottom:12px;">
             {total} events{page > 1 && <> · page {page}</>}
@@ -45,16 +52,13 @@ const totalPages = result?.totalPages ?? 0;
             </div>
           )}
         </>
-      ) : (
-        <div class="state">
-          <div class="ico">
-            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-              <circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" />
-            </svg>
-          </div>
-          <h3>No activity yet</h3>
-          <p>Events will appear here as skills are published and updated.</p>
-        </div>
+      )}
+
+      {!error && items.length === 0 && (
+        <EmptyState
+          title="No activity yet"
+          body="Events will appear here as skills are published and updated."
+        />
       )}
     </div>
   </section>

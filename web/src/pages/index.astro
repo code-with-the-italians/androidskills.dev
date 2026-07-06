@@ -1,6 +1,8 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
 import SkillCard from '../components/SkillCard.astro';
+import EmptyState from '../components/EmptyState.astro';
+import ErrorState from '../components/ErrorState.astro';
 import { createApiClient, type StatsResponse, type SkillCard as SkillCardType, type CategoryWithCount } from '../lib/api';
 
 const api = createApiClient(Astro.request);
@@ -8,6 +10,7 @@ const api = createApiClient(Astro.request);
 let stats: StatsResponse | null = null;
 let popular: SkillCardType[] = [];
 let categories: CategoryWithCount[] = [];
+let error = false;
 
 try {
   const [s, searchResult, cats] = await Promise.all([
@@ -19,13 +22,13 @@ try {
   popular = searchResult.items;
   categories = cats;
 } catch (e) {
-  // API not reachable — render with empty state
+  error = true;
 }
 ---
 
 <BaseLayout title="androidskills.dev">
   <!-- Hero -->
-  <section class="section" style="padding-top:48px;">
+  <section class="section anim-rise" style="padding-top:48px;">
     <div class="wrap">
       <div style="position:relative;">
         <div class="hero-grid" style="position:absolute;inset:-40px -100px 0;z-index:-1;border-radius:var(--r-xl);"></div>
@@ -42,7 +45,7 @@ try {
           </p>
 
           <!-- Hero search -->
-          <form action="/search" method="get" style="margin-top:28px;">
+          <form action="/search" method="get" role="search" style="margin-top:28px;">
             <div class="search big">
               <svg class="ic-search" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <circle cx="11" cy="11" r="8" /><path d="m21 21-4.3-4.3" />
@@ -66,10 +69,21 @@ try {
     </div>
   </section>
 
+  <!-- Error state -->
+  {
+    error && (
+      <section class="section" style="padding-top:0;">
+        <div class="wrap" style="max-width:640px;">
+          <ErrorState title="Couldn’t load the index" body="Some sections are unavailable right now. Search still works." />
+        </div>
+      </section>
+    )
+  }
+
   <!-- Popular skills -->
   {
     popular.length > 0 && (
-      <section class="section" style="padding-top:0;">
+      <section class="section anim-rise" style="padding-top:0;">
         <div class="wrap">
           <div class="between" style="margin-bottom:24px;">
             <h2 style="font-size:26px;">Popular skills</h2>
@@ -85,10 +99,23 @@ try {
     )
   }
 
+  <!-- Cold start -->
+  {
+    !error && !popular.length && (
+      <section class="section" style="padding-top:0;">
+        <div class="wrap" style="max-width:440px;">
+          <EmptyState title="The index is just getting started" body="Popular skills are hidden until there’s data. Search still works.">
+            <a slot="action" class="btn btn-primary" href="/submit">Be the first to submit</a>
+          </EmptyState>
+        </div>
+      </section>
+    )
+  }
+
   <!-- Stats -->
   {
     stats && (
-      <section class="section" style="padding-top:0;">
+      <section class="section anim-rise" style="padding-top:0;">
         <div class="wrap">
           <div class="card" style="display:flex;gap:48px;flex-wrap:wrap;">
             <div class="stat">

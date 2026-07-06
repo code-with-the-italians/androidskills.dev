@@ -1,0 +1,10 @@
+---
+interface Props {
+  size?: number;
+  class?: string;
+}
+
+const { size = 22, class: className = '' } = Astro.props;
+---
+
+<span class={`spinner ${className}`} aria-hidden="true" style={`width:${size}px;height:${size}px;`}></span>

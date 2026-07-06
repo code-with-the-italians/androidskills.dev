@@ -1,0 +1,43 @@
+---
+interface Props {
+  title?: string;
+  body?: string;
+  retryHref?: string;
+  retryLabel?: string;
+  class?: string;
+}
+
+const { title = 'Couldn\'t load', body, retryHref, retryLabel = 'Retry', class: className = '' } = Astro.props;
+---
+
+<div class={`callout error-state ${className}`} role="alert" style="background:var(--danger-soft);border-color:transparent;">
+  <svg class="ci" viewBox="0 0 24 24" fill="none" stroke="var(--danger)" stroke-width="2" stroke-linecap="round">
+    <path d="M12 9v4M12 17h.01M10.3 3.9 2.4 18a2 2 0 0 0 1.7 3h15.8a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"></path>
+  </svg>
+  <div>
+    <strong style="color:var(--danger);">{title}</strong>
+    {body && <p style="margin:2px 0 0;color:var(--text-dim);">{body}</p>}
+    {
+      retryHref && (
+        <a class="retry" href={retryHref} style="color:var(--danger);font-weight:600;text-decoration:underline;">
+          {retryLabel}
+        </a>
+      )
+    }
+  </div>
+</div>
+
+<style>
+  .error-state .ci {
+    width: 18px;
+    height: 18px;
+    flex: none;
+    margin-top: 1px;
+  }
+  .error-state p {
+    font-size: 13px;
+  }
+  .error-state .retry {
+    font-size: 13px;
+  }
+</style>

@@ -1,11 +1,14 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
+import EmptyState from '../components/EmptyState.astro';
+import ErrorState from '../components/ErrorState.astro';
 import { createApiClient } from '../lib/api';
 
 const api = createApiClient(Astro.request);
 
 let me: Awaited<ReturnType<typeof api.getMe>> | null = null;
 let grouped: Awaited<ReturnType<typeof api.getSubmissions>> | null = null;
+let error = false;
 
 try {
   [me, grouped] = await Promise.all([api.getMe(), api.getSubmissions()]);
@@ -27,9 +30,11 @@ const sorted = stateOrder
     return g ? { state, label: stateLabels[state], items: g.items } : null;
   })
   .filter(Boolean) as { state: string; label: string; items: typeof grouped[0]['items'] }[];
+
+const totalSubmissions = sorted.reduce((sum, g) => sum + g.items.length, 0);
 ---
 
-<BaseLayout title="My submissions — androidskills.dev" description="Track your skill submissions.">
+<BaseLayout title="My submissions" description="Track your skill submissions.">
   <section class="section" style="padding-top:32px;">
     <div class="wrap" style="max-width:900px;">
       <div class="between" style="flex-wrap:wrap;gap:12px;margin-bottom:24px;">
@@ -41,51 +46,70 @@ const sorted = stateOrder
         <a class="btn btn-sm btn-primary" href="/submit">Submit a skill</a>
       </div>
 
-      <div style="display:flex;flex-direction:column;gap:28px;">
-        {sorted.map((g) => (
-          <div class="card">
-            <div class="between" style="margin-bottom:14px;">
-              <h2 style="font-size:17px;">{g.label}</h2>
-              <span class="badge neutral">{g.items.length}</span>
-            </div>
-            {g.items.length > 0 ? (
-              <div style="display:flex;flex-direction:column;gap:10px;">
-                {g.items.map((item) => (
-                  <div class="submission-row" data-submission-id={item.id} data-state={g.state} style="display:flex;align-items:center;gap:12px;padding:12px 14px;border:1px solid var(--border);border-radius:var(--r-md);">
-                    <div style="flex:1;min-width:0;">
-                      <div style="font-weight:600;font-size:14.5px;">{item.slug}</div>
-                      <div style="font-family:var(--mono);font-size:11px;color:var(--text-faint);margin-top:3px;">
-                        updated {new Date(item.updatedAt).toLocaleDateString()}
-                        {item.lintScore != null && <span> · lint {item.lintScore}</span>}
+      {error && (
+        <ErrorState title="Couldn’t load submissions" body="Try refreshing the page." />
+      )}
+
+      {!error && totalSubmissions === 0 && (
+        <div style="max-width:440px;">
+          <EmptyState
+            title="No submissions yet"
+            body="Connect a GitHub repo with a top-level skills/ directory to publish your first."
+          >
+            <a slot="action" class="btn btn-sm btn-primary" href="/submit">Submit a skill</a>
+          </EmptyState>
+        </div>
+      )}
+
+      {!error && totalSubmissions > 0 && (
+        <div style="display:flex;flex-direction:column;gap:28px;">
+          {sorted.map((g) => (
+            <div class="card">
+              <div class="between" style="margin-bottom:14px;">
+                <h2 style="font-size:17px;">{g.label}</h2>
+                <span class="badge neutral">{g.items.length}</span>
+              </div>
+              {g.items.length > 0 ? (
+                <div style="display:flex;flex-direction:column;gap:10px;">
+                  {g.items.map((item) => (
+                    <div class="submission-row" data-submission-id={item.id} data-state={g.state} style="display:flex;align-items:center;gap:12px;padding:12px 14px;border:1px solid var(--border);border-radius:var(--r-md);">
+                      <div style="flex:1;min-width:0;">
+                        <div style="font-weight:600;font-size:14.5px;">{item.slug}</div>
+                        <div style="font-family:var(--mono);font-size:11px;color:var(--text-faint);margin-top:3px;">
+                          updated {new Date(item.updatedAt).toLocaleDateString()}
+                          {item.lintScore != null && <span> · lint {item.lintScore}</span>}
+                        </div>
+                      </div>
+                      <div class="actions" style="display:flex;gap:8px;flex-wrap:wrap;">
+                        {g.state === 'draft' && (
+                          <>
+                            <button class="btn btn-sm btn-primary" data-action="submit" type="button">Submit</button>
+                            <button class="btn btn-sm btn-ghost" data-action="delete" type="button">Delete</button>
+                          </>
+                        )}
+                        {(g.state === 'in_review' || g.state === 'changes_requested') && (
+                          <button class="btn btn-sm btn-ghost" data-action="withdraw" type="button">Withdraw</button>
+                        )}
+                        {(g.state === 'published' || g.state === 'rejected') && (
+                          <span class="tag">{g.state}</span>
+                        )}
                       </div>
                     </div>
-                    <div class="actions" style="display:flex;gap:8px;flex-wrap:wrap;">
-                      {g.state === 'draft' && (
-                        <>
-                          <button class="btn btn-sm btn-primary" data-action="submit" type="button">Submit</button>
-                          <button class="btn btn-sm btn-ghost" data-action="delete" type="button">Delete</button>
-                        </>
-                      )}
-                      {(g.state === 'in_review' || g.state === 'changes_requested') && (
-                        <button class="btn btn-sm btn-ghost" data-action="withdraw" type="button">Withdraw</button>
-                      )}
-                      {(g.state === 'published' || g.state === 'rejected') && (
-                        <span class="tag">{g.state}</span>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p class="muted" style="font-size:13.5px;">No submissions in this state.</p>
-            )}
-          </div>
-        ))}
-      </div>
+                  ))}
+                </div>
+              ) : (
+                <p class="muted" style="font-size:13.5px;">No submissions in this state.</p>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   </section>
 
   <script>
+    import { showToast, showError } from '../scripts/toast';
+
     (function () {
       document.querySelectorAll('.submission-row').forEach((row) => {
         const id = row.getAttribute('data-submission-id');
@@ -96,17 +120,23 @@ const sorted = stateOrder
             if (!action) return;
             try {
               if (action === 'submit') {
-                await fetch(`/api/me/submissions/${id}/submit`, { method: 'POST' });
+                const res = await fetch(`/api/me/submissions/${id}/submit`, { method: 'POST' });
+                if (!res.ok) throw new Error(await res.text());
+                showToast('Submitted for review');
               } else if (action === 'withdraw') {
-                await fetch(`/api/me/submissions/${id}/withdraw`, { method: 'POST' });
+                const res = await fetch(`/api/me/submissions/${id}/withdraw`, { method: 'POST' });
+                if (!res.ok) throw new Error(await res.text());
+                showToast('Withdrawn');
               } else if (action === 'delete') {
                 if (!confirm('Delete this draft?')) return;
-                await fetch(`/api/me/submissions/${id}`, { method: 'DELETE' });
+                const res = await fetch(`/api/me/submissions/${id}`, { method: 'DELETE' });
+                if (!res.ok) throw new Error(await res.text());
+                showToast('Draft deleted');
               }
               window.location.reload();
             } catch (e) {
-              console.error(e);
-              alert('Action failed. Please try again.');
+              const msg = e instanceof Error ? e.message : 'Action failed';
+              showError(msg);
             }
           });
         });

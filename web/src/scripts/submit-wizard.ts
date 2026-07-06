@@ -1,4 +1,5 @@
 import { esc } from '../lib/escape';
+import { showToast, showSuccess, showError } from './toast';
 
 interface Repo {
   owner: string;
@@ -251,23 +252,32 @@ async function createDrafts(submit: boolean) {
       version: s.version,
     })),
   };
-  const res = await fetch('/api/me/submissions', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload),
-  });
-  if (!res.ok) throw new Error(await res.text());
-  const { submissionIds } = (await res.json()) as { submissionIds: string[] };
-  if (submit) {
-    if (status) status.textContent = 'Submitting for review…';
-    for (const id of submissionIds) {
-      const r = await fetch(`/api/me/submissions/${id}/submit`, {
-        method: 'POST',
-      });
-      if (!r.ok) throw new Error(await r.text());
+  try {
+    const res = await fetch('/api/me/submissions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) throw new Error(await res.text());
+    const { submissionIds } = (await res.json()) as { submissionIds: string[] };
+    if (submit) {
+      if (status) status.textContent = 'Submitting for review…';
+      for (const id of submissionIds) {
+        const r = await fetch(`/api/me/submissions/${id}/submit`, {
+          method: 'POST',
+        });
+        if (!r.ok) throw new Error(await r.text());
+      }
+      showSuccess('Submitted for review');
+    } else {
+      showToast('Draft saved');
     }
+    window.location.href = '/submissions';
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : 'Submission failed';
+    if (status) status.textContent = msg;
+    showError(msg);
   }
-  window.location.href = '/submissions';
 }
 
 if (vsteps) {

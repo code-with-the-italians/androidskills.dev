@@ -1,5 +1,7 @@
 ---
 import AdminLayout from '../../layouts/AdminLayout.astro';
+import EmptyState from '../../components/EmptyState.astro';
+import ErrorState from '../../components/ErrorState.astro';
 import { requireAdmin } from '../../lib/api';
 import { createAdminApiClient } from '../../lib/admin-api';
 
@@ -8,7 +10,15 @@ if (!me) return new Response(null, { status: 404 });
 
 const api = createAdminApiClient(Astro.request);
 
-const categories = await api.getCategories();
+let categories: Awaited<ReturnType<typeof api.getCategories>> | null = null;
+let error = false;
+try {
+  categories = await api.getCategories();
+} catch (e) {
+  error = true;
+}
+
+const items = categories ?? [];
 ---
 
 <AdminLayout title="Categories" me={me}>
@@ -23,50 +33,64 @@ const categories = await api.getCategories();
     <button class="btn btn-sm btn-primary" data-modal-open="#addCat">Add category</button>
   </div>
 
-  <div class="tbl-wrap">
-    <div class="scroll">
-      <table class="tbl">
-        <thead>
-          <tr>
-            <th>Category</th>
-            <th>Slug</th>
-            <th></th>
-          </tr>
-        </thead>
-        <tbody>
-          {categories.map((cat) => (
-            <tr data-category-slug={cat.slug}>
-              <td>
-                <div class="row" style="gap: 10px;">
-                  <span class="cat-sw" style="background: var(--accent);"></span>
-                  <span style="font-weight: 600;">{cat.name}</span>
-                </div>
-              </td>
-              <td class="slug" style="font-size: 12.5px;">{cat.slug}</td>
-              <td>
-                <button class="btn btn-sm btn-outline" data-rename={cat.slug} data-name={cat.name}>Rename</button>
-                <button class="btn btn-sm btn-danger" data-delete={cat.slug}>Merge</button>
-              </td>
+  {error && (
+    <ErrorState title="Couldn’t load categories" body="The categories table failed to load." />
+  )}
+
+  {!error && (
+    <div class="tbl-wrap">
+      <div class="scroll">
+        <table class="tbl">
+          <thead>
+            <tr>
+              <th scope="col">Category</th>
+              <th scope="col">Slug</th>
+              <th scope="col"></th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {items.length === 0 ? (
+              <tr>
+                <td colspan="3">
+                  <EmptyState title="No categories" body="Create a category to start organizing skills." />
+                </td>
+              </tr>
+            ) : (
+              items.map((cat) => (
+                <tr data-category-slug={cat.slug}>
+                  <td>
+                    <div class="row" style="gap: 10px;">
+                      <span class="cat-sw" style="background: var(--accent);"></span>
+                      <span style="font-weight: 600;">{cat.name}</span>
+                    </div>
+                  </td>
+                  <td class="slug" style="font-size: 12.5px;">{cat.slug}</td>
+                  <td>
+                    <button class="btn btn-sm btn-outline" data-rename={cat.slug} data-name={cat.name}>Rename</button>
+                    <button class="btn btn-sm btn-danger" data-delete={cat.slug}>Merge</button>
+                  </td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
     </div>
-  </div>
+  )}
 
   <div class="scrim" id="addCat" style="display: none;">
-    <div class="modal" style="max-width: 440px;">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="addCatTitle" style="max-width: 440px;">
       <div class="mhd">
-        <b style="font-size: 16px;">Add a category</b>
+        <b id="addCatTitle" style="font-size: 16px;">Add a category</b>
         <button class="icon-btn" data-modal-close aria-label="Close">×</button>
       </div>
       <div class="mbd stack" style="gap: 14px;">
         <div class="field">
-          <label>Name</label>
+          <label for="ncName">Name</label>
           <input class="input" id="ncName" placeholder="e.g. Background Work" autocomplete="off">
         </div>
         <div class="field">
-          <label>Slug</label>
+          <label for="ncSlug">Slug</label>
           <input class="input" id="ncSlug" placeholder="background-work" style="font-family: var(--mono); font-size: 13px;" autocomplete="off">
         </div>
       </div>
@@ -78,19 +102,19 @@ const categories = await api.getCategories();
   </div>
 
   <div class="scrim" id="renameCat" style="display: none;">
-    <div class="modal" style="max-width: 440px;">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="renameCatTitle" style="max-width: 440px;">
       <div class="mhd">
-        <b style="font-size: 16px;">Rename category</b>
+        <b id="renameCatTitle" style="font-size: 16px;">Rename category</b>
         <button class="icon-btn" data-modal-close aria-label="Close">×</button>
       </div>
       <div class="mbd stack" style="gap: 14px;">
         <input type="hidden" id="rcOldSlug">
         <div class="field">
-          <label>New name</label>
+          <label for="rcName">New name</label>
           <input class="input" id="rcName" placeholder="New name" autocomplete="off">
         </div>
         <div class="field">
-          <label>New slug</label>
+          <label for="rcSlug">New slug</label>
           <input class="input" id="rcSlug" placeholder="new-slug" style="font-family: var(--mono); font-size: 13px;" autocomplete="off">
         </div>
       </div>
@@ -103,6 +127,8 @@ const categories = await api.getCategories();
 </AdminLayout>
 
 <script>
+  import { showToast, showError } from '../../scripts/toast';
+
   document.querySelectorAll('[data-modal-open]').forEach((btn) => {
     btn.addEventListener('click', () => {
       const id = btn.getAttribute('data-modal-open');
@@ -118,12 +144,27 @@ const categories = await api.getCategories();
     });
   });
 
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      document.querySelectorAll('.scrim').forEach((scrim) => {
+        (scrim as HTMLElement).style.display = 'none';
+      });
+    }
+  });
+
   document.querySelector('[data-add-cat]')?.addEventListener('click', async () => {
     const name = (document.getElementById('ncName') as HTMLInputElement | null)?.value;
     const slug = (document.getElementById('ncSlug') as HTMLInputElement | null)?.value;
     if (!name || !slug) return;
-    const res = await fetch(`/api/admin/categories?slug=${encodeURIComponent(slug)}&name=${encodeURIComponent(name)}`, { method: 'POST' });
-    if (res.ok) window.location.reload();
+    try {
+      const res = await fetch(`/api/admin/categories?slug=${encodeURIComponent(slug)}&name=${encodeURIComponent(name)}`, { method: 'POST' });
+      if (!res.ok) throw new Error(await res.text());
+      showToast('Category added');
+      window.location.reload();
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : 'Failed to add category';
+      showError(msg);
+    }
   });
 
   document.querySelectorAll('[data-rename]').forEach((btn) => {
@@ -146,12 +187,19 @@ const categories = await api.getCategories();
     const body: Record<string, string | null> = {};
     if (name) body.name = name;
     if (slug) body.slug = slug;
-    const res = await fetch(`/api/admin/categories/${encodeURIComponent(oldSlug)}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-    });
-    if (res.ok) window.location.reload();
+    try {
+      const res = await fetch(`/api/admin/categories/${encodeURIComponent(oldSlug)}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      if (!res.ok) throw new Error(await res.text());
+      showToast('Category renamed');
+      window.location.reload();
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : 'Failed to rename category';
+      showError(msg);
+    }
   });
 
   document.querySelectorAll('[data-delete]').forEach((btn) => {
@@ -159,8 +207,15 @@ const categories = await api.getCategories();
       const from = btn.getAttribute('data-delete')!;
       const to = prompt(`Merge category "${from}" into which slug?`);
       if (!to) return;
-      const res = await fetch(`/api/admin/categories/${encodeURIComponent(from)}/merge?to=${encodeURIComponent(to)}`, { method: 'POST' });
-      if (res.ok) window.location.reload();
+      try {
+        const res = await fetch(`/api/admin/categories/${encodeURIComponent(from)}/merge?to=${encodeURIComponent(to)}`, { method: 'POST' });
+        if (!res.ok) throw new Error(await res.text());
+        showToast('Categories merged');
+        window.location.reload();
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : 'Failed to merge categories';
+        showError(msg);
+      }
     });
   });
 </script>
