@@ -9,16 +9,21 @@ interface Props {
   description?: string;
   /** When true, suppresses the public header/footer (e.g. admin pages). */
   bare?: boolean;
+  /** Override the canonical URL. Used by 404.astro to keep the admin-gate 404 byte-identical. */
+  canonical?: string;
 }
 
 const {
   title,
   description = 'Curated AI coding skills for Android and Kotlin development.',
   bare = false,
+  canonical,
 } = Astro.props;
 
 const pathname = Astro.url.pathname;
-const canonicalUrl = new URL(pathname, Astro.site || Astro.url).toString();
+const canonicalUrl = canonical
+  ? new URL(canonical, Astro.site || Astro.url).toString()
+  : new URL(pathname, Astro.site || Astro.url).toString();
 
 function navActive(href: string): boolean {
   if (href === '/') return pathname === '/';
