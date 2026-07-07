@@ -108,7 +108,7 @@ const activeFilters = [
                   <a
                     class="check"
                     href={`/search?${qs.toString()}`}
-                    aria-label={`${cat.name} (${cat.count} skills) — ${active ? 'Remove' : 'Add'} filter`}
+                    aria-label={`${cat.name} ${cat.count} — ${active ? 'Remove' : 'Add'} filter`}
                   >
                     <span class="box" aria-hidden="true" style={active ? 'background:var(--accent);border-color:var(--accent);' : ''}>
                       {active && <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>}
