@@ -1,0 +1,1503 @@
+openapi: 3.0.3
+info:
+  title: androidskills.dev API
+  description: Backend contract for the Android/Kotlin AI skills index.
+  version: 0.0.1
+  contact:
+    name: androidskills.dev
+servers:
+- url: http://localhost:8080
+- url: https://androidskills.dev
+paths:
+  /api/health:
+    get:
+      tags:
+      - health
+      summary: Lightweight health check for load balancers and Kamal proxy.
+      responses:
+        '200':
+          description: Healthy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+  /api/health/deep:
+    get:
+      tags:
+      - health
+      summary: Deep health check including DB, file store, GitHub App, and LLM.
+      responses:
+        '200':
+          description: All checks healthy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeepHealthResponse'
+        '503':
+          description: One or more subsystems degraded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeepHealthResponse'
+  /api/openapi.yaml:
+    get:
+      tags:
+      - meta
+      summary: This OpenAPI contract (YAML).
+      responses:
+        '200':
+          description: OpenAPI 3.0 YAML document
+          content:
+            text/yaml:
+              schema:
+                type: string
+  /api/stats:
+    get:
+      tags:
+      - public
+      summary: High-level site statistics.
+      responses:
+        '200':
+          description: Stats
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StatsResponse'
+  /api/skills:
+    get:
+      tags:
+      - public
+      summary: Search and list skills.
+      parameters:
+      - name: q
+        in: query
+        schema:
+          type: string
+      - name: cat
+        in: query
+        schema:
+          type: array
+          items:
+            type: string
+      - name: tag
+        in: query
+        schema:
+          type: array
+          items:
+            type: string
+      - name: size
+        in: query
+        schema:
+          type: string
+          enum:
+          - <2k
+          - 2-5k
+          - 5k+
+      - name: verified
+        in: query
+        schema:
+          type: boolean
+          default: true
+      - name: sort
+        in: query
+        schema:
+          type: string
+          enum:
+          - relevance
+          - installs
+          - updated
+          - tokens
+          default: relevance
+      - name: page
+        in: query
+        schema:
+          type: integer
+          default: 1
+      - name: pageSize
+        in: query
+        schema:
+          type: integer
+          default: 20
+      responses:
+        '200':
+          description: Paginated search results
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SkillSearchPage'
+  /api/skills/{slug}:
+    get:
+      tags:
+      - public
+      summary: Full skill detail.
+      parameters:
+      - name: slug
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Skill detail
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SkillDetail'
+        '404':
+          description: Skill not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /api/skills/{slug}/files:
+    get:
+      tags:
+      - public
+      summary: File tree for a skill.
+      parameters:
+      - name: slug
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: File tree
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FileTreeResponse'
+  /api/skills/{slug}/files/{path}:
+    get:
+      tags:
+      - public
+      summary: File content (or raw text preview).
+      parameters:
+      - name: slug
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: path
+        in: path
+        required: true
+        schema:
+          type: string
+        description: Path segments are joined with `/`.
+      - name: raw
+        in: query
+        schema:
+          type: boolean
+      responses:
+        '200':
+          description: File content or raw text
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FileContentResponse'
+            text/plain:
+              schema:
+                type: string
+  /api/skills/{slug}/versions:
+    get:
+      tags:
+      - public
+      summary: Version history for a skill.
+      parameters:
+      - name: slug
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Versions
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VersionsResponse'
+  /api/skills/{slug}/download:
+    get:
+      tags:
+      - public
+      summary: Download a skill archive.
+      parameters:
+      - name: slug
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: version
+        in: query
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Skill archive
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+  /api/skills/{slug}/report:
+    post:
+      tags:
+      - public
+      summary: Report a skill.
+      parameters:
+      - name: slug
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReportRequest'
+      responses:
+        '201':
+          description: Report accepted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReportResponse'
+  /api/categories:
+    get:
+      tags:
+      - public
+      summary: List categories with counts.
+      responses:
+        '200':
+          description: Categories
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/CategoryWithCount'
+  /api/trends:
+    get:
+      tags:
+      - public
+      summary: Trends and aggregations.
+      responses:
+        '200':
+          description: Trends
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TrendsResponse'
+  /api/timeline:
+    get:
+      tags:
+      - public
+      summary: Recent publish/version timeline.
+      parameters:
+      - name: page
+        in: query
+        schema:
+          type: integer
+          default: 1
+      - name: pageSize
+        in: query
+        schema:
+          type: integer
+          default: 20
+      responses:
+        '200':
+          description: Timeline
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TimelinePage'
+  /api/bundles:
+    get:
+      tags:
+      - public
+      summary: List bundles.
+      parameters:
+      - name: page
+        in: query
+        schema:
+          type: integer
+          default: 1
+      - name: pageSize
+        in: query
+        schema:
+          type: integer
+          default: 20
+      responses:
+        '200':
+          description: Bundles
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PageOfBundleSummary'
+  /api/bundles/{id}:
+    get:
+      tags:
+      - public
+      summary: Bundle detail.
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Bundle detail
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BundleDetail'
+  /api/authors/{handle}:
+    get:
+      tags:
+      - public
+      summary: Author profile.
+      parameters:
+      - name: handle
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Author profile
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthorProfile'
+  /api/auth/github/start:
+    get:
+      tags:
+      - auth
+      summary: Start GitHub OAuth flow.
+      responses:
+        '302':
+          description: Redirect to GitHub
+  /api/auth/github/callback:
+    get:
+      tags:
+      - auth
+      summary: GitHub OAuth callback.
+      parameters:
+      - name: code
+        in: query
+        schema:
+          type: string
+      - name: state
+        in: query
+        schema:
+          type: string
+      responses:
+        '302':
+          description: Redirect to site root on success
+        '400':
+          description: OAuth error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /api/auth/logout:
+    post:
+      tags:
+      - auth
+      summary: Log out current session.
+      responses:
+        '200':
+          description: Logged out
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OkResponse'
+  /api/me:
+    delete:
+      tags:
+      - contributor
+      summary: Soft-delete the current account.
+      responses:
+        '204':
+          description: Deleted
+  /api/me/repos:
+    get:
+      tags:
+      - contributor
+      summary: List repos for the current user's GitHub App installations.
+      responses:
+        '200':
+          description: Repositories
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReposResponse'
+        '503':
+          description: GitHub App disabled
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /api/me/repos/{owner}/{repo}/scan:
+    post:
+      tags:
+      - contributor
+      summary: Scan a repo for skills.
+      parameters:
+      - name: owner
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: repo
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Scan results
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ScanResponse'
+  /api/me/submissions:
+    get:
+      tags:
+      - contributor
+      summary: List my submissions grouped by state.
+      responses:
+        '200':
+          description: Submissions
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/GroupedSubmissions'
+    post:
+      tags:
+      - contributor
+      summary: Create draft submissions from selected skills.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateDraftsRequest'
+      responses:
+        '201':
+          description: Drafts created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreateDraftsResponse'
+  /api/me/submissions/{id}:
+    get:
+      tags:
+      - contributor
+      summary: Get a submission detail.
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Submission detail
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SubmissionDetail'
+    delete:
+      tags:
+      - contributor
+      summary: Delete a draft submission.
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '204':
+          description: Deleted
+  /api/me/submissions/{id}/submit:
+    post:
+      tags:
+      - contributor
+      summary: Submit a draft for review.
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Submitted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OkResponse'
+  /api/me/submissions/{id}/withdraw:
+    post:
+      tags:
+      - contributor
+      summary: Withdraw a submission back to draft.
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Withdrawn
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OkResponse'
+  /api/me/stars:
+    get:
+      tags:
+      - contributor
+      summary: List starred skills.
+      responses:
+        '200':
+          description: Starred skill cards
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/SkillCard'
+  /api/me/stars/{slug}:
+    post:
+      tags:
+      - contributor
+      summary: Star a skill.
+      parameters:
+      - name: slug
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '201':
+          description: Starred
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OkResponse'
+    delete:
+      tags:
+      - contributor
+      summary: Unstar a skill.
+      parameters:
+      - name: slug
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '204':
+          description: Unstarred
+  /api/me/settings:
+    get:
+      tags:
+      - contributor
+      summary: Get user settings.
+      responses:
+        '200':
+          description: Settings
+          content:
+            application/json:
+              schema:
+                type: object
+    put:
+      tags:
+      - contributor
+      summary: Update user settings.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OkResponse'
+  /api/skills/{slug}/unpublish:
+    post:
+      tags:
+      - contributor
+      summary: Unpublish a skill.
+      parameters:
+      - name: slug
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Unpublished
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OkResponse'
+  /api/skills/{slug}/resync:
+    post:
+      tags:
+      - contributor
+      summary: Enqueue a resync from the source repo.
+      parameters:
+      - name: slug
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '202':
+          description: Resync enqueued
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OkResponse'
+components:
+  schemas:
+    HealthResponse:
+      type: object
+      required:
+      - ok
+      - version
+      - db
+      - fileStore
+      - llm
+      - auth
+      properties:
+        ok:
+          type: boolean
+        version:
+          type: string
+        db:
+          type: string
+        fileStore:
+          type: string
+        llm:
+          type: string
+        auth:
+          type: string
+    DeepHealthResponse:
+      type: object
+      required:
+      - status
+      - checks
+      properties:
+        status:
+          type: string
+        checks:
+          type: object
+          required:
+          - database
+          - fileStore
+          - githubApp
+          - llm
+          properties:
+            database:
+              type: boolean
+            fileStore:
+              type: boolean
+            githubApp:
+              type: boolean
+            llm:
+              type: boolean
+    StatsResponse:
+      type: object
+      required:
+      - indexed
+      - contributors
+      - lastUpdated
+      properties:
+        indexed:
+          type: integer
+        contributors:
+          type: integer
+        lastUpdated:
+          type: string
+          nullable: true
+    CategoryRef:
+      type: object
+      required:
+      - slug
+      - name
+      properties:
+        slug:
+          type: string
+        name:
+          type: string
+    AuthorRef:
+      type: object
+      required:
+      - handle
+      properties:
+        handle:
+          type: string
+        name:
+          type: string
+          nullable: true
+        avatarUrl:
+          type: string
+          nullable: true
+    BundleRef:
+      type: object
+      required:
+      - id
+      - kind
+      - provenance
+      properties:
+        id:
+          type: string
+        kind:
+          type: string
+        provenance:
+          type: string
+    SkillCard:
+      type: object
+      required:
+      - id
+      - slug
+      - name
+      - description
+      - license
+      - tags
+      - category
+      - version
+      - versionSource
+      - tokenUpfront
+      - tokenOndemand
+      - tokenBand
+      - verified
+      - status
+      - featured
+      - installs
+      - author
+      - bundle
+      - createdAt
+      - updatedAt
+      properties:
+        id:
+          type: string
+        slug:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+        license:
+          type: string
+          nullable: true
+        tags:
+          type: array
+          items:
+            type: string
+        category:
+          allOf:
+          - $ref: '#/components/schemas/CategoryRef'
+          nullable: true
+        version:
+          type: string
+        versionSource:
+          type: string
+        tokenUpfront:
+          type: integer
+        tokenOndemand:
+          type: integer
+        tokenBand:
+          type: string
+        verified:
+          type: boolean
+        status:
+          type: string
+        featured:
+          type: boolean
+        installs:
+          type: integer
+        author:
+          $ref: '#/components/schemas/AuthorRef'
+        bundle:
+          $ref: '#/components/schemas/BundleRef'
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+    SkillDetail:
+      allOf:
+      - $ref: '#/components/schemas/SkillCard'
+      - type: object
+        required:
+        - readmeMd
+        - fileCount
+        - totalSize
+        properties:
+          readmeMd:
+            type: string
+            nullable: true
+          fileCount:
+            type: integer
+          totalSize:
+            type: integer
+            format: int64
+    FacetCount:
+      type: object
+      required:
+      - key
+      - count
+      properties:
+        key:
+          type: string
+        label:
+          type: string
+          nullable: true
+        count:
+          type: integer
+    Facets:
+      type: object
+      required:
+      - categories
+      - tags
+      - sizes
+      properties:
+        categories:
+          type: array
+          items:
+            $ref: '#/components/schemas/FacetCount'
+        tags:
+          type: array
+          items:
+            $ref: '#/components/schemas/FacetCount'
+        sizes:
+          type: array
+          items:
+            $ref: '#/components/schemas/FacetCount'
+    SkillSearchPage:
+      type: object
+      required:
+      - items
+      - page
+      - pageSize
+      - total
+      - totalPages
+      - facets
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/SkillCard'
+        page:
+          type: integer
+        pageSize:
+          type: integer
+        total:
+          type: integer
+        totalPages:
+          type: integer
+        facets:
+          $ref: '#/components/schemas/Facets'
+    FileEntry:
+      type: object
+      required:
+      - path
+      - name
+      - dir
+      - size
+      - isBinary
+      properties:
+        path:
+          type: string
+        name:
+          type: string
+        dir:
+          type: string
+        size:
+          type: integer
+        isBinary:
+          type: boolean
+    TreeNode:
+      type: object
+      required:
+      - name
+      - path
+      - type
+      properties:
+        name:
+          type: string
+        path:
+          type: string
+        type:
+          type: string
+          enum:
+          - file
+          - dir
+        size:
+          type: integer
+        isBinary:
+          type: boolean
+        children:
+          type: array
+          items:
+            $ref: '#/components/schemas/TreeNode'
+          nullable: true
+    FileTreeResponse:
+      type: object
+      required:
+      - slug
+      - files
+      - tree
+      properties:
+        slug:
+          type: string
+        files:
+          type: array
+          items:
+            $ref: '#/components/schemas/FileEntry'
+        tree:
+          type: array
+          items:
+            $ref: '#/components/schemas/TreeNode'
+    FileContentResponse:
+      type: object
+      required:
+      - slug
+      - path
+      - size
+      - isBinary
+      - downloadOnly
+      properties:
+        slug:
+          type: string
+        path:
+          type: string
+        size:
+          type: integer
+        isBinary:
+          type: boolean
+        content:
+          type: string
+          nullable: true
+        downloadOnly:
+          type: boolean
+        downloadUrl:
+          type: string
+          nullable: true
+    VersionEntry:
+      type: object
+      required:
+      - version
+      - sourceRef
+      - createdAt
+      - current
+      properties:
+        version:
+          type: string
+        sourceRef:
+          type: string
+        createdAt:
+          type: string
+        current:
+          type: boolean
+    VersionsResponse:
+      type: object
+      required:
+      - slug
+      - current
+      - versions
+      properties:
+        slug:
+          type: string
+        current:
+          type: string
+        versions:
+          type: array
+          items:
+            $ref: '#/components/schemas/VersionEntry'
+    CategoryWithCount:
+      type: object
+      required:
+      - id
+      - slug
+      - name
+      - count
+      properties:
+        id:
+          type: string
+        slug:
+          type: string
+        name:
+          type: string
+        count:
+          type: integer
+    TrendsResponse:
+      type: object
+      required:
+      - categories
+      - tags
+      - tokenMix
+      - securityPassRate
+      - submissionFunnel
+      properties:
+        categories:
+          type: array
+          items:
+            $ref: '#/components/schemas/FacetCount'
+        tags:
+          type: array
+          items:
+            $ref: '#/components/schemas/FacetCount'
+        tokenMix:
+          type: array
+          items:
+            $ref: '#/components/schemas/FacetCount'
+        securityPassRate:
+          type: number
+          format: double
+          nullable: true
+        submissionFunnel:
+          type: object
+          additionalProperties:
+            type: integer
+    TimelineEvent:
+      type: object
+      required:
+      - type
+      - at
+      - slug
+      - name
+      properties:
+        type:
+          type: string
+          enum:
+          - publish
+          - version
+        at:
+          type: string
+        slug:
+          type: string
+        name:
+          type: string
+        version:
+          type: string
+          nullable: true
+        authorHandle:
+          type: string
+          nullable: true
+    TimelinePage:
+      type: object
+      required:
+      - items
+      - page
+      - pageSize
+      - total
+      - totalPages
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/TimelineEvent'
+        page:
+          type: integer
+        pageSize:
+          type: integer
+        total:
+          type: integer
+        totalPages:
+          type: integer
+    PageOfBundleSummary:
+      type: object
+      required:
+      - items
+      - page
+      - pageSize
+      - total
+      - totalPages
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/BundleSummary'
+        page:
+          type: integer
+        pageSize:
+          type: integer
+        total:
+          type: integer
+        totalPages:
+          type: integer
+    BundleSummary:
+      type: object
+      required:
+      - id
+      - kind
+      - provenance
+      - owner
+      - skillCount
+      - createdAt
+      properties:
+        id:
+          type: string
+        kind:
+          type: string
+        provenance:
+          type: string
+        owner:
+          $ref: '#/components/schemas/AuthorRef'
+        sourceRef:
+          type: string
+          nullable: true
+        skillCount:
+          type: integer
+        syncedAt:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+    BundleDetail:
+      type: object
+      required:
+      - id
+      - kind
+      - provenance
+      - owner
+      - skills
+      - createdAt
+      properties:
+        id:
+          type: string
+        kind:
+          type: string
+        provenance:
+          type: string
+        owner:
+          $ref: '#/components/schemas/AuthorRef'
+        sourceRef:
+          type: string
+          nullable: true
+        syncedAt:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+        skills:
+          type: array
+          items:
+            $ref: '#/components/schemas/SkillCard'
+    AuthorProfile:
+      type: object
+      required:
+      - handle
+      - skillCount
+      - totalInstalls
+      - skills
+      properties:
+        handle:
+          type: string
+        name:
+          type: string
+          nullable: true
+        avatarUrl:
+          type: string
+          nullable: true
+        skillCount:
+          type: integer
+        totalInstalls:
+          type: integer
+        skills:
+          type: array
+          items:
+            $ref: '#/components/schemas/SkillCard'
+    ErrorBody:
+      type: object
+      required:
+      - code
+      - message
+      properties:
+        code:
+          type: string
+        message:
+          type: string
+        details:
+          type: object
+          additionalProperties:
+            type: string
+          nullable: true
+    ErrorResponse:
+      type: object
+      required:
+      - error
+      properties:
+        error:
+          $ref: '#/components/schemas/ErrorBody'
+    OkResponse:
+      type: object
+      required:
+      - ok
+      properties:
+        ok:
+          type: boolean
+    MeResponse:
+      type: object
+      required:
+      - id
+      - handle
+      - name
+      - avatarUrl
+      - role
+      - status
+      - createdAt
+      properties:
+        id:
+          type: string
+        handle:
+          type: string
+        name:
+          type: string
+          nullable: true
+        avatarUrl:
+          type: string
+          nullable: true
+        role:
+          type: string
+        status:
+          type: string
+        createdAt:
+          type: string
+    RepoDto:
+      type: object
+      required:
+      - owner
+      - name
+      - fullName
+      properties:
+        owner:
+          type: string
+        name:
+          type: string
+        fullName:
+          type: string
+        defaultBranch:
+          type: string
+          nullable: true
+    ReposResponse:
+      type: object
+      required:
+      - repos
+      properties:
+        repos:
+          type: array
+          items:
+            $ref: '#/components/schemas/RepoDto'
+    DetectedFieldError:
+      type: object
+      required:
+      - field
+      - reason
+      properties:
+        field:
+          type: string
+        reason:
+          type: string
+    DetectedSkillDto:
+      type: object
+      required:
+      - slug
+      - name
+      - description
+      - license
+      - tags
+      - version
+      - versionSource
+      - tokenUpfront
+      - tokenOndemand
+      - tokenBand
+      - parseErrors
+      - fileCount
+      properties:
+        slug:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+        license:
+          type: string
+          nullable: true
+        tags:
+          type: array
+          items:
+            type: string
+        version:
+          type: string
+        versionSource:
+          type: string
+        tokenUpfront:
+          type: integer
+        tokenOndemand:
+          type: integer
+        tokenBand:
+          type: string
+        parseErrors:
+          type: array
+          items:
+            $ref: '#/components/schemas/DetectedFieldError'
+        fileCount:
+          type: integer
+    ScanResponse:
+      type: object
+      required:
+      - slug
+      - commitSha
+      - skills
+      properties:
+        slug:
+          type: string
+        commitSha:
+          type: string
+        skills:
+          type: array
+          items:
+            $ref: '#/components/schemas/DetectedSkillDto'
+    SelectedSkill:
+      type: object
+      required:
+      - slug
+      - name
+      - description
+      - license
+      properties:
+        slug:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+        license:
+          type: string
+        tags:
+          type: array
+          items:
+            type: string
+        version:
+          type: string
+          nullable: true
+    CreateDraftsRequest:
+      type: object
+      required:
+      - repoOwner
+      - repoName
+      - ref
+      - skills
+      properties:
+        repoOwner:
+          type: string
+        repoName:
+          type: string
+        ref:
+          type: string
+        skills:
+          type: array
+          items:
+            $ref: '#/components/schemas/SelectedSkill'
+    CreateDraftsResponse:
+      type: object
+      required:
+      - submissionIds
+      properties:
+        submissionIds:
+          type: array
+          items:
+            type: string
+    SubmissionSummary:
+      type: object
+      required:
+      - id
+      - slug
+      - state
+      - createdAt
+      - updatedAt
+      properties:
+        id:
+          type: string
+        slug:
+          type: string
+        state:
+          type: string
+        lintScore:
+          type: integer
+          nullable: true
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+    GroupedSubmissions:
+      type: object
+      required:
+      - state
+      - items
+      properties:
+        state:
+          type: string
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/SubmissionSummary'
+    SubmissionDetail:
+      type: object
+      required:
+      - id
+      - slug
+      - state
+      - createdAt
+      - updatedAt
+      properties:
+        id:
+          type: string
+        slug:
+          type: string
+        state:
+          type: string
+        lintScore:
+          type: integer
+          nullable: true
+        note:
+          type: string
+          nullable: true
+        payload:
+          type: object
+          nullable: true
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+    ReportRequest:
+      type: object
+      properties:
+        reason:
+          type: string
+          nullable: true
+    ReportResponse:
+      type: object
+      required:
+      - id
+      - accepted
+      properties:
+        id:
+          type: string
+        accepted:
+          type: boolean

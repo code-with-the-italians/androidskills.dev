@@ -1,0 +1,55 @@
+---
+import StarButton from './StarButton.astro';
+import type { SkillCard as SkillCardType } from '../lib/api';
+
+interface Props {
+  skill: SkillCardType;
+  anonymous?: boolean;
+}
+
+const { skill, anonymous = false } = Astro.props;
+
+const initials = skill.name
+  .split(/\s+/)
+  .slice(0, 2)
+  .map((w) => w[0])
+  .join('')
+  .toUpperCase();
+---
+
+<div class="card skill-card" style="position:relative;">
+  <a class="card-link" href={`/skill/${skill.slug}`} aria-label={skill.name || skill.slug} style="position:absolute;inset:0;z-index:1;"
+></a>
+  <div class="top">
+    <div class="skill-ico">{initials}</div>
+    <div style="flex:1;min-width:0;">
+      <h3>{skill.name}</h3>
+      <div class="slug">{skill.slug}</div>
+    </div>
+    {skill.verified && <span class="badge ok">Verified</span>}
+  </div>
+  <p class="desc">{skill.description}</p>
+  {
+    skill.tags.length > 0 && (
+      <div class="tags">
+        {skill.tags.slice(0, 4).map((tag) => (
+          <span class="tag">{tag}</span>
+        ))}
+      </div>
+    )
+  }
+  <div class="meta">
+    <span class="m">{skill.installs.toLocaleString()} installs</span>
+    <span class="m">·</span>
+    <span class="m">{skill.tokenBand}</span>
+    {skill.author.name && (
+      <>
+        <span class="m">·</span>
+        <span class="m">{skill.author.name}</span>
+      </>
+    )}
+  </div>
+  <div style="position:relative;z-index:2;margin-top:12px;display:inline-flex;">
+    <StarButton slug={skill.slug} anonymous={anonymous} />
+  </div>
+</div>

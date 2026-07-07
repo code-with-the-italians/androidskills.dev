@@ -1,0 +1,87 @@
+---
+import AdminLayout from '../../layouts/AdminLayout.astro';
+import AdminStatCard from '../../components/AdminStatCard.astro';
+import { requireAdmin } from '../../lib/api';
+import { createAdminApiClient } from '../../lib/admin-api';
+
+const me = await requireAdmin(Astro.request).catch(() => null);
+if (!me) return new Response(null, { status: 404 });
+
+const api = createAdminApiClient(Astro.request);
+
+const stats = await api.getStats();
+const recentAudit = await api.getAudit({ page: 1 });
+
+const auditItems = recentAudit.slice(0, 5);
+---
+
+<AdminLayout title="Dashboard" me={me}>
+  <div class="grid" style="grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; margin-bottom: 28px;">
+    <AdminStatCard label="Queue" value={stats.queue} accent={stats.queue > 0 ? 'warn' : 'neutral'} />
+    <AdminStatCard label="Skills" value={stats.skills} />
+    <AdminStatCard label="Users" value={stats.users} />
+    <AdminStatCard label="Contributors" value={stats.contributors} />
+    <AdminStatCard label="New (30d)" value={stats.newUsers30d} />
+    <AdminStatCard label="Suspended" value={stats.suspended} accent={stats.suspended > 0 ? 'danger' : 'neutral'} />
+  </div>
+
+  <div class="card" style="margin-bottom: 28px;">
+    <div class="between" style="margin-bottom: 16px;">
+      <h2 style="font-size: 16px;">Recent audit</h2>
+      <a href="/admin/audit" class="btn btn-sm btn-outline">View all</a>
+    </div>
+    <div class="tbl-wrap">
+      <div class="scroll">
+        <table class="tbl">
+          <thead>
+            <tr>
+              <th>Actor</th>
+              <th>Action</th>
+              <th>Target</th>
+              <th>When</th>
+            </tr>
+          </thead>
+          <tbody>
+            {auditItems.length === 0 ? (
+              <tr>
+                <td colspan="4" class="muted">No audit entries yet.</td>
+              </tr>
+            ) : (
+              auditItems.map((entry) => (
+                <tr>
+                  <td>{entry.actorHandle}</td>
+                  <td>{entry.action}</td>
+                  <td>{entry.target}</td>
+                  <td class="faint">{entry.createdAt}</td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid" style="grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 14px;">
+    <a href="/admin/queue" class="card" style="text-decoration: none; color: inherit;">
+      <div class="kicker"><span class="tick">//</span> REVIEW</div>
+      <h3 style="font-size: 16px; margin-top: 6px;">Review queue</h3>
+      <p class="muted" style="font-size: 13px; margin-top: 4px;">Approve, request changes, or reject submissions.</p>
+    </a>
+    <a href="/admin/skills" class="card" style="text-decoration: none; color: inherit;">
+      <div class="kicker"><span class="tick">//</span> SKILLS</div>
+      <h3 style="font-size: 16px; margin-top: 6px;">Skills</h3>
+      <p class="muted" style="font-size: 13px; margin-top: 4px;">Feature, unlist, or delete skills.</p>
+    </a>
+    <a href="/admin/users" class="card" style="text-decoration: none; color: inherit;">
+      <div class="kicker"><span class="tick">//</span> USERS</div>
+      <h3 style="font-size: 16px; margin-top: 6px;">Users</h3>
+      <p class="muted" style="font-size: 13px; margin-top: 4px;">Manage roles and statuses.</p>
+    </a>
+    <a href="/admin/settings" class="card" style="text-decoration: none; color: inherit;">
+      <div class="kicker"><span class="tick">//</span> PLATFORM</div>
+      <h3 style="font-size: 16px; margin-top: 6px;">Settings</h3>
+      <p class="muted" style="font-size: 13px; margin-top: 4px;">Review policy and token soft cap.</p>
+    </a>
+  </div>
+</AdminLayout>

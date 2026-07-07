@@ -1,0 +1,6 @@
+<div class="toast-region" aria-live="polite" aria-atomic="true"></div>
+
+<script>
+  import { showToast } from '../scripts/toast';
+  (window as typeof window & { showToast: typeof showToast }).showToast = showToast;
+</script>

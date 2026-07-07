@@ -1,0 +1,140 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import SkillCard from '../components/SkillCard.astro';
+import EmptyState from '../components/EmptyState.astro';
+import ErrorState from '../components/ErrorState.astro';
+import { createApiClient, type StatsResponse, type SkillCard as SkillCardType, type CategoryWithCount } from '../lib/api';
+
+const api = createApiClient(Astro.request);
+
+let stats: StatsResponse | null = null;
+let popular: SkillCardType[] = [];
+let categories: CategoryWithCount[] = [];
+let error = false;
+
+try {
+  const [s, searchResult, cats] = await Promise.all([
+    api.getStats(),
+    api.searchSkills({ sort: 'installs', pageSize: 6 }),
+    api.getCategories(),
+  ]);
+  stats = s;
+  popular = searchResult.items;
+  categories = cats;
+} catch (e) {
+  error = true;
+}
+---
+
+<BaseLayout title="androidskills.dev">
+  <!-- Hero -->
+  <section class="section anim-rise" style="padding-top:48px;">
+    <div class="wrap">
+      <div style="position:relative;">
+        <div class="hero-grid" style="position:absolute;inset:-40px -100px 0;z-index:-1;border-radius:var(--r-xl);"></div>
+        <div style="max-width:680px;padding-block:32px;">
+          <span class="eyebrow">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+            {stats ? `${stats.indexed} skills indexed` : 'Loading…'}
+          </span>
+          <h1 style="font-size:clamp(36px,5vw,56px);font-weight:800;letter-spacing:-.03em;margin-top:16px;line-height:1.05;">
+            The index of AI coding skills<br />for <b style="color:var(--accent-text);">Android & Kotlin</b>
+          </h1>
+          <p class="lede" style="margin-top:16px;max-width:520px;">
+            Community-curated, maintainer-reviewed. Find a skill, inspect its source, and install it in seconds.
+          </p>
+
+          <!-- Hero search -->
+          <form action="/search" method="get" role="search" style="margin-top:28px;">
+            <div class="search big">
+              <svg class="ic-search" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="11" cy="11" r="8" /><path d="m21 21-4.3-4.3" />
+              </svg>
+              <input type="text" name="q" placeholder="Search skills, e.g. “compose mvi” or “room migration”…" autocomplete="off" aria-label="Search skills" />
+            </div>
+          </form>
+
+          <!-- Quick category chips -->
+          {
+            categories.length > 0 && (
+              <div class="pillbar" style="margin-top:18px;flex-wrap:wrap;gap:8px;">
+                {categories.slice(0, 6).map((cat) => (
+                  <a class="chip" href={`/search?cat=${encodeURIComponent(cat.slug)}`}>{cat.name}</a>
+                ))}
+              </div>
+            )
+          }
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Error state -->
+  {
+    error && (
+      <section class="section" style="padding-top:0;">
+        <div class="wrap" style="max-width:640px;">
+          <ErrorState title="Couldn’t load the index" body="Some sections are unavailable right now. Search still works." />
+        </div>
+      </section>
+    )
+  }
+
+  <!-- Popular skills -->
+  {
+    popular.length > 0 && (
+      <section class="section anim-rise" style="padding-top:0;">
+        <div class="wrap">
+          <div class="between" style="margin-bottom:24px;">
+            <h2 style="font-size:26px;">Popular skills</h2>
+            <a class="btn btn-sm btn-outline" href="/search?sort=installs">View all →</a>
+          </div>
+          <div class="grid grid-skills">
+            {popular.map((skill) => (
+              <SkillCard skill={skill} />
+            ))}
+          </div>
+        </div>
+      </section>
+    )
+  }
+
+  <!-- Cold start -->
+  {
+    !error && !popular.length && (
+      <section class="section" style="padding-top:0;">
+        <div class="wrap" style="max-width:440px;">
+          <EmptyState title="The index is just getting started" body="Popular skills are hidden until there’s data. Search still works.">
+            <a slot="action" class="btn btn-primary" href="/submit">Be the first to submit</a>
+          </EmptyState>
+        </div>
+      </section>
+    )
+  }
+
+  <!-- Stats -->
+  {
+    stats && (
+      <section class="section anim-rise" style="padding-top:0;">
+        <div class="wrap">
+          <div class="card" style="display:flex;gap:48px;flex-wrap:wrap;">
+            <div class="stat">
+              <span class="n">{stats.indexed.toLocaleString()}</span>
+              <span class="l">Skills indexed</span>
+            </div>
+            <div class="stat">
+              <span class="n">{stats.contributors.toLocaleString()}</span>
+              <span class="l">Contributors</span>
+            </div>
+            {stats.lastUpdated && (
+              <div class="stat">
+                <span class="n" style="font-size:14px;">{new Date(stats.lastUpdated).toLocaleDateString()}</span>
+                <span class="l">Last updated</span>
+              </div>
+            )}
+          </div>
+        </div>
+      </section>
+    )
+  }
+</BaseLayout>

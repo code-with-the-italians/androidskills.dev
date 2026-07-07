@@ -1,0 +1,65 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import TimelineEvent from '../components/TimelineEvent.astro';
+import EmptyState from '../components/EmptyState.astro';
+import ErrorState from '../components/ErrorState.astro';
+import { createApiClient, type TimelinePage } from '../lib/api';
+
+const page = parseInt(Astro.url.searchParams.get('page') ?? '1', 10);
+const api = createApiClient(Astro.request);
+
+let result: TimelinePage | null = null;
+let error = false;
+try {
+  result = await api.getTimeline(page, 20);
+} catch (e) {
+  error = true;
+}
+
+const items = result?.items ?? [];
+const total = result?.total ?? 0;
+const totalPages = result?.totalPages ?? 0;
+---
+
+<BaseLayout title="Timeline" description="Every publish, version bump and re-sync, newest first.">
+  <section class="section" style="padding-top:32px;">
+    <div class="wrap wrap-narrow">
+      <div style="margin-bottom:28px;">
+        <div class="kicker"><span class="tick">//</span> activity feed</div>
+        <h1 style="font-size:32px;margin-top:6px;">Timeline</h1>
+        <p class="lede" style="margin-top:8px;">Every publish, version bump and re-sync — traced back to the skill it came from.</p>
+      </div>
+
+      {error && (
+        <ErrorState title="Couldn’t load timeline" retryHref={`/timeline?page=${page}`} />
+      )}
+
+      {!error && items.length > 0 && (
+        <>
+          <div style="font-size:13px;color:var(--text-faint);margin-bottom:12px;">
+            {total} events{page > 1 && <> · page {page}</>}
+          </div>
+          {items.map((event) => <TimelineEvent event={event} />)}
+
+          {totalPages > 1 && (
+            <div style="display:flex;justify-content:center;margin-top:24px;">
+              <div class="pager">
+                {page > 1 && <a href={`/timeline?page=${page - 1}`}>←</a>}
+                <span class="cur">{page}</span>
+                <span class="faint">/ {totalPages}</span>
+                {page < totalPages && <a href={`/timeline?page=${page + 1}`}>→</a>}
+              </div>
+            </div>
+          )}
+        </>
+      )}
+
+      {!error && items.length === 0 && (
+        <EmptyState
+          title="No activity yet"
+          body="Events will appear here as skills are published and updated."
+        />
+      )}
+    </div>
+  </section>
+</BaseLayout>

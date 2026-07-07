@@ -1,0 +1,40 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import { createApiClient } from '../lib/api';
+
+const api = createApiClient(Astro.request);
+try {
+  await api.getMe();
+  return Astro.redirect('/');
+} catch {
+  // not signed in — render the sign-in page
+}
+---
+
+<BaseLayout title="Sign in" description="Sign in with GitHub to contribute skills and manage your account.">
+  <section class="section" style="padding-top:64px;">
+    <div class="wrap" style="max-width:420px;margin:0 auto;text-align:center;">
+      <div class="card" style="padding:36px 28px;">
+        <div class="skill-ico" style="width:64px;height:64px;border-radius:var(--r-lg);margin:0 auto 20px;">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor" style="color:var(--accent-text);">
+            <path d="M12 2C6.5 2 2 6.6 2 12.3c0 4.5 2.9 8.3 6.8 9.7.5.1.7-.2.7-.5v-1.7c-2.8.6-3.4-1.4-3.4-1.4-.5-1.2-1.1-1.5-1.1-1.5-.9-.6.1-.6.1-.6 1 .1 1.5 1 1.5 1 .9 1.6 2.4 1.1 3 .9.1-.7.4-1.1.6-1.4-2.2-.3-4.6-1.1-4.6-5 0-1.1.4-2 1-2.7-.1-.3-.4-1.3.1-2.7 0 0 .8-.3 2.7 1a9.4 9.4 0 0 1 5 0c1.9-1.3 2.7-1 2.7-1 .5 1.4.2 2.4.1 2.7.6.7 1 1.6 1 2.7 0 3.9-2.3 4.7-4.6 5 .4.3.7.9.7 1.9v2.8c0 .3.2.6.7.5 3.9-1.4 6.8-5.2 6.8-9.7C22 6.6 17.5 2 12 2z"/>
+          </svg>
+        </div>
+        <h1 style="font-size:26px;">Sign in with GitHub</h1>
+        <p class="muted" style="margin-top:10px;font-size:14px;line-height:1.55;">
+          Contributors sign in with GitHub so we can read skill manifests from the repositories you choose.
+          No password needed.
+        </p>
+        <a class="btn btn-primary btn-lg" href="/api/auth/github/start" style="margin-top:24px;width:100%;justify-content:center;">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" style="margin-right:8px;">
+            <path d="M12 2C6.5 2 2 6.6 2 12.3c0 4.5 2.9 8.3 6.8 9.7.5.1.7-.2.7-.5v-1.7c-2.8.6-3.4-1.4-3.4-1.4-.5-1.2-1.1-1.5-1.1-1.5-.9-.6.1-.6.1-.6 1 .1 1.5 1 1.5 1 .9 1.6 2.4 1.1 3 .9.1-.7.4-1.1.6-1.4-2.2-.3-4.6-1.1-4.6-5 0-1.1.4-2 1-2.7-.1-.3-.4-1.3.1-2.7 0 0 .8-.3 2.7 1a9.4 9.4 0 0 1 5 0c1.9-1.3 2.7-1 2.7-1 .5 1.4.2 2.4.1 2.7.6.7 1 1.6 1 2.7 0 3.9-2.3 4.7-4.6 5 .4.3.7.9.7 1.9v2.8c0 .3.2.6.7.5 3.9-1.4 6.8-5.2 6.8-9.7C22 6.6 17.5 2 12 2z"/>
+          </svg>
+          Continue with GitHub
+        </a>
+        <p class="hint" style="margin-top:16px;font-size:12.5px;">
+          By signing in, you agree to our <a href="/about" style="color:var(--accent-text);">community guidelines</a>.
+        </p>
+      </div>
+    </div>
+  </section>
+</BaseLayout>

@@ -1,0 +1,151 @@
+---
+import AdminLayout from '../../layouts/AdminLayout.astro';
+import EmptyState from '../../components/EmptyState.astro';
+import ErrorState from '../../components/ErrorState.astro';
+import { requireAdmin } from '../../lib/api';
+import { createAdminApiClient } from '../../lib/admin-api';
+
+const me = await requireAdmin(Astro.request).catch(() => null);
+if (!me) return new Response(null, { status: 404 });
+
+const api = createAdminApiClient(Astro.request);
+
+const url = Astro.url;
+const filter = url.searchParams.get('filter') || undefined;
+const q = url.searchParams.get('q') || undefined;
+const page = parseInt(url.searchParams.get('page') || '1', 10) || 1;
+
+let users: Awaited<ReturnType<typeof api.getUsers>> | null = null;
+let error = false;
+try {
+  users = await api.getUsers({ filter, q, page });
+} catch (e) {
+  error = true;
+}
+
+const items = users ?? [];
+---
+
+<AdminLayout title="Users" me={me}>
+  <div class="row" style="gap: 10px; margin-bottom: 16px; flex-wrap: wrap;">
+    <form id="userFilter" class="row" method="get" style="gap: 10px; flex-wrap: wrap; flex: 1; align-items: center;">
+      <div class="search search-sm" style="max-width: 320px; flex: 1;">
+        <svg class="ic-search" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="11" cy="11" r="7"></circle>
+          <path d="m20 20-3.2-3.2" stroke-linecap="round"></path>
+        </svg>
+        <input name="q" type="search" value={q} placeholder="Search by handle…" aria-label="Search users">
+      </div>
+      <select name="filter" class="select" style="width: auto; height: 36px; font-size: 13px;" onchange="this.form.submit()" aria-label="Filter by status">
+        <option value="" selected={!filter}>All statuses</option>
+        <option value="active" selected={filter === 'active'}>Active</option>
+        <option value="suspended" selected={filter === 'suspended'}>Suspended</option>
+      </select>
+    </form>
+    <a class="btn btn-sm btn-outline" href={`/api/admin/users/export${filter ? `?filter=${filter}` : ''}${q ? `${filter ? '&' : '?'}q=${q}` : ''}`}>Export CSV</a>
+  </div>
+
+  {error && (
+    <ErrorState title="Couldn’t load users" body="The users table failed to load." />
+  )}
+
+  {!error && (
+    <div class="tbl-wrap">
+      <div class="scroll">
+        <table class="tbl">
+          <thead>
+            <tr>
+              <th scope="col">User</th>
+              <th scope="col">Role</th>
+              <th scope="col">Skills</th>
+              <th scope="col">Joined</th>
+              <th scope="col">Status</th>
+              <th scope="col"></th>
+            </tr>
+          </thead>
+          <tbody>
+            {items.length === 0 ? (
+              <tr>
+                <td colspan="6">
+                  <EmptyState title="No users found" body={q ? 'Try a different search term.' : 'No users match the selected filter.'} />
+                </td>
+              </tr>
+            ) : (
+              items.map((user) => (
+                <tr data-user-id={user.id}>
+                  <td>
+                    <div class="row" style="gap: 11px;">
+                      <span class="avatar sm" style="color: var(--accent-text);">{user.handle.slice(0, 2).toUpperCase()}</span>
+                      <div>
+                        <div style="font-weight: 600;">{user.handle}</div>
+                        <div class="slug" style="font-size: 11px;">@{user.handle}</div>
+                      </div>
+                    </div>
+                  </td>
+                  <td>
+                    <span class={`badge ${user.role === 'admin' ? 'danger' : user.role === 'contributor' ? 'ok' : 'neutral'}`}>{user.role}</span>
+                  </td>
+                  <td class="num">{user.skillCount}</td>
+                  <td class="faint" style="font-size: 12.5px;">{user.createdAt}</td>
+                  <td>
+                    <span class={`row ${user.status === 'suspended' ? 'danger' : ''}`} style="gap: 6px; font-size: 13px;">
+                      <span class="pill-dot" style={user.status === 'suspended' ? 'background: var(--danger);' : ''}></span>
+                      {user.status}
+                    </span>
+                  </td>
+                  <td>
+                    <select class="select select-sm" data-user-action style="width: auto; height: 44px; font-size: 13px;" aria-label={`Actions for ${user.handle}`}>
+                      <option value="">Actions</option>
+                      <option value={`role:${user.id}:admin`}>Make admin</option>
+                      <option value={`role:${user.id}:contributor`}>Make contributor</option>
+                      <option value={`role:${user.id}:member`}>Make member</option>
+                      <option value={`status:${user.id}:suspended`}>Suspend</option>
+                      <option value={`status:${user.id}:active`}>Activate</option>
+                    </select>
+                  </td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  )}
+
+  {!error && items.length > 0 && (
+    <div class="between" style="margin-top: 18px;">
+      <span class="faint" style="font-family: var(--mono); font-size: 12px;">Page {page}</span>
+      <div class="pager">
+        <a href={`?page=${Math.max(1, page - 1)}${filter ? `&filter=${filter}` : ''}${q ? `&q=${q}` : ''}`} aria-label="Previous">←</a>
+        <a href={`?page=${page + 1}${filter ? `&filter=${filter}` : ''}${q ? `&q=${q}` : ''}`}>→</a>
+      </div>
+    </div>
+  )}
+</AdminLayout>
+
+<script>
+  import { showToast, showError } from '../../scripts/toast';
+
+  document.querySelectorAll('[data-user-action]').forEach((select) => {
+    select.addEventListener('change', async () => {
+      const value = (select as HTMLSelectElement).value;
+      if (!value) return;
+      (select as HTMLSelectElement).value = '';
+      const [kind, id, target] = value.split(':');
+      const body = kind === 'role' ? { role: target } : { status: target };
+      try {
+        const res = await fetch(`/api/admin/users/${encodeURIComponent(id)}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        });
+        if (!res.ok) throw new Error(await res.text());
+        showToast(`${kind === 'role' ? 'Role' : 'Status'} updated`);
+        window.location.reload();
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : 'Update failed';
+        showError(msg);
+      }
+    });
+  });
+</script>

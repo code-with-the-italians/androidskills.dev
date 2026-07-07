@@ -1,0 +1,117 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import { createApiClient } from '../lib/api';
+
+const api = createApiClient(Astro.request);
+try {
+  await api.getMe();
+} catch {
+  return Astro.redirect('/signin');
+}
+---
+
+<BaseLayout title="Submit a skill — androidskills.dev" description="Import skills from a GitHub repository.">
+  <section class="section" style="padding-top:32px;">
+    <div class="wrap" style="max-width:1024px;">
+      <div class="between" style="flex-wrap:wrap;gap:12px;margin-bottom:24px;">
+        <div>
+          <div class="kicker"><span class="tick">//</span> CONTRIBUTE</div>
+          <h1 style="font-size:30px;margin:8px 0 6px;">Submit a skill</h1>
+          <p class="muted" style="max-width:560px;">
+            Import skills straight from a GitHub repository. The skill's <code style="font-family:var(--mono);font-size:12px;">SKILL.md</code> is the source of truth — androidskills.dev reads its metadata, never overrides it.
+          </p>
+        </div>
+        <a class="btn btn-sm btn-outline" href="/submissions">My submissions</a>
+      </div>
+
+      <div class="submit-grid" style="display:grid;grid-template-columns:1fr 320px;gap:36px;align-items:start;">
+        <div class="vsteps" id="vsteps">
+          <div class="vstep" data-step="1">
+            <div class="vno">1</div>
+            <div class="vbody">
+              <div class="vhead"><h3>Repository</h3></div>
+              <div class="vcontent" id="step1content"></div>
+            </div>
+          </div>
+          <div class="vstep" data-step="2">
+            <div class="vno">2</div>
+            <div class="vbody">
+              <div class="vhead"><h3>Detected skills</h3></div>
+              <div class="vcontent" id="step2content"></div>
+            </div>
+          </div>
+          <div class="vstep" data-step="3">
+            <div class="vno">3</div>
+            <div class="vbody">
+              <div class="vhead"><h3>Review & submit</h3></div>
+              <div class="vcontent" id="step3content"></div>
+            </div>
+          </div>
+        </div>
+
+        <aside class="det-side" style="position:sticky;top:80px;display:flex;flex-direction:column;gap:18px;">
+          <div class="card">
+            <div class="kicker" style="margin-bottom:12px;"><span class="tick">//</span> WHAT MAKES A GOOD SKILL</div>
+            <ul class="guide-list" style="list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:11px;font-size:13.5px;color:var(--text-dim);">
+              <li style="display:flex;align-items:flex-start;gap:9px;"><svg viewBox="0 0 24 24" fill="none" stroke="var(--accent-text)" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;margin-top:2px;flex:none;"><path d="M20 6L9 17l-5-5"/></svg><span>A clear <code style="font-family:var(--mono);font-size:12px;">SKILL.md</code> with frontmatter</span></li>
+              <li style="display:flex;align-items:flex-start;gap:9px;"><svg viewBox="0 0 24 24" fill="none" stroke="var(--accent-text)" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;margin-top:2px;flex:none;"><path d="M20 6L9 17l-5-5"/></svg><span>Android / Kotlin scope</span></li>
+              <li style="display:flex;align-items:flex-start;gap:9px;"><svg viewBox="0 0 24 24" fill="none" stroke="var(--accent-text)" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;margin-top:2px;flex:none;"><path d="M20 6L9 17l-5-5"/></svg><span>Concise — under ~8k tokens</span></li>
+              <li style="display:flex;align-items:flex-start;gap:9px;"><svg viewBox="0 0 24 24" fill="none" stroke="var(--accent-text)" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;margin-top:2px;flex:none;"><path d="M20 6L9 17l-5-5"/></svg><span>An open-source license</span></li>
+            </ul>
+            <a class="btn btn-sm btn-outline btn-block" href="/about" style="margin-top:12px;">Read full guidelines</a>
+          </div>
+        </aside>
+      </div>
+    </div>
+  </section>
+
+  <noscript>
+    <div class="wrap" style="max-width:1024px;">
+      <div class="callout" style="margin-top:24px;background:var(--danger-soft);border-color:transparent;align-items:flex-start;">
+        <svg class="ci" viewBox="0 0 24 24" fill="none" stroke="var(--danger)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.3 3.9 2.4 18a2 2 0 0 0 1.7 3h15.8a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><path d="M12 9v4M12 17h.01"/></svg>
+        <div><b>JavaScript is required</b> to scan a repository and select skills for submission.</div>
+      </div>
+    </div>
+  </noscript>
+
+  <style>
+    .vsteps { display: flex; flex-direction: column; }
+    .vstep { display: grid; grid-template-columns: 32px 1fr; gap: 16px; position: relative; padding-bottom: 26px; }
+    .vstep:last-child { padding-bottom: 0; }
+    .vstep::before { content: ""; position: absolute; left: 15px; top: 36px; bottom: 4px; width: 2px; background: var(--border); }
+    .vstep:last-child::before { display: none; }
+    .vstep.done::before { background: var(--accent); }
+    .vno { width: 32px; height: 32px; border-radius: 999px; display: grid; place-items: center; font-family: var(--mono); font-size: 13px; font-weight: 700; border: 2px solid var(--border-2); color: var(--text-faint); background: var(--surface); z-index: 1; }
+    .vstep.done .vno { background: var(--accent); border-color: transparent; color: var(--accent-ink); }
+    .vstep.active .vno { border-color: var(--accent); color: var(--accent-text); }
+    .vbody { min-width: 0; }
+    .vhead { display: flex; align-items: center; gap: 12px; min-height: 32px; }
+    .vcontent { margin-top: 14px; display: none; }
+    .vstep.active .vcontent { display: block; }
+    .vstep.upcoming { opacity: 0.5; }
+    .repo { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-bottom: 1px solid var(--border); cursor: pointer; transition: background 0.12s; }
+    .repo:last-child { border-bottom: 0; }
+    .repo:hover { background: var(--surface-2); }
+    .repo .radio { width: 18px; height: 18px; border-radius: 999px; border: 2px solid var(--border-2); flex: none; display: grid; place-items: center; }
+    .repo.sel .radio { border-color: var(--accent); }
+    .repo.sel .radio::after { content: ""; width: 9px; height: 9px; border-radius: 999px; background: var(--accent); }
+    .repo.sel { background: var(--accent-soft); }
+    .acc { border: 1px solid var(--border); border-radius: var(--r-md); overflow: hidden; background: var(--surface); }
+    .acc + .acc { margin-top: 10px; }
+    .acc-h:hover { background: var(--surface-2); }
+    .acc .acc-body { transition: grid-template-rows 0.28s ease, opacity 0.22s ease, border-color 0.28s ease; }
+    .acc.open .acc-body { grid-template-rows: 1fr; opacity: 1; border-top-color: var(--border); }
+    .acc.open .chev { transform: rotate(180deg); }
+    .seg { display: inline-flex; border: 1px solid var(--border); border-radius: var(--r-md); overflow: hidden; }
+    .seg button { background: var(--surface); border: 0; border-right: 1px solid var(--border); padding: 6px 12px; font-size: 13px; cursor: pointer; }
+    .seg button:last-child { border-right: 0; }
+    .seg button[aria-pressed="true"] { background: var(--accent-soft); color: var(--accent-text); font-weight: 600; }
+    .pref-sw button[aria-pressed="true"]::after { content: ""; position: absolute; inset: 0; margin: auto; width: 7px; height: 7px; border-radius: 999px; background: var(--accent-ink); }
+    .pref-sw button { position: relative; }
+    @media (max-width: 880px) { .submit-grid { grid-template-columns: 1fr; } }
+  </style>
+
+  <script>
+    import '../scripts/submit-wizard';
+  </script>
+</BaseLayout>

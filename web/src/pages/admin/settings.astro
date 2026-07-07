@@ -1,0 +1,115 @@
+---
+import AdminLayout from '../../layouts/AdminLayout.astro';
+import ErrorState from '../../components/ErrorState.astro';
+import { requireAdmin } from '../../lib/api';
+import { createAdminApiClient } from '../../lib/admin-api';
+
+const me = await requireAdmin(Astro.request).catch(() => null);
+if (!me) return new Response(null, { status: 404 });
+
+const api = createAdminApiClient(Astro.request);
+
+let settings: Awaited<ReturnType<typeof api.getSettings>> | null = null;
+let error = false;
+try {
+  settings = await api.getSettings();
+} catch (e) {
+  error = true;
+}
+---
+
+<AdminLayout title="Settings" me={me}>
+  {error && (
+    <ErrorState title="Couldn’t load settings" body="The platform settings failed to load." />
+  )}
+
+  {!error && settings && (
+    <div class="set-wrap" style="max-width: 720px;">
+      <div class="card set-card" style="margin-bottom: 18px;">
+        <h2 style="font-size: 16px; margin-bottom: 4px;">Review policy</h2>
+        <p style="color: var(--text-dim); font-size: 13px; margin-bottom: 6px;">How submissions move from the queue into the public index.</p>
+        <div class="set-row" style="border-top: 0; padding-top: 10px;">
+          <div class="lab" style="flex: 1;">
+            <div style="font-weight: 600; font-size: 14px;">Policy</div>
+            <div style="font-size: 12.5px; color: var(--text-dim); margin-top: 2px;">Manual review requires an admin decision. Auto approves trusted submissions.</div>
+          </div>
+          <div class="ctl" style="flex: none;">
+            <label for="reviewPolicy" class="visually-hidden">Review policy</label>
+            <select id="reviewPolicy" class="select" style="width: auto; height: 36px; font-size: 13px;">
+              <option value="manual" selected={settings.reviewPolicy === 'manual'}>Manual</option>
+              <option value="auto" selected={settings.reviewPolicy === 'auto'}>Auto</option>
+            </select>
+          </div>
+        </div>
+        <div class="set-row">
+          <div class="lab">
+            <div style="font-weight: 600; font-size: 14px;">Token soft cap</div>
+            <div style="font-size: 12.5px; color: var(--text-dim); margin-top: 2px;">Skills over this estimate get a warning in review.</div>
+          </div>
+          <div class="ctl">
+            <label for="tokenSoftCap" class="visually-hidden">Token soft cap</label>
+            <input id="tokenSoftCap" type="number" class="input num-in" value={settings.tokenSoftCap} step="100" style="width: 92px; height: 36px; text-align: right; font-family: var(--mono);">
+          </div>
+        </div>
+        <div class="set-row">
+          <div class="lab">
+            <div style="font-weight: 600; font-size: 14px;">LLM enabled</div>
+            <div style="font-size: 12.5px; color: var(--text-dim); margin-top: 2px;">Use LLM-assisted review when an LLM provider is configured.</div>
+          </div>
+          <div class="ctl">
+            <button id="llmEnabled" class="switch" role="switch" aria-checked={settings.llmEnabled ? 'true' : 'false'} aria-label="LLM enabled"></button>
+          </div>
+        </div>
+      </div>
+
+      <div class="save-bar" style="position: sticky; bottom: 0; background: color-mix(in oklab, var(--bg) 88%, transparent); backdrop-filter: blur(10px); border-top: 1px solid var(--border); padding: 14px 0; margin-top: 8px; display: flex; justify-content: flex-end; gap: 10px;">
+        <button class="btn btn-primary" data-save-settings>Save settings</button>
+      </div>
+    </div>
+  )}
+</AdminLayout>
+
+<script>
+  import { showToast, showError } from '../../scripts/toast';
+
+  (function () {
+    const llmSwitch = document.getElementById('llmEnabled') as HTMLElement | null;
+    llmSwitch?.addEventListener('click', () => {
+      const checked = llmSwitch.getAttribute('aria-checked') === 'true';
+      llmSwitch.setAttribute('aria-checked', String(!checked));
+    });
+
+    document.querySelector('[data-save-settings]')?.addEventListener('click', async () => {
+      const reviewPolicy = (document.getElementById('reviewPolicy') as HTMLSelectElement | null)?.value;
+      const tokenSoftCap = parseInt((document.getElementById('tokenSoftCap') as HTMLInputElement | null)?.value || '0', 10);
+      const llmEnabled = document.getElementById('llmEnabled')?.getAttribute('aria-checked') === 'true';
+      try {
+        const res = await fetch('/api/admin/settings', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ reviewPolicy, tokenSoftCap, llmEnabled }),
+        });
+        if (!res.ok) throw new Error(await res.text());
+        showToast('Settings saved');
+        window.location.reload();
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : 'Failed to save settings';
+        showError(msg);
+      }
+    });
+  })();
+</script>
+
+<style>
+  .visually-hidden {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
+</style>

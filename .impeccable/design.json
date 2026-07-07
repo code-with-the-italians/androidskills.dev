@@ -1,0 +1,387 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-07-07T00:00:00Z",
+  "title": "Design System: androidskills.dev",
+  "extensions": {
+    "colorMeta": {
+      "signal-green": {
+        "role": "primary",
+        "displayName": "Signal Green",
+        "canonical": "#34d27e",
+        "tonalRamp": [
+          "#04130a",
+          "#0b3d23",
+          "#0b7a43",
+          "#1f9d5b",
+          "#34d27e",
+          "#5be39a",
+          "#a3f2c6",
+          "#e7f8ee"
+        ]
+      },
+      "accent-green": {
+        "role": "primary",
+        "displayName": "Green Accent",
+        "canonical": "#34d27e",
+        "tonalRamp": ["#04130a", "#0b3d23", "#0b7a43", "#1f9d5b", "#34d27e", "#5be39a", "#a3f2c6", "#e7f8ee"]
+      },
+      "accent-indigo": {
+        "role": "primary",
+        "displayName": "Indigo Accent",
+        "canonical": "#6c8cff",
+        "tonalRamp": ["#060a1c", "#142952", "#3f5fe0", "#4f7ed6", "#6c8cff", "#93a9ff", "#b9c7ff", "#ecefff"]
+      },
+      "accent-orange": {
+        "role": "primary",
+        "displayName": "Orange Accent",
+        "canonical": "#ff7a45",
+        "tonalRamp": ["#1d0c04", "#5c2a15", "#c9521f", "#dd5a25", "#ff7a45", "#ff986e", "#ffbc9a", "#fdeee6"]
+      },
+      "accent-mono": {
+        "role": "primary",
+        "displayName": "Mono Accent",
+        "canonical": "#8b909a",
+        "tonalRamp": ["#0e1014", "#1b1e24", "#565c67", "#6b7280", "#8b909a", "#a6adb8", "#d8dade", "#eef0f3"]
+      },
+      "info": {
+        "role": "status",
+        "displayName": "Info Blue",
+        "canonical": "#2d69ce",
+        "tonalRamp": [
+          "#111a2e",
+          "#142952",
+          "#2d69ce",
+          "#4f7ed6",
+          "#6c8cff",
+          "#93a9ff",
+          "#b9c7ff",
+          "#e8f0fd"
+        ]
+      },
+      "warn": {
+        "role": "status",
+        "displayName": "Warn Amber",
+        "canonical": "#b5820a",
+        "tonalRamp": [
+          "#2a230f",
+          "#5c4600",
+          "#b5820a",
+          "#c9a12b",
+          "#e7b53d",
+          "#efd06f",
+          "#f6e9a6",
+          "#fbf2da"
+        ]
+      },
+      "danger": {
+        "role": "status",
+        "displayName": "Danger Red",
+        "canonical": "#b83030",
+        "tonalRamp": [
+          "#2a1212",
+          "#5c1a1a",
+          "#b83030",
+          "#d64d4d",
+          "#ff6b6b",
+          "#ff9e9e",
+          "#ffc7c7",
+          "#fbe6e6"
+        ]
+      },
+      "neutral-bg": {
+        "role": "neutral",
+        "displayName": "Paper Background",
+        "canonical": "#fbfbfc",
+        "tonalRamp": [
+          "#0a0c10",
+          "#0e1014",
+          "#14171c",
+          "#16191f",
+          "#1b1f26",
+          "#f1f2f4",
+          "#f5f6f8",
+          "#fbfbfc"
+        ]
+      },
+      "neutral-surface": {
+        "role": "neutral",
+        "displayName": "Surface",
+        "canonical": "#ffffff",
+        "tonalRamp": [
+          "#0a0c10",
+          "#0e1014",
+          "#14171c",
+          "#16191f",
+          "#1b1f26",
+          "#f1f2f4",
+          "#f5f6f8",
+          "#ffffff"
+        ]
+      },
+      "neutral-text": {
+        "role": "neutral",
+        "displayName": "Ink",
+        "canonical": "#15171c",
+        "tonalRamp": [
+          "#15171c",
+          "#565c67",
+          "#6b7280",
+          "#868d99",
+          "#a6adb8",
+          "#d8dade",
+          "#e7e8ec",
+          "#f1f3f6"
+        ]
+      }
+    },
+    "typographyMeta": {
+      "display": {
+        "displayName": "Display",
+        "purpose": "Hero headlines on the home page and major landing sections."
+      },
+      "headline": {
+        "displayName": "Headline",
+        "purpose": "Section titles on browse pages, admin dashboards, and detail pages."
+      },
+      "title": {
+        "displayName": "Title",
+        "purpose": "Card titles, list item titles, and small headings."
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "Paragraphs, descriptions, and form helper text."
+      },
+      "lede": {
+        "displayName": "Lede",
+        "purpose": "Introductory paragraphs and hero descriptions."
+      },
+      "label": {
+        "displayName": "Label",
+        "purpose": "Table headers, stat labels, footer titles, and metadata."
+      },
+      "mono": {
+        "displayName": "Mono",
+        "purpose": "Slugs, counts, file paths, token bands, and code."
+      }
+    },
+    "shadows": [
+      {
+        "name": "ambient-low",
+        "value": "0 1px 2px rgba(20, 22, 28, 0.06)",
+        "purpose": "Subtle elevation for buttons, chips, and small controls at rest."
+      },
+      {
+        "name": "lift",
+        "value": "0 6px 24px -6px rgba(20, 22, 28, 0.14)",
+        "purpose": "Hover lift on cards, dropdowns, and medium overlays."
+      },
+      {
+        "name": "pop",
+        "value": "0 16px 50px -10px rgba(20, 22, 28, 0.22)",
+        "purpose": "Modals, drawers, mobile menus, and toasts."
+      }
+    ],
+    "motion": [
+      {
+        "name": "t-micro",
+        "value": "120ms",
+        "purpose": "Micro-interactions: active presses, icon color transitions."
+      },
+      {
+        "name": "t-base",
+        "value": "200ms",
+        "purpose": "Default state transitions: hover, focus, border color."
+      },
+      {
+        "name": "t-entrance",
+        "value": "320ms",
+        "purpose": "Entrance animations: rise, fade, pop."
+      },
+      {
+        "name": "t-slow",
+        "value": "440ms",
+        "purpose": "Larger state changes: drawer slide, modal appearance."
+      },
+      {
+        "name": "e-pop",
+        "value": "cubic-bezier(0.16, 1, 0.3, 1)",
+        "purpose": "Pop entrance easing; exponential ease-out with slight anticipation."
+      },
+      {
+        "name": "e-standard",
+        "value": "cubic-bezier(0.2, 0, 0, 1)",
+        "purpose": "Standard easing for most transitions."
+      },
+      {
+        "name": "e-decelerate",
+        "value": "cubic-bezier(0, 0, 0, 1)",
+        "purpose": "Entrance deceleration."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "lg",
+        "value": "1080px"
+      },
+      {
+        "name": "md",
+        "value": "920px"
+      },
+      {
+        "name": "sm",
+        "value": "760px"
+      }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "The main call-to-action. Used for submit, install, and primary admin actions.",
+      "html": "<button class=\"ds-btn-primary\">Install skill</button>",
+      "css": ".ds-btn-primary { display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 40px; padding: 0 16px; border-radius: 11px; font-family: 'Bricolage Grotesque', ui-sans-serif, system-ui, sans-serif; font-weight: 600; font-size: 14px; background: var(--accent); color: var(--accent-ink); border: 1px solid transparent; cursor: pointer; transition: background 0.14s, transform 0.06s; } .ds-btn-primary:hover { background: var(--accent-strong); } .ds-btn-primary:active { transform: translateY(1px); }"
+    },
+    {
+      "name": "Ghost Button",
+      "kind": "button",
+      "refersTo": "button-ghost",
+      "description": "Low-emphasis action. Used for secondary choices, cancel, and subtle toggles.",
+      "html": "<button class=\"ds-btn-ghost\">Cancel</button>",
+      "css": ".ds-btn-ghost { display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 40px; padding: 0 16px; border-radius: 11px; font-family: 'Bricolage Grotesque', ui-sans-serif, system-ui, sans-serif; font-weight: 600; font-size: 14px; background: transparent; color: var(--text-dim); border: 1px solid transparent; cursor: pointer; transition: background 0.14s, color 0.14s; } .ds-btn-ghost:hover { background: var(--surface-2); color: var(--text); }"
+    },
+    {
+      "name": "Card",
+      "kind": "card",
+      "refersTo": "card",
+      "description": "Default container for content, lists, and forms. Lifts on hover when clickable.",
+      "html": "<div class=\"ds-card\"><h3 class=\"ds-card-title\">Card title</h3><p class=\"ds-card-body\">Card body content.</p></div>",
+      "css": ".ds-card { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 22px; color: var(--text); font-family: 'Bricolage Grotesque', ui-sans-serif, system-ui, sans-serif; } .ds-card-title { font-size: 16.5px; font-weight: 700; letter-spacing: -0.02em; margin: 0 0 8px; } .ds-card-body { font-size: 15px; line-height: 1.55; color: var(--text-dim); margin: 0; }"
+    },
+    {
+      "name": "Card Link",
+      "kind": "card",
+      "refersTo": "card",
+      "description": "A clickable card that lifts on hover.",
+      "html": "<a class=\"ds-card-link\" href=\"#\"><h3 class=\"ds-card-title\">Skill name</h3><p class=\"ds-card-body\">Skill description.</p></a>",
+      "css": ".ds-card-link { display: block; background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 22px; color: var(--text); text-decoration: none; font-family: 'Bricolage Grotesque', ui-sans-serif, system-ui, sans-serif; transition: border-color 0.14s, box-shadow 0.14s, transform 0.12s; } .ds-card-link:hover { border-color: var(--border-2); box-shadow: 0 6px 24px -6px rgba(20, 22, 28, 0.14); transform: translateY(-2px); } .ds-card-link .ds-card-title { font-size: 16.5px; font-weight: 700; letter-spacing: -0.02em; margin: 0 0 8px; } .ds-card-link .ds-card-body { font-size: 15px; line-height: 1.55; color: var(--text-dim); margin: 0; }"
+    },
+    {
+      "name": "Input",
+      "kind": "input",
+      "refersTo": "input",
+      "description": "Standard text input for forms and admin fields.",
+      "html": "<input class=\"ds-input\" type=\"text\" placeholder=\"Type here…\" />",
+      "css": ".ds-input { width: 100%; height: 40px; padding: 0 13px; background: var(--surface); border: 1px solid var(--border-2); border-radius: 11px; color: var(--text); font-family: 'Bricolage Grotesque', ui-sans-serif, system-ui, sans-serif; font-size: 14.5px; transition: border-color 0.14s, box-shadow 0.14s; } .ds-input::placeholder { color: var(--text-faint); } .ds-input:focus { outline: none; border-color: var(--accent-text); box-shadow: 0 0 0 3px color-mix(in oklab, var(--accent) 28%, transparent); }"
+    },
+    {
+      "name": "Search Input",
+      "kind": "input",
+      "refersTo": "input",
+      "description": "Large search input used in the hero and search page.",
+      "html": "<div class=\"ds-search\"><svg class=\"ds-search-icon\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\"><circle cx=\"11\" cy=\"11\" r=\"8\" /><path d=\"m21 21-4.3-4.3\" /></svg><input type=\"text\" placeholder=\"Search skills…\" /></div>",
+      "css": ".ds-search { position: relative; display: flex; align-items: center; background: var(--surface); border: 1px solid var(--border-2); border-radius: 16px; box-shadow: 0 1px 2px rgba(20, 22, 28, 0.06); transition: border-color 0.14s, box-shadow 0.14s; } .ds-search:focus-within { border-color: var(--accent-text); box-shadow: 0 0 0 4px color-mix(in oklab, var(--accent) 26%, transparent); } .ds-search input { flex: 1; height: 56px; border: 0; background: transparent; padding: 0 16px 0 46px; font-family: 'Bricolage Grotesque', ui-sans-serif, system-ui, sans-serif; font-size: 16px; color: var(--text); outline: none; } .ds-search-icon { position: absolute; left: 16px; width: 20px; height: 20px; color: var(--text-faint); }"
+    },
+    {
+      "name": "Chip",
+      "kind": "chip",
+      "refersTo": "chip",
+      "description": "Pill-shaped filter or action toggle.",
+      "html": "<button class=\"ds-chip\" aria-pressed=\"false\">Compose</button>",
+      "css": ".ds-chip { display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: 28px; padding: 0 11px; border-radius: 999px; font-family: 'Bricolage Grotesque', ui-sans-serif, system-ui, sans-serif; font-size: 12.5px; font-weight: 500; background: var(--surface-2); border: 1px solid var(--border); color: var(--text-dim); cursor: pointer; transition: 0.12s; } .ds-chip:hover { border-color: var(--border-2); color: var(--text); } .ds-chip[aria-pressed='true'] { background: var(--accent-soft); border-color: color-mix(in oklab, var(--accent) 55%, var(--border)); color: var(--accent-text); }"
+    },
+    {
+      "name": "Tag",
+      "kind": "chip",
+      "refersTo": "tag",
+      "description": "Compact metadata label for skill tags and language labels.",
+      "html": "<span class=\"ds-tag\">Kotlin</span>",
+      "css": ".ds-tag { display: inline-flex; align-items: center; gap: 5px; height: 22px; padding: 0 8px; border-radius: 6px; font-family: 'Spline Sans Mono', ui-monospace, monospace; font-size: 11.5px; font-weight: 500; background: var(--surface-2); border: 1px solid var(--border); color: var(--text-dim); }"
+    },
+    {
+      "name": "Nav Link",
+      "kind": "nav",
+      "refersTo": "nav",
+      "description": "Primary navigation link in the public header.",
+      "html": "<a class=\"ds-nav-link\" href=\"#\" aria-current=\"page\">Skills</a>",
+      "css": ".ds-nav-link { padding: 7px 11px; border-radius: 7px; font-family: 'Bricolage Grotesque', ui-sans-serif, system-ui, sans-serif; font-size: 14px; font-weight: 500; color: var(--text-dim); text-decoration: none; transition: background 0.14s, color 0.14s; } .ds-nav-link:hover { color: var(--text); background: var(--surface-2); } .ds-nav-link[aria-current='page'] { color: var(--text); background: var(--surface-2); }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Workbench",
+    "overview": "The interface is a clean, well-organized workbench: every tool has a place, nothing is decorative, and every element earns its keep by moving the user toward finding, evaluating, or managing a skill. The aesthetic is straightforward, functional, and getting-shit-done — a tool made by developers for developers, not a billboard or a corporate brochure. The system is dual-themed (light and dark) via CSS light-dark(), with dark mode as the primary, most-tested environment. Surfaces are layered with subtle borders and tonal shifts rather than heavy shadows. Motion is restrained and purposeful: state changes are quick, entrances are subtle, and everything respects prefers-reduced-motion.",
+    "keyCharacteristics": [
+      "Dark-first, light-capable via light-dark() tokens.",
+      "One accent: a functional signal green used for verification, primary actions, and status.",
+      "Monospace reserved for machine values, slugs, labels, and code.",
+      "Cards with 16px corners, 1px borders, and hover lift on search results.",
+      "Sticky headers with frosted-glass blur, not solid blocks."
+    ],
+    "rules": [
+      {
+        "name": "The One Accent Rule",
+        "body": "Green is the only saturated color in normal use. Info, warn, and danger are reserved for status; they do not become decorative accents.",
+        "section": "colors"
+      },
+      {
+        "name": "The Light-Dark as Source Rule",
+        "body": "Every neutral token is defined with CSS light-dark(). There are no hard-coded light or dark exceptions; components inherit the theme from :root.",
+        "section": "colors"
+      },
+      {
+        "name": "The No-Cream Rule",
+        "body": "Backgrounds are cool-tinted, not warm paper or sand. Light mode is #fbfbfc (near-white with a cool grey tint), not beige or cream.",
+        "section": "colors"
+      },
+      {
+        "name": "The Mono-for-Machine-Values Rule",
+        "body": "Use Spline Sans Mono only for slugs, counts, file paths, token bands, and code. Never set body prose or headings in monospace.",
+        "section": "typography"
+      },
+      {
+        "name": "The Tight-Not-Touching Rule",
+        "body": "Display headings use letter-spacing as tight as -0.03em, but never tighter. Body text keeps normal spacing.",
+        "section": "typography"
+      },
+      {
+        "name": "The One-Sans Rule",
+        "body": "Bricolage Grotesque is the only sans-serif in use. Do not introduce a second sans for 'contrast'.",
+        "section": "typography"
+      },
+      {
+        "name": "The Flat-by-Default Rule",
+        "body": "Surfaces are flat at rest. Elevation is earned through interaction (hover) or explicit layering (modal/drawer).",
+        "section": "elevation"
+      },
+      {
+        "name": "The Border-Not-Shadow Rule",
+        "body": "Separate adjacent surfaces with 1px borders first. Shadows are for lift, not boundaries.",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "Do use signal green for primary actions, verified badges, and selected filter states.",
+      "Do keep body text within 65–75ch for readability.",
+      "Do use light-dark() tokens for every color that changes across themes.",
+      "Do use Spline Sans Mono for slugs, counts, file paths, token bands, and code only.",
+      "Do respect prefers-reduced-motion by collapsing animation durations to zero.",
+      "Do use 1px borders as the primary separator between surfaces.",
+      "Do make the skill card the center of gravity: search → card → detail → install.",
+      "Do use focus-visible rings in accent with a 2px offset and 3px spread."
+    ],
+    "donts": [
+      "Don't mimic official Android/Google branding, color palette, or marketing language. This is an independent community index.",
+      "Don't use soul-less corporate Apple minimalism: cold white space, sterile layouts, or anonymous luxury product pages.",
+      "Don't add cute illustrations, playful mascots, ornamental flourishes, or decorative gradients.",
+      "Don't use SaaS marketing-page theater: big hero metrics, gradient-text slogans, or generic 'revolutionize your workflow' copy.",
+      "Don't use border-left or border-right greater than 1px as a colored accent on cards, list items, or callouts.",
+      "Don't use gradient text (background-clip: text) for headings or emphasis.",
+      "Don't use glassmorphism as a default treatment.",
+      "Don't pair a 1px border with a wide soft drop shadow on the same element for decoration.",
+      "Don't use border-radius larger than 16px on cards or sections; reserve pill radius for tags, chips, and buttons.",
+      "Don't use decorative grid backgrounds or stripe patterns unless the surface is an actual canvas or map.",
+      "Don't set decorative motion as a gate to content visibility; every section must be visible by default.",
+      "Don't rely on color alone to indicate status or actions; pair with text, icons, or badges."
+    ]
+  }
+}
