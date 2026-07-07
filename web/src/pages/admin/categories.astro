@@ -129,8 +129,8 @@ const items = categories ?? [];
   import { createFocusTrap } from '../../scripts/focus-trap';
   import { showToast, showError } from '../../scripts/toast';
 
-  function initModal(scrimSelector: string, triggerSelector?: string) {
-    const scrim = document.querySelector(scrimSelector) as HTMLElement | null;
+  function initModal(scrimSelector: string) {
+    const scrim = document.querySelector(scrimSelector) as HTMLElement;
     if (!scrim) return;
     const modal = scrim.querySelector('.modal') as HTMLElement | null;
     const closeBtns = scrim.querySelectorAll('[data-modal-close]');
