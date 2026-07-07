@@ -154,7 +154,7 @@ function renderStep2() {
     .map(
       (s, i) => `
     <div class="acc" data-acc>
-      <div class="acc-h" data-acc-head role="button" tabindex="0" aria-expanded="true" aria-label="${esc(s.name)} skill details">
+      <div class="acc-h" data-acc-head role="button" tabindex="0" aria-expanded="false" aria-label="${esc(s.name)} skill details">
         <input type="checkbox" data-skill-idx="${i}" checked style="width:18px;height:18px;flex:none;" aria-label="Select ${esc(s.name)} for submission">
         <div style="flex:1;min-width:0;">
           <div class="nm" style="font-weight:600;font-size:14.5px;">${esc(s.name)}</div>
@@ -342,7 +342,11 @@ if (vsteps) {
       repo.dispatchEvent(new Event('click', { bubbles: true }));
     }
     const acc = target.closest('[data-acc-head]');
-    if (acc && (e.key === 'Enter' || e.key === ' ')) {
+    if (
+      acc &&
+      !target.closest('input[type="checkbox"]') &&
+      (e.key === 'Enter' || e.key === ' ')
+    ) {
       e.preventDefault();
       acc.dispatchEvent(new Event('click', { bubbles: true }));
     }

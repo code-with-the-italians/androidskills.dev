@@ -1275,7 +1275,8 @@ kbd,
   border: 1px solid var(--border);
   border-radius: var(--r-md);
 }
-.seg-item {
+.seg-item,
+.seg > button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -1292,7 +1293,8 @@ kbd,
   min-height: 24px;
   min-width: 24px;
 }
-.seg-item[aria-checked='true'] {
+.seg-item[aria-checked='true'],
+.seg > button[aria-pressed='true'] {
   background: var(--surface);
   color: var(--text);
   box-shadow: var(--shadow-1);
