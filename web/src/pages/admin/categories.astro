@@ -131,7 +131,7 @@ const items = categories ?? [];
 
   function initModal(scrimSelector: string) {
     const scrim = document.querySelector(scrimSelector) as HTMLElement;
-    if (!scrim) return;
+    if (!scrim) return null;
     const modal = scrim.querySelector('.modal') as HTMLElement | null;
     const closeBtns = scrim.querySelectorAll('[data-modal-close]');
     let trigger: HTMLElement | null = null;
@@ -164,10 +164,12 @@ const items = categories ?? [];
     document.addEventListener('keydown', (e) => {
       if (e.key === 'Escape' && scrim.style.display === 'flex') close();
     });
+
+    return { open, close };
   }
 
+  const renameModal = initModal('#renameCat');
   initModal('#addCat');
-  initModal('#renameCat');
 
   document.querySelector('[data-add-cat]')?.addEventListener('click', async () => {
     const name = (document.getElementById('ncName') as HTMLInputElement | null)?.value;
@@ -191,8 +193,7 @@ const items = categories ?? [];
       (document.getElementById('rcOldSlug') as HTMLInputElement | null)!.value = slug;
       (document.getElementById('rcName') as HTMLInputElement | null)!.value = name;
       (document.getElementById('rcSlug') as HTMLInputElement | null)!.value = slug;
-      const scrim = document.getElementById('renameCat');
-      if (scrim) scrim.style.display = 'flex';
+      renameModal?.open(btn as HTMLElement);
     });
   });
 
