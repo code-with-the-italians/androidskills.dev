@@ -30,7 +30,7 @@ try {
   return Astro.redirect('/404');
 }
 
-const readmeHtml = skill.readmeMd ? await renderMarkdown(skill.readmeMd) : '';
+const readmeHtml = skill.readmeMd ? await renderMarkdown(skill.readmeMd, { shiftHeadings: true }) : '';
 const fileTree = files?.tree ?? [];
 ---
 
@@ -110,20 +110,27 @@ const fileTree = files?.tree ?? [];
         <!-- Sidebar: file tree + versions -->
         <aside class="stack">
           {fileTree.length > 0 && (
-            <div class="card" style="padding:0;overflow:hidden;">
+            <div class="card" style="padding:0;overflow:hidden;" role="region" aria-label="File tree">
               <div style="padding:14px 18px;border-bottom:1px solid var(--border);">
                 <h4 style="font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--text-faint);">Files</h4>
               </div>
-              <div style="padding:8px;">
+              <div style="padding:8px;" role="list">
                 {fileTree.map((node) => (
-                  <a
-                    href={node.type === 'file' ? `/skill/${slug}/files/${node.path}` : '#'}
-                    class="file-row"
-                    style={node.type === 'dir' ? 'font-weight:600;' : ''}
-                  >
-                    <span class="nm">{node.name}</span>
-                    {node.type === 'file' && <span class="sz">{node.size}B</span>}
-                  </a>
+                  node.type === 'file' ? (
+                    <a
+                      href={`/skill/${slug}/files/${node.path}`}
+                      class="file-row"
+                      role="listitem"
+                      aria-label={`File ${node.name} (${node.size} bytes)`}
+                    >
+                      <span class="nm">{node.name}</span>
+                      <span class="sz">{node.size}B</span>
+                    </a>
+                  ) : (
+                    <span class="file-row" role="listitem" style="font-weight:600;" aria-label={`Directory ${node.name}`}>
+                      <span class="nm">{node.name}</span>
+                    </span>
+                  )
                 ))}
               </div>
             </div>

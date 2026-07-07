@@ -80,14 +80,19 @@ const activeFilters = [
           ) : null}
 
           <div class="filter-grp">
-            <h4>Sort</h4>
-            <div class="seg" role="radiogroup" aria-label="Sort">
-              {['relevance', 'installs', 'updated', 'tokens'].map((s) => (
-                <a href={`/search?${new URLSearchParams({ ...Object.fromEntries(params), sort: s }).toString()}`}>
-                  <button aria-checked={sort === s} role="radio">{s}</button>
-                </a>
-              ))}
-            </div>
+            <label for="sort" class="h4">Sort</label>
+            <form action="/search" method="get" id="sortForm">
+              {Array.from(params.entries()).map(([k, v]) =>
+                k !== 'sort' ? <input type="hidden" name={k} value={v} /> : null
+              )}
+              <select id="sort" name="sort" class="select" onchange="this.form.submit()" aria-label="Sort results">
+                <option value="relevance" selected={sort === 'relevance'}>Most relevant</option>
+                <option value="installs" selected={sort === 'installs'}>Most installed</option>
+                <option value="updated" selected={sort === 'updated'}>Recently updated</option>
+                <option value="tokens" selected={sort === 'tokens'}>Fewest tokens</option>
+              </select>
+              <noscript><button type="submit" class="btn btn-sm btn-primary" style="margin-top:8px;">Apply</button></noscript>
+            </form>
           </div>
 
           {categories.length > 0 && (
@@ -100,11 +105,15 @@ const activeFilters = [
                 qs.delete('cat');
                 newCats.forEach((c) => qs.append('cat', c));
                 return (
-                  <a class="check" href={`/search?${qs.toString()}`}>
-                    <span class="box" style={active ? 'background:var(--accent);border-color:var(--accent);' : ''}>
+                  <a
+                    class="check"
+                    href={`/search?${qs.toString()}`}
+                    aria-label={`${cat.name} (${cat.count} skills) — ${active ? 'Remove' : 'Add'} filter`}
+                  >
+                    <span class="box" aria-hidden="true" style={active ? 'background:var(--accent);border-color:var(--accent);' : ''}>
                       {active && <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>}
                     </span>
-                    {cat.name}
+                    <span>{cat.name}</span>
                     <span class="ct">{cat.count}</span>
                   </a>
                 );
@@ -119,11 +128,15 @@ const activeFilters = [
               const qs = new URLSearchParams({ ...Object.fromEntries(params.entries()) });
               if (active) qs.delete('size'); else qs.set('size', s);
               return (
-                <a class="check" href={`/search?${qs.toString()}`}>
-                  <span class="box" style={active ? 'background:var(--accent);border-color:var(--accent);' : ''}>
+                <a
+                  class="check"
+                  href={`/search?${qs.toString()}`}
+                  aria-label={`${s} — ${active ? 'Remove' : 'Add'} token-size filter`}
+                >
+                  <span class="box" aria-hidden="true" style={active ? 'background:var(--accent);border-color:var(--accent);' : ''}>
                     {active && <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>}
                   </span>
-                  {s}
+                  <span>{s}</span>
                 </a>
               );
             })}
@@ -138,7 +151,7 @@ const activeFilters = [
 
           {!error && total > 0 && (
             <div class="between" style="margin-bottom:16px;">
-              <span class="muted" style="font-size:13.5px;">
+              <span class="muted" style="font-size:13.5px;" aria-live="polite" aria-atomic="true">
                 {total} skill{total !== 1 ? 's' : ''}
                 {q && <> for “<strong>{q}</strong>”</>}
               </span>
@@ -174,12 +187,12 @@ const activeFilters = [
             <div style="display:flex;justify-content:center;margin-top:32px;">
               <div class="pager">
                 {page > 1 && (
-                  <a href={`/search?${new URLSearchParams({ ...Object.fromEntries(params), page: String(page - 1) }).toString()}`}>←</a>
+                  <a href={`/search?${new URLSearchParams({ ...Object.fromEntries(params), page: String(page - 1) }).toString()}`} aria-label="Previous page">←</a>
                 )}
-                <span class="cur">{page}</span>
+                <span class="cur" aria-current="page">{page}</span>
                 <span class="faint">/ {totalPages}</span>
                 {page < totalPages && (
-                  <a href={`/search?${new URLSearchParams({ ...Object.fromEntries(params), page: String(page + 1) }).toString()}`}>→</a>
+                  <a href={`/search?${new URLSearchParams({ ...Object.fromEntries(params), page: String(page + 1) }).toString()}`} aria-label="Next page">→</a>
                 )}
               </div>
             </div>

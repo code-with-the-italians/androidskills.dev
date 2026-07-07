@@ -99,8 +99,8 @@ function renderRepoList() {
   list.innerHTML = repos
     .map(
       (r) => `
-    <div class="repo ${state.repo?.fullName === r.fullName ? ' sel' : ''}" data-repo="${esc(r.fullName)}" role="button" tabindex="0">
-      <span class="radio"></span>
+    <div class="repo ${state.repo?.fullName === r.fullName ? ' sel' : ''}" data-repo="${esc(r.fullName)}" role="button" tabindex="0" aria-pressed="${state.repo?.fullName === r.fullName ? 'true' : 'false'}" aria-label="Select repository ${esc(r.fullName)}">
+      <span class="radio" aria-hidden="true"></span>
       <div style="flex:1;min-width:0;">
         <div style="font-weight:600;font-size:14px;">${esc(r.fullName)}</div>
         <div class="slug" style="font-size:11.5px;">${esc(r.defaultBranch || 'default branch')}</div>
@@ -154,8 +154,8 @@ function renderStep2() {
     .map(
       (s, i) => `
     <div class="acc" data-acc>
-      <div class="acc-h" data-acc-head style="display:flex;align-items:center;gap:12px;padding:13px 14px;cursor:pointer;">
-        <input type="checkbox" data-skill-idx="${i}" checked style="width:18px;height:18px;flex:none;">
+      <div class="acc-h" data-acc-head role="button" tabindex="0" aria-expanded="false" aria-label="${esc(s.name)} skill details">
+        <input type="checkbox" data-skill-idx="${i}" checked style="width:18px;height:18px;flex:none;" aria-label="Select ${esc(s.name)} for submission">
         <div style="flex:1;min-width:0;">
           <div class="nm" style="font-weight:600;font-size:14.5px;">${esc(s.name)}</div>
           <div class="sl" style="font-family:var(--mono);font-size:11.5px;color:var(--text-faint);">skills/${esc(s.slug)}/</div>
@@ -163,7 +163,7 @@ function renderStep2() {
         <span class="tag" style="flex:none;">${esc(s.tokenUpfront + s.tokenOndemand)} tok</span>
         <svg class="chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
       </div>
-      <div class="acc-body" style="max-height:0;overflow:hidden;padding:0 14px;border-top:1px solid transparent;">
+      <div class="acc-body" style="max-height:0;overflow:hidden;padding:0 14px;border-top:1px solid transparent;" role="region" aria-label="${esc(s.name)} metadata">
         <div style="padding:12px 0;">
           <div class="kv" style="display:grid;grid-template-columns:130px 1fr;gap:12px;padding:10px 0;border-bottom:1px solid var(--border);font-size:14px;"><span class="k" style="font-family:var(--mono);font-size:12px;color:var(--text-faint);">description</span><span class="v">${esc(s.description)}</span></div>
           <div class="kv" style="display:grid;grid-template-columns:130px 1fr;gap:12px;padding:10px 0;border-bottom:1px solid var(--border);font-size:14px;"><span class="k" style="font-family:var(--mono);font-size:12px;color:var(--text-faint);">version</span><span class="v">${esc(s.version)}</span></div>
@@ -177,7 +177,7 @@ function renderStep2() {
     )
     .join('');
   container.innerHTML = `
-    <div class="callout" style="margin-bottom:16px;"><svg class="ci" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 16v-4M12 8h.01" stroke-linecap="round"/></svg><div><b>${esc(skills.length)} skill${skills.length > 1 ? 's' : ''}</b> found. Everything below is read from each skill's SKILL.md frontmatter.</div></div></div>
+    <div class="callout" style="margin-bottom:16px;" aria-live="polite" aria-atomic="true"><svg class="ci" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 16v-4M12 8h.01" stroke-linecap="round"/></svg><div><b>${esc(skills.length)} skill${skills.length > 1 ? 's' : ''}</b> found. Everything below is read from each skill's SKILL.md frontmatter.</div></div></div>
     <div class="accs">${items}</div>
     <button class="btn btn-primary" data-continue style="margin-top:18px;">Continue with selected skills</button>
   `;
@@ -195,9 +195,9 @@ function renderStep3() {
     </div>
     <div class="row" style="gap:10px;">
       <button class="btn btn-ghost" data-save-draft>Save draft</button>
-      <button class="btn btn-primary btn-lg" data-submit><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/></svg> Submit for review</button>
+      <button class="btn btn-primary btn-lg" data-submit aria-busy="false"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/></svg> Submit for review</button>
     </div>
-    <div id="submitStatus" class="hint" style="margin-top:10px;"></div>
+    <div id="submitStatus" class="hint" style="margin-top:10px;" aria-live="polite" aria-atomic="true"></div>
   `;
 }
 
@@ -221,9 +221,15 @@ function render() {
     const cls =
       n < state.step ? 'done' : n === state.step ? 'active' : 'upcoming';
     el.classList.add(cls);
+    el.setAttribute('aria-current', cls === 'active' ? 'step' : 'false');
     const no = el.querySelector('.vno') as HTMLElement;
     no.innerHTML = cls === 'done' ? CHECK : String(n);
   });
+  const activeStep = steps.find((s) => s.classList.contains('active'));
+  if (activeStep) {
+    const title = activeStep.querySelector('.vtitle') as HTMLElement | null;
+    title?.focus({ preventScroll: true });
+  }
   const status = document.getElementById('repoStatus');
   if (status) {
     if (state.checking)
@@ -238,7 +244,16 @@ async function createDrafts(submit: boolean) {
   const skills = selectedSkills();
   if (skills.length === 0 || !state.repo || !state.scan) return;
   const status = document.getElementById('submitStatus');
+  const submitBtn = document.querySelector(
+    '[data-submit]',
+  ) as HTMLButtonElement | null;
+  const saveBtn = document.querySelector(
+    '[data-save-draft]',
+  ) as HTMLButtonElement | null;
   if (status) status.textContent = 'Creating drafts…';
+  submitBtn?.setAttribute('aria-busy', 'true');
+  submitBtn?.setAttribute('disabled', 'true');
+  saveBtn?.setAttribute('disabled', 'true');
   const payload = {
     repoOwner: state.repo.owner,
     repoName: state.repo.name,
@@ -277,6 +292,10 @@ async function createDrafts(submit: boolean) {
     const msg = e instanceof Error ? e.message : 'Submission failed';
     if (status) status.textContent = msg;
     showError(msg);
+  } finally {
+    submitBtn?.setAttribute('aria-busy', 'false');
+    submitBtn?.removeAttribute('disabled');
+    saveBtn?.removeAttribute('disabled');
   }
 }
 
@@ -291,8 +310,10 @@ if (vsteps) {
       return;
     }
     const acc = target.closest('[data-acc-head]');
-    if (acc) {
-      acc.closest('[data-acc]')?.classList.toggle('open');
+    if (acc && !target.closest('input[type="checkbox"]')) {
+      const panel = acc.closest('[data-acc]') as HTMLElement | null;
+      const expanded = panel?.classList.toggle('open');
+      acc.setAttribute('aria-expanded', String(expanded));
       return;
     }
     const cont = target.closest('[data-continue]');
@@ -310,6 +331,24 @@ if (vsteps) {
     if (sub) {
       createDrafts(true);
       return;
+    }
+  });
+
+  vsteps.addEventListener('keydown', (e) => {
+    const target = e.target as HTMLElement;
+    const repo = target.closest('[data-repo]');
+    if (repo && (e.key === 'Enter' || e.key === ' ')) {
+      e.preventDefault();
+      repo.dispatchEvent(new Event('click', { bubbles: true }));
+    }
+    const acc = target.closest('[data-acc-head]');
+    if (
+      acc &&
+      !target.closest('input[type="checkbox"]') &&
+      (e.key === 'Enter' || e.key === ' ')
+    ) {
+      e.preventDefault();
+      acc.dispatchEvent(new Event('click', { bubbles: true }));
     }
   });
 

@@ -44,10 +44,10 @@ const totalPages = result?.totalPages ?? 0;
           {totalPages > 1 && (
             <div style="display:flex;justify-content:center;margin-top:24px;">
               <div class="pager">
-                {page > 1 && <a href={`/timeline?page=${page - 1}`}>←</a>}
-                <span class="cur">{page}</span>
+                {page > 1 && <a href={`/timeline?page=${page - 1}`} aria-label="Previous page">←</a>}
+                <span class="cur" aria-current="page">{page}</span>
                 <span class="faint">/ {totalPages}</span>
-                {page < totalPages && <a href={`/timeline?page=${page + 1}`}>→</a>}
+                {page < totalPages && <a href={`/timeline?page=${page + 1}`} aria-label="Next page">→</a>}
               </div>
             </div>
           )}

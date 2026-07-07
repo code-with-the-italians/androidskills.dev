@@ -32,8 +32,8 @@ const detail = selectedId ? await api.getQueueDetail(selectedId).catch(() => nul
   <div class="admin-split" data-queue-shell>
     <div class="queue-list" data-queue-list>
       {queue.map((item) => (
-        <div class="queue-item" data-queue-id={item.id} data-state={item.state} data-slug={item.slug} data-submitter={item.submitterHandle}>
-          <span class="avatar sm" style="color: var(--accent-text);">{item.submitterHandle.slice(0, 2).toUpperCase()}</span>
+        <div class="queue-item" data-queue-id={item.id} data-state={item.state} data-slug={item.slug} data-submitter={item.submitterHandle} role="button" tabindex="0" aria-label={`Review ${item.slug} by ${item.submitterHandle}, ${item.state}`}>
+          <span class="avatar sm" style="color: var(--accent-text);" aria-hidden="true">{item.submitterHandle.slice(0, 2).toUpperCase()}</span>
           <div style="flex: 1; min-width: 0;">
             <div class="between">
               <b style="font-size: 14px;">{item.slug}</b>
@@ -105,8 +105,8 @@ const detail = selectedId ? await api.getQueueDetail(selectedId).catch(() => nul
   const shell = document.querySelector('[data-queue-shell]');
   if (shell) {
     (async () => {
-      const list = shell.querySelector('[data-queue-list]');
-      const detail = shell.querySelector('[data-queue-detail]');
+      const list = shell.querySelector('[data-queue-list]') as HTMLElement | null;
+      const detail = shell.querySelector('[data-queue-detail]') as HTMLElement | null;
       const tabs = document.querySelector('[data-queue-tabs]');
       const search = document.querySelector('#queueSearch') as HTMLInputElement | null;
 
@@ -141,8 +141,8 @@ const detail = selectedId ? await api.getQueueDetail(selectedId).catch(() => nul
         list.innerHTML = filtered
           .map(
             (item) => `
-              <div class="queue-item ${selectedId === item.id ? 'active' : ''}" data-queue-id="${esc(item.id)}" data-state="${esc(item.state)}" data-slug="${esc(item.slug)}" data-submitter="${esc(item.submitterHandle)}" role="button" tabindex="0">
-                <span class="avatar sm" style="color: var(--accent-text);">${esc(item.submitterHandle.slice(0, 2).toUpperCase())}</span>
+              <div class="queue-item ${selectedId === item.id ? 'active' : ''}" data-queue-id="${esc(item.id)}" data-state="${esc(item.state)}" data-slug="${esc(item.slug)}" data-submitter="${esc(item.submitterHandle)}" role="button" tabindex="0" aria-label="Review ${esc(item.slug)} by ${esc(item.submitterHandle)}, ${esc(item.state)}">
+                <span class="avatar sm" style="color: var(--accent-text);" aria-hidden="true">${esc(item.submitterHandle.slice(0, 2).toUpperCase())}</span>
                 <div style="flex: 1; min-width: 0;">
                   <div class="between">
                     <b style="font-size: 14px;">${esc(item.slug)}</b>
@@ -221,6 +221,11 @@ const detail = selectedId ? await api.getQueueDetail(selectedId).catch(() => nul
               </div>
             </div>
           `;
+          const heading = detail.querySelector('h2');
+          if (heading) {
+            heading.setAttribute('tabindex', '-1');
+            heading.focus({ preventScroll: true });
+          }
         }
         renderList(Array.from(document.querySelectorAll('[data-queue-id]')).map((el) => ({
           id: el.getAttribute('data-queue-id')!,
@@ -233,6 +238,15 @@ const detail = selectedId ? await api.getQueueDetail(selectedId).catch(() => nul
       list?.addEventListener('click', (e) => {
         const item = (e.target as HTMLElement).closest('[data-queue-id]');
         if (!item) return;
+        const id = item.getAttribute('data-queue-id');
+        if (id) loadDetail(id);
+      });
+
+      list?.addEventListener('keydown', (e: KeyboardEvent) => {
+        if (e.key !== 'Enter' && e.key !== ' ') return;
+        const item = (e.target as HTMLElement).closest('[data-queue-id]');
+        if (!item) return;
+        e.preventDefault();
         const id = item.getAttribute('data-queue-id');
         if (id) loadDetail(id);
       });

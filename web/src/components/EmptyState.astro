@@ -17,7 +17,7 @@ const { title, body, class: className = '' } = Astro.props;
       </svg>
     </slot>
   </div>
-  <h3>{title}</h3>
+  <h2 class="empty-title">{title}</h2>
   {body && <p>{body}</p>}
   <slot name="action" />
 </div>
@@ -31,8 +31,10 @@ const { title, body, class: className = '' } = Astro.props;
     text-align: center;
     gap: 8px;
   }
-  .empty-state h3 {
+  .empty-title {
     font-size: 16px;
+    font-weight: 600;
+    margin: 0;
   }
   .empty-state p {
     font-size: 13px;
