@@ -83,12 +83,12 @@ const totalSubmissions = sorted.reduce((sum, g) => sum + g.items.length, 0);
                       <div class="actions" style="display:flex;gap:8px;flex-wrap:wrap;">
                         {g.state === 'draft' && (
                           <>
-                            <button class="btn btn-sm btn-primary" data-action="submit" type="button">Submit</button>
-                            <button class="btn btn-sm btn-ghost" data-action="delete" type="button">Delete</button>
+                            <button class="btn btn-sm btn-primary" data-action="submit" type="button" aria-label={`Submit ${item.slug} for review`}>Submit</button>
+                            <button class="btn btn-sm btn-ghost" data-action="delete" type="button" aria-label={`Delete ${item.slug} draft`}>Delete</button>
                           </>
                         )}
                         {(g.state === 'in_review' || g.state === 'changes_requested') && (
-                          <button class="btn btn-sm btn-ghost" data-action="withdraw" type="button">Withdraw</button>
+                          <button class="btn btn-sm btn-ghost" data-action="withdraw" type="button" aria-label={`Withdraw ${item.slug}`}>Withdraw</button>
                         )}
                         {(g.state === 'published' || g.state === 'rejected') && (
                           <span class="tag">{g.state}</span>

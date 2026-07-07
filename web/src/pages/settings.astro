@@ -88,7 +88,7 @@ try {
               <div class="kicker" style="margin-bottom:2px;"><span class="tick">//</span> APPEARANCE</div>
               <div class="pref-row" data-pref="theme" style="display:grid;grid-template-columns:150px 1fr;gap:16px;align-items:center;padding:14px 0;border-top:0;">
                 <div style="font-size:13.5px;color:var(--text-dim);font-weight:600;">Theme</div>
-                <div class="seg" style="display:inline-flex;"><button type="button" data-val="system">System</button><button type="button" data-val="light">Light</button><button type="button" data-val="dark">Dark</button></div>
+                <div class="seg" style="display:inline-flex;"><button type="button" data-val="system" aria-pressed="false">System</button><button type="button" data-val="light" aria-pressed="false">Light</button><button type="button" data-val="dark" aria-pressed="false">Dark</button></div>
               </div>
               <div class="pref-row" data-pref="accent" style="display:grid;grid-template-columns:150px 1fr;gap:16px;align-items:center;padding:14px 0;border-top:1px solid var(--border);">
                 <div style="font-size:13.5px;color:var(--text-dim);font-weight:600;">Accent</div>
@@ -101,7 +101,7 @@ try {
               </div>
               <div class="pref-row" data-pref="density" style="display:grid;grid-template-columns:150px 1fr;gap:16px;align-items:center;padding:14px 0;border-top:1px solid var(--border);">
                 <div style="font-size:13.5px;color:var(--text-dim);font-weight:600;">Density</div>
-                <div class="seg" style="display:inline-flex;"><button type="button" data-val="compact">Compact</button><button type="button" data-val="regular">Regular</button><button type="button" data-val="comfy">Comfy</button></div>
+                <div class="seg" style="display:inline-flex;"><button type="button" data-val="compact" aria-pressed="false">Compact</button><button type="button" data-val="regular" aria-pressed="false">Regular</button><button type="button" data-val="comfy" aria-pressed="false">Comfy</button></div>
               </div>
             </div>
 
@@ -117,7 +117,7 @@ try {
                 <span class="box"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></span>
                 <span>Public profile</span>
               </label>
-              <div id="settingsStatus" class="hint" style="margin-top:10px;"></div>
+              <div id="settingsStatus" class="hint" style="margin-top:10px;" aria-live="polite" aria-atomic="true"></div>
             </div>
           </section>
 

@@ -31,7 +31,7 @@ const labels: Record<string, string> = {
       <span class="badge neutral" style="font-size:10px;">{labels[event.type] ?? event.type}</span>
     </div>
     <div style="font-family:var(--mono);font-size:11.5px;color:var(--text-faint);margin-top:3px;">
-      {event.authorHandle && <span>by <a href={`/u/${event.authorHandle}`} style="color:var(--accent-text);">{event.authorHandle}</a> · </span>}
+      {event.authorHandle && <span>by <a href={`/u/${event.authorHandle}`} style="color:var(--accent-text);text-decoration:underline;">{event.authorHandle}</a> · </span>}
       {new Date(event.at).toLocaleString()}
     </div>
   </div>

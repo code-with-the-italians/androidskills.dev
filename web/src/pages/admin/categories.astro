@@ -43,9 +43,9 @@ const items = categories ?? [];
         <table class="tbl">
           <thead>
             <tr>
-              <th scope="col">Category</th>
-              <th scope="col">Slug</th>
-              <th scope="col"></th>
+              <th scope="col" id="cat-cat">Category</th>
+              <th scope="col" id="cat-slug">Slug</th>
+              <th scope="col" id="cat-actions">Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -58,14 +58,14 @@ const items = categories ?? [];
             ) : (
               items.map((cat) => (
                 <tr data-category-slug={cat.slug}>
-                  <td>
+                  <td headers="cat-cat">
                     <div class="row" style="gap: 10px;">
-                      <span class="cat-sw" style="background: var(--accent);"></span>
+                      <span class="cat-sw" aria-hidden="true" style="background: var(--accent);"></span>
                       <span style="font-weight: 600;">{cat.name}</span>
                     </div>
                   </td>
-                  <td class="slug" style="font-size: 12.5px;">{cat.slug}</td>
-                  <td>
+                  <td class="slug" headers="cat-slug" style="font-size: 12.5px;">{cat.slug}</td>
+                  <td headers="cat-actions">
                     <button class="btn btn-sm btn-outline" data-rename={cat.slug} data-name={cat.name}>Rename</button>
                     <button class="btn btn-sm btn-danger" data-delete={cat.slug}>Merge</button>
                   </td>
@@ -81,7 +81,7 @@ const items = categories ?? [];
   <div class="scrim" id="addCat" style="display: none;">
     <div class="modal" role="dialog" aria-modal="true" aria-labelledby="addCatTitle" style="max-width: 440px;">
       <div class="mhd">
-        <b id="addCatTitle" style="font-size: 16px;">Add a category</b>
+        <b id="addCatTitle" style="font-size: 16px;" tabindex="-1">Add a category</b>
         <button class="icon-btn" data-modal-close aria-label="Close">×</button>
       </div>
       <div class="mbd stack" style="gap: 14px;">
@@ -104,7 +104,7 @@ const items = categories ?? [];
   <div class="scrim" id="renameCat" style="display: none;">
     <div class="modal" role="dialog" aria-modal="true" aria-labelledby="renameCatTitle" style="max-width: 440px;">
       <div class="mhd">
-        <b id="renameCatTitle" style="font-size: 16px;">Rename category</b>
+        <b id="renameCatTitle" style="font-size: 16px;" tabindex="-1">Rename category</b>
         <button class="icon-btn" data-modal-close aria-label="Close">×</button>
       </div>
       <div class="mbd stack" style="gap: 14px;">
@@ -133,7 +133,11 @@ const items = categories ?? [];
     btn.addEventListener('click', () => {
       const id = btn.getAttribute('data-modal-open');
       const scrim = id ? document.querySelector(id) : null;
-      if (scrim) (scrim as HTMLElement).style.display = 'flex';
+      if (scrim) {
+        (scrim as HTMLElement).style.display = 'flex';
+        const title = (scrim as HTMLElement).querySelector('b[id$="Title"]') as HTMLElement | null;
+        title?.focus({ preventScroll: true });
+      }
     });
   });
 
