@@ -35,15 +35,15 @@ const items = skills ?? [];
           <circle cx="11" cy="11" r="7"></circle>
           <path d="m20 20-3.2-3.2" stroke-linecap="round"></path>
         </svg>
-        <input name="q" type="search" value={q} placeholder="Search skills…">
+        <input name="q" type="search" value={q} placeholder="Search skills…" aria-label="Search skills">
       </div>
-      <select name="filter" class="select" style="width: auto; height: 36px; font-size: 13px;" onchange="this.form.submit()">
+      <select name="filter" class="select" style="width: auto; height: 36px; font-size: 13px;" onchange="this.form.submit()" aria-label="Filter by status">
         <option value="" selected={!filter}>All statuses</option>
         <option value="published" selected={filter === 'published'}>Published</option>
         <option value="unlisted" selected={filter === 'unlisted'}>Unlisted</option>
         <option value="flagged" selected={filter === 'flagged'}>Flagged</option>
       </select>
-      <select name="sort" class="select" style="width: auto; height: 36px; font-size: 13px;" onchange="this.form.submit()">
+      <select name="sort" class="select" style="width: auto; height: 36px; font-size: 13px;" onchange="this.form.submit()" aria-label="Sort by">
         <option value="updated" selected={sort === 'updated'}>Sort: Updated</option>
         <option value="installs" selected={sort === 'installs'}>Installs</option>
         <option value="created" selected={sort === 'created'}>Created</option>
@@ -103,7 +103,7 @@ const items = skills ?? [];
                   <td>{skill.featured ? '★' : '—'}</td>
                   <td class="faint" style="font-size: 12.5px;">{skill.updatedAt}</td>
                   <td>
-                    <select class="select select-sm" data-action style="width: auto; height: 32px; font-size: 13px;" aria-label={`Actions for ${skill.name}`}>
+                    <select class="select select-sm" data-action style="width: auto; height: 44px; font-size: 13px;" aria-label={`Actions for ${skill.name}`}>
                       <option value="">Actions</option>
                       <option value={`feature:${skill.id}`}>{skill.featured ? 'Unfeature' : 'Feature'}</option>
                       <option value={`unlist:${skill.id}`}>{skill.status === 'unlisted' ? 'Publish' : 'Unlist'}</option>

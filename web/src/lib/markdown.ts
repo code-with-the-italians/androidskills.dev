@@ -13,7 +13,12 @@ import rehypeStringify from 'rehype-stringify';
  * The result is safe for `set:html`.
  */
 export async function renderMarkdown(markdown: string): Promise<string> {
-  const rawHtml = await marked.parse(markdown, { async: true });
+  const renderer = new marked.Renderer();
+  renderer.heading = ({ text, depth }: { text: string; depth: number }) => {
+    const shifted = Math.min(depth + 1, 6);
+    return `<h${shifted}>${text}</h${shifted}>`;
+  };
+  const rawHtml = await marked.parse(markdown, { async: true, renderer });
 
   const sanitized = await unified()
     .use(rehypeParse, { fragment: true })

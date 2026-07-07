@@ -99,14 +99,14 @@ try {
     .acc { border: 1px solid var(--border); border-radius: var(--r-md); overflow: hidden; background: var(--surface); }
     .acc + .acc { margin-top: 10px; }
     .acc-h:hover { background: var(--surface-2); }
-    .acc .acc-body { transition: max-height 0.28s ease, opacity 0.22s ease, padding 0.28s ease, border-color 0.28s ease; }
-    .acc.open .acc-body { max-height: 720px; opacity: 1; padding: 2px 14px 12px; border-top-color: var(--border); }
+    .acc .acc-body { transition: grid-template-rows 0.28s ease, opacity 0.22s ease, border-color 0.28s ease; }
+    .acc.open .acc-body { grid-template-rows: 1fr; opacity: 1; border-top-color: var(--border); }
     .acc.open .chev { transform: rotate(180deg); }
     .seg { display: inline-flex; border: 1px solid var(--border); border-radius: var(--r-md); overflow: hidden; }
     .seg button { background: var(--surface); border: 0; border-right: 1px solid var(--border); padding: 6px 12px; font-size: 13px; cursor: pointer; }
     .seg button:last-child { border-right: 0; }
     .seg button[aria-pressed="true"] { background: var(--accent-soft); color: var(--accent-text); font-weight: 600; }
-    .pref-sw button[aria-pressed="true"]::after { content: ""; position: absolute; inset: 0; margin: auto; width: 7px; height: 7px; border-radius: 999px; background: #fff; mix-blend-mode: difference; }
+    .pref-sw button[aria-pressed="true"]::after { content: ""; position: absolute; inset: 0; margin: auto; width: 7px; height: 7px; border-radius: 999px; background: var(--accent-ink); }
     .pref-sw button { position: relative; }
     @media (max-width: 880px) { .submit-grid { grid-template-columns: 1fr; } }
   </style>

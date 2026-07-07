@@ -34,9 +34,9 @@ const items = users ?? [];
           <circle cx="11" cy="11" r="7"></circle>
           <path d="m20 20-3.2-3.2" stroke-linecap="round"></path>
         </svg>
-        <input name="q" type="search" value={q} placeholder="Search by handle…">
+        <input name="q" type="search" value={q} placeholder="Search by handle…" aria-label="Search users">
       </div>
-      <select name="filter" class="select" style="width: auto; height: 36px; font-size: 13px;" onchange="this.form.submit()">
+      <select name="filter" class="select" style="width: auto; height: 36px; font-size: 13px;" onchange="this.form.submit()" aria-label="Filter by status">
         <option value="" selected={!filter}>All statuses</option>
         <option value="active" selected={filter === 'active'}>Active</option>
         <option value="suspended" selected={filter === 'suspended'}>Suspended</option>
@@ -94,7 +94,7 @@ const items = users ?? [];
                     </span>
                   </td>
                   <td>
-                    <select class="select select-sm" data-user-action style="width: auto; height: 32px; font-size: 13px;" aria-label={`Actions for ${user.handle}`}>
+                    <select class="select select-sm" data-user-action style="width: auto; height: 44px; font-size: 13px;" aria-label={`Actions for ${user.handle}`}>
                       <option value="">Actions</option>
                       <option value={`role:${user.id}:admin`}>Make admin</option>
                       <option value={`role:${user.id}:contributor`}>Make contributor</option>

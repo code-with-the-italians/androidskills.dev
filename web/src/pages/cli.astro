@@ -22,21 +22,21 @@ import BaseLayout from '../layouts/BaseLayout.astro';
       <!-- Terminal demo -->
       <div style="margin-top:32px;max-width:680px;">
         <div class="term" style="background:light-dark(#0e1014,#07090c);border:1px solid var(--border-2);border-radius:var(--r-lg);overflow:hidden;box-shadow:var(--shadow-2);">
-          <div style="display:flex;align-items:center;gap:7px;padding:11px 14px;border-bottom:1px solid #ffffff14;">
-            <span style="width:11px;height:11px;border-radius:999px;background:#ffffff26;"></span>
-            <span style="width:11px;height:11px;border-radius:999px;background:#ffffff26;"></span>
-            <span style="width:11px;height:11px;border-radius:999px;background:#ffffff26;"></span>
-            <span style="margin-left:8px;font-family:var(--mono);font-size:11.5px;color:#ffffff66;">zsh — androidskills</span>
+          <div style="display:flex;align-items:center;gap:7px;padding:11px 14px;border-bottom:1px solid color-mix(in oklab, var(--text) 8%, transparent);">
+            <span style="width:11px;height:11px;border-radius:999px;background:color-mix(in oklab, var(--text) 15%, transparent);"></span>
+            <span style="width:11px;height:11px;border-radius:999px;background:color-mix(in oklab, var(--text) 15%, transparent);"></span>
+            <span style="width:11px;height:11px;border-radius:999px;background:color-mix(in oklab, var(--text) 15%, transparent);"></span>
+            <span style="margin-left:8px;font-family:var(--mono);font-size:11.5px;color:color-mix(in oklab, var(--text) 40%, transparent);">zsh — androidskills</span>
           </div>
-          <pre style="margin:0;padding:18px;font-family:var(--mono);font-size:13px;line-height:1.85;color:#e8eaed;overflow-x:auto;"><code><span style="color:#ffffff55;"># install (preview — not yet live)</span>
-<span style="color:#34d27e;">$</span> brew install androidskills          <span style="color:#ffffff55;"># macOS / Linux</span>
-<span style="color:#34d27e;">$</span> winget install androidskills        <span style="color:#ffffff55;"># Windows</span>
-<span style="color:#34d27e;">$</span> curl -fsSL androidskills.dev/install | sh
+          <pre style="margin:0;padding:18px;font-family:var(--mono);font-size:13px;line-height:1.85;color:var(--text);overflow-x:auto;"><code><span style="color:color-mix(in oklab, var(--text-faint) 70%, transparent);"># install (preview — not yet live)</span>
+<span style="color:var(--accent);">$</span> brew install androidskills          <span style="color:color-mix(in oklab, var(--text-faint) 70%, transparent);"># macOS / Linux</span>
+<span style="color:var(--accent);">$</span> winget install androidskills        <span style="color:color-mix(in oklab, var(--text-faint) 70%, transparent);"># Windows</span>
+<span style="color:var(--accent);">$</span> curl -fsSL androidskills.dev/install | sh
 
-<span style="color:#ffffff55;"># search and add a skill</span>
-<span style="color:#34d27e;">$</span> androidskills search <span style="color:#6c8cff;">"compose mvi"</span>
-<span style="color:#34d27e;">$</span> androidskills add jetpack-compose-mvi
-<span style="color:#ffffff55;"># → skill copied to .skills/jetpack-compose-mvi/</span></code></pre>
+<span style="color:color-mix(in oklab, var(--text-faint) 70%, transparent);"># search and add a skill</span>
+<span style="color:var(--accent);">$</span> androidskills search <span style="color:var(--info);">"compose mvi"</span>
+<span style="color:var(--accent);">$</span> androidskills add jetpack-compose-mvi
+<span style="color:color-mix(in oklab, var(--text-faint) 70%, transparent);"># → skill copied to .skills/jetpack-compose-mvi/</span></code></pre>
         </div>
       </div>
 

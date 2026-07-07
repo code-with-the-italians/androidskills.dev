@@ -44,7 +44,7 @@ describe('renderMarkdown — XSS sanitization', () => {
     const html = await renderMarkdown(
       '# Title\n\nSome **bold** text.\n\n[link](https://example.com)\n\n`code`',
     );
-    assert.ok(html.includes('<h1>'), 'heading lost');
+    assert.ok(html.includes('<h2>'), 'heading lost');
     assert.ok(html.includes('<strong>bold</strong>'), 'bold lost');
     assert.ok(html.includes('href="https://example.com"'), 'safe link lost');
     assert.ok(html.includes('<code>code</code>'), 'code lost');

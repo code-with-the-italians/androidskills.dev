@@ -7,7 +7,9 @@ export const onRequest = defineMiddleware(async (_ctx, next) => {
   res.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin');
   res.headers.set(
     'Content-Security-Policy',
-    "frame-ancestors 'none'; object-src 'none'; base-uri 'none'",
+    "script-src 'self' 'unsafe-inline' 'unsafe-eval' http://localhost:8400; " +
+      "connect-src 'self' http://localhost:8400; " +
+      "frame-ancestors 'none'; object-src 'none'; base-uri 'none'",
   );
   return res;
 });
