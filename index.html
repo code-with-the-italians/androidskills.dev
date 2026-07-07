@@ -1,12 +1,436 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta http-equiv="refresh" content="0; url=/search">
-  <title>androidskills.dev</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>androidskills.dev — Curated skills for top-shelf Android</title>
+<meta name="description" content="A searchable, maintainer-reviewed index of AI coding skills for Android development — Compose, Kotlin, testing, Material 3 and the craft around them. Launching soon.">
+<link rel="canonical" href="https://androidskills.dev/">
+<link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
+
+<!-- Social -->
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="androidskills.dev">
+<meta property="og:title" content="androidskills.dev — Curated skills for top-shelf Android">
+<meta property="og:description" content="A searchable, maintainer-reviewed index of AI coding skills for Android development. Launching soon.">
+<meta property="og:url" content="https://androidskills.dev/">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="androidskills.dev">
+<meta name="twitter:description" content="A searchable, maintainer-reviewed index of AI coding skills for Android development. Launching soon.">
+
+<meta name="theme-color" media="(prefers-color-scheme: light)" content="#fbfbfc">
+<meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0e1014">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,500;12..96,600;12..96,700;12..96,800&family=Spline+Sans+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/styles.css">
+
+<!-- Apply saved theme/accent before paint to avoid a flash -->
+<script>(function(){try{var s=JSON.parse(localStorage.getItem('androidskills')||'{}');var r=document.documentElement;if(s.theme&&s.theme!=='system')r.setAttribute('data-theme',s.theme);if(s.accent&&s.accent!=='green')r.setAttribute('data-accent',s.accent);if(s.density&&s.density!=='regular')r.setAttribute('data-density',s.density);}catch(e){}})();</script>
+
+<style>
+  /* ---------- Page-local: landing layout ---------- */
+  .skip { position:absolute; left:-9999px; top:0; z-index:300; background:var(--surface); border:1px solid var(--border-2); padding:10px 14px; border-radius:var(--r-sm); }
+  .skip:focus { left:12px; top:12px; }
+
+  .nav a.pill { color: var(--text-dim); }
+  .nav a.pill[aria-current="true"] { color: var(--text); }
+
+  /* Hero */
+  .hero { position: relative; overflow: hidden; }
+  .hero .grid-bg { position: absolute; inset: -2px 0 auto 0; height: 560px; z-index: 0; }
+  .hero .inner { position: relative; z-index: 1; padding-block: 84px 72px; }
+  .hero-grid-wrap { display:grid; grid-template-columns: 1.15fr .85fr; gap: 56px; align-items: center; }
+  .hero h1 { font-size: clamp(38px, 6.4vw, 66px); letter-spacing: -.035em; line-height: 1.02; }
+  .hero h1 .g { color: var(--accent-text); }
+  .hero .sub { font-size: clamp(16px, 2.2vw, 19px); color: var(--text-dim); max-width: 540px; margin-top: 18px; }
+  .hero .cta-row { display:flex; flex-wrap:wrap; gap: 10px; margin-top: 26px; }
+
+  /* Coming-soon status pill (carried over from the placeholder) */
+  .status-pill {
+    display:inline-flex; align-items:center; gap:9px; height:30px; padding:0 13px;
+    border-radius:999px; background:var(--accent-soft); color:var(--accent-text);
+    border:1px solid color-mix(in oklab, var(--accent) 32%, var(--border));
+    font-family:var(--mono); font-size:11.5px; font-weight:600; letter-spacing:.08em; text-transform:uppercase;
+  }
+  .status-pill .dot { position:relative; width:8px; height:8px; }
+  .status-pill .dot i { position:absolute; inset:0; border-radius:999px; background:var(--accent); }
+  .status-pill .dot i:first-child { animation: ping 1.8s cubic-bezier(0,0,.2,1) infinite; opacity:.7; }
+
+  @keyframes ping { 0%{transform:scale(1);opacity:.7} 75%,100%{transform:scale(2.6);opacity:0} }
+
+  /* Roadmap strip — honest status, no fake counts */
+  .roadmap { display:flex; flex-wrap:wrap; gap:8px; margin-top:30px; }
+  .rm { display:inline-flex; align-items:center; gap:8px; height:30px; padding:0 12px; border-radius:999px;
+        background:var(--surface); border:1px solid var(--border); font-family:var(--mono); font-size:12px; color:var(--text-dim); }
+  .rm .mk { width:8px; height:8px; border-radius:999px; background:var(--text-faint); }
+  .rm.done .mk { background: var(--ok); }
+  .rm.done { color: var(--text); }
+  .rm.now  .mk { background: var(--accent); animation: pulse 1.6s ease-in-out infinite; }
+  .rm.now  { color: var(--accent-text); border-color: color-mix(in oklab, var(--accent) 40%, var(--border)); }
+  @keyframes pulse { 50% { opacity:.4; } }
+
+  /* Preview card — clearly illustrative */
+  .preview-wrap { position:relative; }
+  .preview-tag {
+    position:absolute; top:-12px; left:18px; z-index:3; transform:translateY(-100%);
+    font-family:var(--mono); font-size:10.5px; letter-spacing:.1em; text-transform:uppercase; color:var(--text-faint);
+    display:inline-flex; align-items:center; gap:7px;
+  }
+  .preview-tag::before { content:""; width:6px; height:6px; border-radius:999px; background:var(--warn); }
+  .preview-wrap .skill-card { box-shadow: var(--shadow-2); }
+  .preview-wrap .glow {
+    position:absolute; inset:-30px -20px -10px; z-index:-1; border-radius:var(--r-xl);
+    background: radial-gradient(60% 60% at 70% 20%, color-mix(in oklab, var(--accent) 16%, transparent), transparent 70%);
+  }
+  .install-cmd {
+    display:flex; align-items:center; gap:8px; padding:9px 12px; margin-top:12px;
+    background:var(--inset); border:1px solid var(--border); border-radius:var(--r-sm);
+    font-family:var(--mono); font-size:12.5px; color:var(--text-dim);
+  }
+  .install-cmd .pmt { color:var(--accent-text); }
+  .install-cmd .arg { color:var(--text); }
+  .install-cmd button { margin-left:auto; }
+
+  /* Section headings */
+  .sec-head { max-width:640px; margin-bottom:30px; }
+  .sec-head h2 { font-size: clamp(26px, 3.4vw, 34px); letter-spacing:-.025em; margin-top:8px; }
+  .sec-head p { color: var(--text-dim); margin-top:10px; }
+
+  /* Feature grid */
+  .feat-grid { grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); }
+  .feat { padding: var(--card-pad); }
+  .feat .fi { width:42px; height:42px; border-radius:var(--r-md); display:grid; place-items:center;
+              background:var(--accent-soft); color:var(--accent-text);
+              border:1px solid color-mix(in oklab, var(--accent) 30%, var(--border)); margin-bottom:14px; }
+  .feat .fi svg { width:22px; height:22px; }
+  .feat h3 { font-size:17px; margin-bottom:6px; }
+  .feat p { font-size:13.5px; color:var(--text-dim); }
+
+  /* Categories (the shelves we're stocking) */
+  .cat-grid { grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); }
+  .cat-tile { display:flex; align-items:center; gap:13px; padding:16px; border:1px solid var(--border);
+              border-radius:var(--r-md); background:var(--surface); transition:.14s; }
+  .cat-tile:hover { border-color:var(--border-2); background:var(--surface-2); transform:translateY(-2px); }
+  .cat-tile .ci { width:38px; height:38px; border-radius:10px; flex:none; display:grid; place-items:center;
+                  background:var(--accent-soft); color:var(--accent-text);
+                  border:1px solid color-mix(in oklab, var(--accent) 25%, var(--border)); }
+  .cat-tile .ci svg { width:19px; height:19px; }
+  .cat-tile .nm { font-weight:600; font-size:14.5px; }
+  .cat-tile .ct { font-family:var(--mono); font-size:11px; color:var(--text-faint); letter-spacing:.04em; }
+  .cat-tile { cursor: default; }
+
+  /* Steps (how it works) */
+  .steps { counter-reset: st; display:grid; grid-template-columns: repeat(auto-fit, minmax(240px,1fr)); gap: var(--gap); }
+  .step { position:relative; padding: var(--card-pad); padding-top: 26px; }
+  .step::before { counter-increment: st; content: counter(st, decimal-leading-zero);
+                  position:absolute; top:18px; right:18px; font-family:var(--mono); font-size:12px; color:var(--text-faint); }
+  .step .arr { color:var(--accent-text); font-family:var(--mono); font-size:12px; margin-bottom:12px; display:inline-flex; align-items:center; gap:6px; }
+  .step h3 { font-size:16.5px; margin-bottom:6px; }
+  .step p { font-size:13.5px; color:var(--text-dim); }
+
+  /* Principles */
+  .principles { display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:14px; }
+  .pr { display:flex; gap:12px; padding:16px; border:1px solid var(--border); border-radius:var(--r-md); background:var(--surface); }
+  .pr .pi { width:18px; height:18px; flex:none; color:var(--accent-text); margin-top:2px; }
+  .pr .pt { font-weight:600; font-size:14px; }
+  .pr .pd { font-size:12.5px; color:var(--text-dim); margin-top:2px; }
+
+  /* Notify CTA */
+  .notify {
+    border:1px solid var(--border); border-radius:var(--r-xl); padding: clamp(28px, 4vw, 48px);
+    background:
+      radial-gradient(120% 140% at 0% 0%, var(--accent-soft), transparent 55%),
+      radial-gradient(90% 120% at 100% 100%, color-mix(in oklab, var(--accent) 8%, transparent), transparent 60%),
+      var(--surface);
+  }
+  .notify h2 { font-size: clamp(24px, 3vw, 32px); letter-spacing:-.02em; }
+  .notify p { color: var(--text-dim); margin-top:10px; max-width:520px; }
+  .notify-grid { display:grid; grid-template-columns: 1.05fr .95fr; gap:40px; align-items:center; }
+  .notify-embed { min-width:0; }                                   /* iframe needs a bounded grid child */
+  .notify-embed iframe { width:100%; height:238px; border:0; border-radius:var(--r-md); display:block; background:transparent; }
+  .notify-embed noscript a { margin-top:8px; }
+  @media (max-width: 860px) { .notify-grid { grid-template-columns:1fr; gap:24px; } }
+
+  .cta-divider { height:1px; background:var(--border); border:0; margin-block: 0; }
+
+  @media (max-width: 920px) {
+    .hero-grid-wrap { grid-template-columns: 1fr; gap: 40px; }
+    .preview-wrap { max-width: 440px; }
+  }
+</style>
 </head>
 <body>
-  <p>Redirecting to <a href="/search">androidskills.dev</a>…</p>
+
+<a class="skip" href="#main">Skip to content</a>
+
+<!-- ===== HEADER ===== -->
+<header class="site-head">
+  <div class="wrap bar">
+    <a class="brand" href="#"><b>android</b>skills.dev</a>
+    <nav class="nav" aria-label="Primary">
+      <a class="pill" href="#what">What it is</a>
+      <a class="pill" href="#shelves">Categories</a>
+      <a class="pill" href="#how">How it works</a>
+      <a class="pill" href="#principles">Principles</a>
+    </nav>
+    <div class="head-right">
+      <button class="icon-btn hide-sm" data-theme-toggle aria-label="Toggle theme"></button>
+      <a class="btn btn-sm btn-outline hide-sm" href="https://github.com/CWTI-Ltd/androidskills.dev" target="_blank" rel="noopener">
+        <svg class="ic" viewBox="0 0 24 24" fill="currentColor"><path d="M12 1.5a10.5 10.5 0 0 0-3.32 20.46c.52.1.71-.23.71-.5v-1.77c-2.89.63-3.5-1.24-3.5-1.24-.47-1.2-1.15-1.52-1.15-1.52-.94-.64.07-.63.07-.63 1.04.07 1.59 1.07 1.59 1.07.92 1.58 2.42 1.12 3.01.86.09-.67.36-1.12.66-1.38-2.31-.26-4.74-1.16-4.74-5.14 0-1.14.4-2.06 1.07-2.79-.11-.27-.47-1.33.1-2.76 0 0 .87-.28 2.85 1.07a9.8 9.8 0 0 1 5.18 0c1.98-1.35 2.85-1.07 2.85-1.07.57 1.43.21 2.49.1 2.76.67.73 1.07 1.65 1.07 2.79 0 3.99-2.44 4.88-4.76 5.13.37.33.7.97.7 1.96v2.9c0 .28.19.61.72.5A10.5 10.5 0 0 0 12 1.5z"/></svg>
+        GitHub
+      </a>
+      <button class="icon-btn menu-btn" data-menu-open aria-label="Open menu">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
+      </button>
+    </div>
+  </div>
+</header>
+
+<main id="main">
+
+<!-- ===== HERO ===== -->
+<section class="hero">
+  <div class="grid-bg hero-grid"></div>
+  <div class="wrap inner">
+    <div class="hero-grid-wrap">
+      <div>
+        <span class="status-pill" role="status">
+          <span class="dot"><i></i><i></i></span>
+          Coming soon · pre-launch
+        </span>
+
+        <h1 style="margin-top:22px;">Curated skills for<br><span class="g">top-shelf Android.</span></h1>
+        <p class="sub">The good stuff, not the slop — a searchable, maintainer-reviewed index of AI coding skills for Android: Compose, Kotlin, testing, Material&nbsp;3 and the craft around them.</p>
+
+        <div class="cta-row">
+          <a class="btn btn-lg btn-primary" href="https://github.com/CWTI-Ltd/androidskills.dev" target="_blank" rel="noopener">
+            <svg class="ic" viewBox="0 0 24 24" fill="currentColor"><path d="M12 1.5a10.5 10.5 0 0 0-3.32 20.46c.52.1.71-.23.71-.5v-1.77c-2.89.63-3.5-1.24-3.5-1.24-.47-1.2-1.15-1.52-1.15-1.52-.94-.64.07-.63.07-.63 1.04.07 1.59 1.07 1.59 1.07.92 1.58 2.42 1.12 3.01.86.09-.67.36-1.12.66-1.38-2.31-.26-4.74-1.16-4.74-5.14 0-1.14.4-2.06 1.07-2.79-.11-.27-.47-1.33.1-2.76 0 0 .87-.28 2.85 1.07a9.8 9.8 0 0 1 5.18 0c1.98-1.35 2.85-1.07 2.85-1.07.57 1.43.21 2.49.1 2.76.67.73 1.07 1.65 1.07 2.79 0 3.99-2.44 4.88-4.76 5.13.37.33.7.97.7 1.96v2.9c0 .28.19.61.72.5A10.5 10.5 0 0 0 12 1.5z"/></svg>
+            Star on GitHub
+          </a>
+          <a class="btn btn-lg btn-outline" href="#how">See how it works</a>
+        </div>
+
+        <div class="roadmap" aria-label="Project status">
+          <span class="rm done"><span class="mk"></span>Design locked</span>
+          <span class="rm now"><span class="mk"></span>Building the index</span>
+          <span class="rm"><span class="mk"></span>Private beta next</span>
+        </div>
+      </div>
+
+      <!-- Illustrative preview card — clearly labeled, not live data -->
+      <div class="preview-wrap">
+        <span class="preview-tag">Preview · illustrative</span>
+        <div class="glow"></div>
+        <div class="card skill-card" aria-hidden="true">
+          <div class="top">
+            <span class="skill-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg></span>
+            <div style="flex:1;min-width:0;">
+              <h3>Jetpack Compose UI Patterns</h3>
+              <div class="slug">compose-ui-patterns</div>
+            </div>
+            <span class="badge ok">✓ Verified</span>
+          </div>
+          <p class="desc">State hoisting, slot APIs and recomposition-safe patterns for production Compose UIs.</p>
+          <div class="tags"><span class="tag">compose</span><span class="tag">ui</span><span class="tag">state</span></div>
+          <div class="meta">
+            <span class="m"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M13 6l6 6-6 6" stroke-linecap="round" stroke-linejoin="round"/></svg> ~4k tok</span>
+            <span class="m" style="margin-left:auto;">v1.2.0</span>
+          </div>
+          <div class="install-cmd">
+            <span class="pmt">$</span><span class="arg">androidskills</span> add <span class="arg">compose-ui-patterns</span>
+            <button class="icon-btn" style="width:28px;height:28px;" data-copy="androidskills add compose-ui-patterns" tabindex="-1" aria-label="Copy install command (preview)">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== WHAT IT IS ===== -->
+<section id="what" class="wrap section" style="padding-top:24px;">
+  <div class="sec-head">
+    <div class="kicker"><span class="tick">//</span> THE IDEA</div>
+    <h2>A trusted home for the skills that drive your agent.</h2>
+    <p>Coding agents are only as good as the instructions you hand them. androidskills.dev collects the ones worth keeping — written by practitioners, checked before they ship.</p>
+  </div>
+  <div class="grid feat-grid">
+    <div class="card feat">
+      <span class="fi"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 12l2 2 4-4"/><circle cx="12" cy="12" r="9"/></svg></span>
+      <h3>Maintainer-reviewed</h3>
+      <p>Every submission is reviewed and runs an automated security pass before it lands. &ldquo;Verified&rdquo; means something — and it&rsquo;s the default filter.</p>
+    </div>
+    <div class="card feat">
+      <span class="fi"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16v5H4zM4 14h7v6H4zM14 14h6v6h-6z"/><path d="M8 6.5h.01M8 16.5h.01"/></svg></span>
+      <h3>Manifest-first</h3>
+      <p>A skill is a folder with a <code style="font-family:var(--mono);font-size:.9em;">SKILL.md</code>. Name, slug, tags and license are read straight from the manifest — never overwritten in the UI.</p>
+    </div>
+    <div class="card feat">
+      <span class="fi"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 7l7-4 7 4-7 4-7-4z"/><path d="M5 12l7 4 7-4M5 17l7 4 7-4"/></svg></span>
+      <h3>Agent-ready install</h3>
+      <p>No npm. Install is a manual <code style="font-family:var(--mono);font-size:.9em;">.zip</code> drop into your agent&rsquo;s skills directory — or one command from the CLI (coming).</p>
+    </div>
+  </div>
+</section>
+
+<!-- ===== CATEGORIES (the shelves we're stocking) ===== -->
+<section id="shelves" class="wrap section" style="padding-top:0;">
+  <div class="sec-head">
+    <div class="kicker"><span class="tick">//</span> THE SHELVES WE&rsquo;RE STOCKING</div>
+    <h2>Browse by what you actually work in.</h2>
+    <p>The taxonomy the automated review assigns into. Counts land at launch — for now, here&rsquo;s the map.</p>
+  </div>
+  <div class="grid cat-grid">
+    <div class="cat-tile"><span class="ci"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg></span><div><div class="nm">Jetpack Compose</div><div class="ct">coming</div></div></div>
+    <div class="cat-tile"><span class="ci"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 5l-5 7 5 7M16 5l5 7-5 7"/></svg></span><div><div class="nm">Kotlin language</div><div class="ct">coming</div></div></div>
+    <div class="cat-tile"><span class="ci"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21V8l9-5 9 5v13M9 21v-6h6v6"/></svg></span><div><div class="nm">Architecture</div><div class="ct">coming</div></div></div>
+    <div class="cat-tile"><span class="ci"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3h6M10 3v5l-5 9a2 2 0 0 0 1.8 3h10.4A2 2 0 0 0 19 17l-5-9V3"/></svg></span><div><div class="nm">Testing &amp; QA</div><div class="ct">coming</div></div></div>
+    <div class="cat-tile"><span class="ci"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="13.5" cy="6.5" r="2.5"/><circle cx="18" cy="14" r="2.5"/><circle cx="9" cy="17" r="2.5"/><path d="M11 4.5C6 5 3 9 3 13a8 8 0 0 0 .5 3"/></svg></span><div><div class="nm">Material Design</div><div class="ct">coming</div></div></div>
+    <div class="cat-tile"><span class="ci"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7l9-4 9 4-9 4-9-4z"/><path d="M3 12l9 4 9-4M3 17l9 4 9-4"/></svg></span><div><div class="nm">Data &amp; persistence</div><div class="ct">coming</div></div></div>
+    <div class="cat-tile"><span class="ci"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/></svg></span><div><div class="nm">Networking</div><div class="ct">coming</div></div></div>
+    <div class="cat-tile"><span class="ci"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2L3 14h7l-1 8 10-12h-7l1-8z"/></svg></span><div><div class="nm">Performance</div><div class="ct">coming</div></div></div>
+  </div>
+</section>
+
+<!-- ===== HOW IT WORKS ===== -->
+<section id="how" class="wrap section" style="padding-top:0;">
+  <div class="sec-head">
+    <div class="kicker"><span class="tick">//</span> HOW IT WORKS</div>
+    <h2>Find it. Read it. Trust it. Install it.</h2>
+    <p>Browsing is anonymous. No account needed to discover and inspect a skill.</p>
+  </div>
+  <div class="steps">
+    <div class="card step">
+      <span class="arr">// step</span>
+      <h3>Search &amp; refine</h3>
+      <p>Faceted search by category, token size and tags. &ldquo;Verified only&rdquo; is on by default; every filter lives in a shareable URL.</p>
+    </div>
+    <div class="card step">
+      <span class="arr">// step</span>
+      <h3>Inspect before you trust</h3>
+      <p>Read the manifest, the references and every file in the bundle. Token estimates surface as honest order-of-magnitude bands, not false precision.</p>
+    </div>
+    <div class="card step">
+      <span class="arr">// step</span>
+      <h3>Copy the install</h3>
+      <p>Grab <code style="font-family:var(--mono);font-size:.9em;">androidskills add {slug}</code>, or download the <code style="font-family:var(--mono);font-size:.9em;">.zip</code> straight into <code style="font-family:var(--mono);font-size:.9em;">~/.claude/skills/</code> or <code style="font-family:var(--mono);font-size:.9em;">~/.codex/skills/</code>.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ===== PRINCIPLES ===== -->
+<section id="principles" class="wrap section" style="padding-top:0;">
+  <div class="sec-head">
+    <div class="kicker"><span class="tick">//</span> PRINCIPLES</div>
+    <h2>Built to be trusted with autonomous agents.</h2>
+  </div>
+  <div class="principles">
+    <div class="pr">
+      <svg class="pi" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 12l2 2 4-4"/><circle cx="12" cy="12" r="9"/></svg>
+      <div><div class="pt">Verified by default</div><div class="pd">Human review plus an automated pass. Unverified skills carry a persistent caution and a report action.</div></div>
+    </div>
+    <div class="pr">
+      <svg class="pi" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1"/><path d="M14 11a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1"/></svg>
+      <div><div class="pt">Full provenance</div><div class="pd">Every skill traces back to its source repo @ commit, so you can verify origin yourself.</div></div>
+    </div>
+    <div class="pr">
+      <svg class="pi" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19V5M4 19h16M8 15l3-4 3 2 4-5"/></svg>
+      <div><div class="pt">Token bands, not guesswork</div><div class="pd">Every model tokenises differently, so sizes show as ~100s / ~1k / ~10k / ~100k — not to-the-digit fiction.</div></div>
+    </div>
+    <div class="pr">
+      <svg class="pi" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7l9-4 9 4-9 4-9-4z"/><path d="M3 12l9 4 9-4"/></svg>
+      <div><div class="pt">No package manager</div><div class="pd">Install is a manual zip drop, or a single static-binary CLI. Never npm.</div></div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== NOTIFY CTA ===== -->
+<section class="wrap" style="padding-bottom:var(--section-y); padding-top:0;">
+  <div class="notify">
+    <div class="notify-grid">
+      <div>
+        <div class="kicker"><span class="tick">//</span> BE FIRST ON THE INDEX</div>
+        <h2 style="margin-top:10px;">Get a ping when the index opens.</h2>
+        <p>We&rsquo;re stocking the shelves now. Drop your email and we&rsquo;ll let you know the moment browsing goes live — or watch the repo to follow along in the open.</p>
+        <div class="row" style="gap:10px; margin-top:18px; flex-wrap:wrap;">
+          <a class="btn btn-ghost btn-sm" href="https://github.com/CWTI-Ltd/androidskills.dev" target="_blank" rel="noopener">Watch on GitHub</a>
+          <a class="btn btn-ghost btn-sm" href="https://codewiththeitalians.it" target="_blank" rel="noopener">Curated by Code With The Italians</a>
+        </div>
+      </div>
+      <div class="notify-embed">
+        <iframe data-tally-src="https://tally.so/embed/jaE1pR?alignLeft=1&hideTitle=1&transparentBackground=0&dynamicHeight=1" loading="lazy" width="100%" height="238" frameborder="0" marginheight="0" marginwidth="0" title="androidskills.dev waitlist"></iframe>
+        <script>var d=document,w="https://tally.so/widgets/embed.js",v=function(){"undefined"!=typeof Tally?Tally.loadEmbeds():d.querySelectorAll("iframe[data-tally-src]:not([src])").forEach((function(e){e.src=e.dataset.tallySrc}))};if("undefined"!=typeof Tally)v();else if(d.querySelector('script[src="'+w+'"]')==null){var s=d.createElement("script");s.src=w,s.onload=v,s.onerror=v,d.body.appendChild(s);}</script>
+        <noscript><a class="btn btn-outline btn-sm" href="https://tally.so/r/jaE1pR" target="_blank" rel="noopener">Open the waitlist form &rarr;</a></noscript>
+      </div>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<!-- ===== FOOTER ===== -->
+<footer class="site-foot">
+  <div class="wrap">
+    <div class="cols">
+      <div>
+        <a class="brand" href="#" style="margin-bottom:14px;"><b>android</b>skills.dev</a>
+        <p class="muted" style="font-size:13.5px;max-width:280px;">The open index of AI coding skills for Android development. Community-curated, maintainer-reviewed.</p>
+      </div>
+      <div>
+        <h5>Explore</h5>
+        <a href="#what">What it is</a>
+        <a href="#shelves">Categories</a>
+        <a href="#how">How it works</a>
+        <a href="#principles">Principles</a>
+      </div>
+      <div>
+        <h5>Project</h5>
+        <a href="https://github.com/CWTI-Ltd/androidskills.dev" target="_blank" rel="noopener">GitHub</a>
+        <a href="https://github.com/CWTI-Ltd/androidskills.dev/releases" target="_blank" rel="noopener">Changelog</a>
+        <a href="https://codewiththeitalians.it" target="_blank" rel="noopener">Code With The Italians</a>
+      </div>
+      <div>
+        <h5>Contribute</h5>
+        <a href="#main">Submit a skill <span class="faint" style="font-family:var(--mono);font-size:11px;">(soon)</span></a>
+        <a href="https://github.com/CWTI-Ltd/androidskills.dev" target="_blank" rel="noopener">Guidelines</a>
+        <a href="https://github.com/CWTI-Ltd/androidskills.dev/issues" target="_blank" rel="noopener">Contact</a>
+      </div>
+    </div>
+    <div class="legal">
+      <span>© <span id="year">2026</span> CWTI Ltd. · Curated by codewiththeitalians.it · Not affiliated with Google or the Android Open Source Project.</span>
+      <span>v0.1 · pre-launch</span>
+    </div>
+  </div>
+</footer>
+
+<!-- ===== MOBILE DRAWER ===== -->
+<div class="drawer">
+  <div class="scrim" style="display:grid;align-items:start;">
+    <div class="modal" style="max-width:none;width:100%;border-radius:0 0 var(--r-xl) var(--r-xl);">
+      <div class="mhd">
+        <a class="brand" href="#"><b>android</b>skills.dev</a>
+        <button class="icon-btn" data-menu-close aria-label="Close menu">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+        </button>
+      </div>
+      <div class="mbd stack" style="gap:4px;">
+        <a class="btn btn-ghost btn-block" style="justify-content:flex-start;" href="#what" data-menu-close>What it is</a>
+        <a class="btn btn-ghost btn-block" style="justify-content:flex-start;" href="#shelves" data-menu-close>Categories</a>
+        <a class="btn btn-ghost btn-block" style="justify-content:flex-start;" href="#how" data-menu-close>How it works</a>
+        <a class="btn btn-ghost btn-block" style="justify-content:flex-start;" href="#principles" data-menu-close>Principles</a>
+        <hr class="divider" style="margin:8px 0;">
+        <a class="btn btn-outline btn-block" href="https://github.com/CWTI-Ltd/androidskills.dev" target="_blank" rel="noopener">Star on GitHub</a>
+        <button class="btn btn-ghost btn-block" style="margin-top:4px;" data-theme-toggle>Toggle theme</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>document.getElementById('year').textContent = new Date().getFullYear();</script>
+<script src="assets/brand.js"></script>
+<script src="assets/app.js"></script>
 </body>
 </html>
