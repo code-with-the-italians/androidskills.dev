@@ -403,6 +403,18 @@ textarea {
   color: var(--accent-text);
 }
 
+/* Section label — mono metadata, not a document heading */
+.section-label {
+  display: block;
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  line-height: 1.2;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+
 /* ---------- Header ---------- */
 .site-head {
   position: sticky;
@@ -1258,7 +1270,7 @@ kbd,
 .tabs button:hover {
   color: var(--text);
 }
-.tabs button[aria-selected='true'] {
+.tabs button[aria-pressed='true'] {
   color: var(--text);
   border-bottom-color: var(--accent);
 }
@@ -1494,6 +1506,9 @@ kbd,
 .drawer-panel .close {
   margin-left: auto;
   padding: 8px;
+}
+.drawer-panel .icon-btn {
+  justify-content: center;
 }
 
 /* ---------- Toast ---------- */

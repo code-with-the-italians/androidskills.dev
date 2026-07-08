@@ -11,7 +11,7 @@ const { title, data, max } = Astro.props;
 const top = max ?? Math.max(...data.map((d) => d.count), 1);
 ---
 <div class="card">
-  <h2 style="font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--text-faint);margin-bottom:16px;">{title}</h2>
+  <span class="section-label" style="margin-bottom:16px;">{title}</span>
   <div style="display:flex;flex-direction:column;gap:10px;">
     {data.slice(0, 10).map((item) => (
       <div class="bar-row" style="display:flex;align-items:center;gap:12px;">

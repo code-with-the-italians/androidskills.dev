@@ -15,10 +15,10 @@ const detail = selectedId ? await api.getQueueDetail(selectedId).catch(() => nul
 
 <AdminLayout title="Review queue" me={me}>
   <div class="between" style="margin-bottom: 18px; flex-wrap: wrap; gap: 12px;">
-    <div class="tabs" style="border: 0; gap: 6px;" data-queue-tabs role="tablist" aria-label="Queue filter">
-      <button data-filter="all" aria-selected="true" role="tab" class="queue-tab">All</button>
-      <button data-filter="in_review" role="tab" class="queue-tab">Pending</button>
-      <button data-filter="changes_requested" role="tab" class="queue-tab">Changes requested</button>
+    <div class="tabs" style="border: 0; gap: 6px;" data-queue-tabs role="group" aria-label="Queue filter">
+      <button data-filter="all" aria-pressed="true" class="queue-tab">All</button>
+      <button data-filter="in_review" aria-pressed="false" class="queue-tab">Pending</button>
+      <button data-filter="changes_requested" aria-pressed="false" class="queue-tab">Changes requested</button>
     </div>
     <form class="search search-sm" onsubmit="return false;" role="search" style="max-width: 260px;">
       <svg class="ic-search" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -63,7 +63,7 @@ const detail = selectedId ? await api.getQueueDetail(selectedId).catch(() => nul
             <div class="stat"><span class="n">{detail.sourceRef.slice(0, 7)}</span><span class="l">Ref</span></div>
           </div>
 
-          <h4 style="font-family: var(--mono); font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--text-faint); margin-bottom: 10px;">Files</h4>
+          <span class="section-label" style="margin-bottom: 10px;">Files</span>
           <div class="tbl-wrap" style="margin-bottom: 24px;">
             <div class="scroll">
               <table class="tbl">
@@ -189,7 +189,7 @@ const detail = selectedId ? await api.getQueueDetail(selectedId).catch(() => nul
                 <div class="stat"><span class="n">${esc(d.provenance)}</span><span class="l">Source</span></div>
                 <div class="stat"><span class="n">${esc(d.sourceRef.slice(0, 7))}</span><span class="l">Ref</span></div>
               </div>
-              <h4 style="font-family: var(--mono); font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--text-faint); margin-bottom: 10px;">Files</h4>
+              <span class="section-label" style="margin-bottom: 10px;">Files</span>
               <div class="tbl-wrap" style="margin-bottom: 24px;">
                 <div class="scroll">
                   <table class="tbl">
@@ -254,8 +254,8 @@ const detail = selectedId ? await api.getQueueDetail(selectedId).catch(() => nul
       tabs?.addEventListener('click', (e) => {
         const btn = (e.target as HTMLElement).closest('[data-filter]');
         if (!btn) return;
-        tabs.querySelectorAll('[data-filter]').forEach((b) => b.setAttribute('aria-selected', 'false'));
-        btn.setAttribute('aria-selected', 'true');
+        tabs.querySelectorAll('[data-filter]').forEach((b) => b.setAttribute('aria-pressed', 'false'));
+        btn.setAttribute('aria-pressed', 'true');
         currentFilter = btn.getAttribute('data-filter') || 'all';
         loadQueue();
       });
