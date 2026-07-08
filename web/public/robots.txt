@@ -1,6 +1,0 @@
-User-agent: *
-Allow: /
-
-# Note: /admin is not listed here deliberately.
-# The application returns 404 for /admin/* to non-admin callers, which already
-# prevents indexing. Listing it would advertise the prefix's existence.
