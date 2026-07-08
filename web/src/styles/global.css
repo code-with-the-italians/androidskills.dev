@@ -863,7 +863,8 @@ kbd,
   width: 22px;
   height: 22px;
 }
-.skill-card h3 {
+.skill-card h3,
+.skill-card .card-title {
   font-size: 16.5px;
   letter-spacing: -0.02em;
 }
@@ -1439,7 +1440,7 @@ kbd,
 .drawer-backdrop {
   position: fixed;
   inset: 0;
-  background: color-mix(in oklab, var(--text) 42%, transparent);
+  background: color-mix(in oklab, #000 42%, transparent);
   z-index: 200;
   opacity: 0;
   visibility: hidden;
@@ -1636,7 +1637,7 @@ kbd,
 .scrim {
   position: fixed;
   inset: 0;
-  background: color-mix(in oklab, var(--text) 40%, transparent);
+  background: light-dark(rgba(20, 22, 28, 0.4), rgba(0, 0, 0, 0.6));
   -webkit-backdrop-filter: blur(2px);
   backdrop-filter: blur(2px);
   z-index: 200;

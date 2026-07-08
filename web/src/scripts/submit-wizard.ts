@@ -163,15 +163,15 @@ function renderStep2() {
         <span class="tag" style="flex:none;">${esc(s.tokenUpfront + s.tokenOndemand)} tok</span>
         <svg class="chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
       </div>
-      <div class="acc-body" role="region" aria-label="${esc(s.name)} metadata" style="display:grid;grid-template-rows:0fr;opacity:0;border-top:1px solid transparent;">
+      <div class="acc-body" role="region" aria-label="${esc(s.name)} metadata">
         <div style="overflow:hidden;">
-        <div style="padding:12px 14px;">
-          <div class="kv" style="display:grid;grid-template-columns:130px 1fr;gap:12px;padding:10px 0;border-bottom:1px solid var(--border);font-size:14px;"><span class="k" style="font-family:var(--mono);font-size:12px;color:var(--text-faint);">description</span><span class="v">${esc(s.description)}</span></div>
-          <div class="kv" style="display:grid;grid-template-columns:130px 1fr;gap:12px;padding:10px 0;border-bottom:1px solid var(--border);font-size:14px;"><span class="k" style="font-family:var(--mono);font-size:12px;color:var(--text-faint);">version</span><span class="v">${esc(s.version)}</span></div>
-          <div class="kv" style="display:grid;grid-template-columns:130px 1fr;gap:12px;padding:10px 0;border-bottom:1px solid var(--border);font-size:14px;"><span class="k" style="font-family:var(--mono);font-size:12px;color:var(--text-faint);">license</span><span class="v">${esc(s.license) || '—'}</span></div>
-          <div class="kv" style="display:grid;grid-template-columns:130px 1fr;gap:12px;padding:10px 0;border-bottom:1px solid var(--border);font-size:14px;"><span class="k" style="font-family:var(--mono);font-size:12px;color:var(--text-faint);">tags</span><span class="v">${(s.tags || []).map((t) => `<span class="tag">${esc(t)}</span>`).join(' ')}</span></div>
-          <div class="kv" style="display:grid;grid-template-columns:130px 1fr;gap:12px;padding:10px 0;font-size:14px;"><span class="k" style="font-family:var(--mono);font-size:12px;color:var(--text-faint);">contents</span><span class="v">${esc(s.fileCount)} files · <span style="color:var(--accent-text);">${esc(s.tokenUpfront + s.tokenOndemand)} tokens</span></span></div>
-        </div>
+          <div style="padding:12px 14px;">
+            <div class="kv" style="display:grid;grid-template-columns:130px 1fr;gap:12px;padding:10px 0;border-bottom:1px solid var(--border);font-size:14px;"><span class="k" style="font-family:var(--mono);font-size:12px;color:var(--text-faint);">description</span><span class="v">${esc(s.description)}</span></div>
+            <div class="kv" style="display:grid;grid-template-columns:130px 1fr;gap:12px;padding:10px 0;border-bottom:1px solid var(--border);font-size:14px;"><span class="k" style="font-family:var(--mono);font-size:12px;color:var(--text-faint);">version</span><span class="v">${esc(s.version)}</span></div>
+            <div class="kv" style="display:grid;grid-template-columns:130px 1fr;gap:12px;padding:10px 0;border-bottom:1px solid var(--border);font-size:14px;"><span class="k" style="font-family:var(--mono);font-size:12px;color:var(--text-faint);">license</span><span class="v">${esc(s.license) || '—'}</span></div>
+            <div class="kv" style="display:grid;grid-template-columns:130px 1fr;gap:12px;padding:10px 0;border-bottom:1px solid var(--border);font-size:14px;"><span class="k" style="font-family:var(--mono);font-size:12px;color:var(--text-faint);">tags</span><span class="v">${(s.tags || []).map((t) => `<span class="tag">${esc(t)}</span>`).join(' ')}</span></div>
+            <div class="kv" style="display:grid;grid-template-columns:130px 1fr;gap:12px;padding:10px 0;font-size:14px;"><span class="k" style="font-family:var(--mono);font-size:12px;color:var(--text-faint);">contents</span><span class="v">${esc(s.fileCount)} files · <span style="color:var(--accent-text);">${esc(s.tokenUpfront + s.tokenOndemand)} tokens</span></span></div>
+          </div>
         </div>
       </div>
     </div>
