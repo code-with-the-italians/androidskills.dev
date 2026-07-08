@@ -1,0 +1,9 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [
+      "web/src/lib/markdown.test.ts"
+    ],
+    "ignoreValues": []
+  }
+}

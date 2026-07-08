@@ -60,7 +60,7 @@ const activeFilters = [
           <svg class="ic-search" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <circle cx="11" cy="11" r="8" /><path d="m21 21-4.3-4.3" />
           </svg>
-          <input type="text" name="q" value={q ?? ''} placeholder="Search skills…" autocomplete="off" />
+          <input type="text" name="q" value={q ?? ''} placeholder="Search skills…" autocomplete="off" aria-label="Search skills" />
         </div>
       </form>
 
@@ -80,7 +80,7 @@ const activeFilters = [
           ) : null}
 
           <div class="filter-grp">
-            <label for="sort" class="h4">Sort</label>
+            <h4><label for="sort">Sort</label></h4>
             <form action="/search" method="get" id="sortForm">
               {Array.from(params.entries()).map(([k, v]) =>
                 k !== 'sort' ? <input type="hidden" name={k} value={v} /> : null

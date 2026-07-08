@@ -147,7 +147,7 @@ function renderStep2() {
   const skills = state.scan.skills || [];
   if (skills.length === 0) {
     container.innerHTML =
-      '<div class="callout" style="background:var(--danger-soft);border-color:transparent;align-items:flex-start;"><svg class="ci" viewBox="0 0 24 24" fill="none" stroke="var(--danger)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 9v4M12 17h.01M10.3 3.9 2.4 18a2 2 0 0 0 1.7 3h15.8a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg><div><b>No skill found.</b> A skill is a folder containing a SKILL.md inside a top-level skills/ directory.</div></div></div>';
+      '<div class="callout" style="background:var(--danger-soft);border-color:transparent;align-items:flex-start;"><svg class="ci" viewBox="0 0 24 24" fill="none" stroke="var(--danger)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 9v4M12 17h.01M10.3 3.9 2.4 18a2 2 0 0 0 1.7 3h15.8a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg><div><b>No skill found.</b> A skill is a folder containing a SKILL.md inside a top-level skills/ directory.</div></div>';
     return;
   }
   const items = skills
@@ -163,13 +163,15 @@ function renderStep2() {
         <span class="tag" style="flex:none;">${esc(s.tokenUpfront + s.tokenOndemand)} tok</span>
         <svg class="chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
       </div>
-      <div class="acc-body" style="max-height:0;overflow:hidden;padding:0 14px;border-top:1px solid transparent;" role="region" aria-label="${esc(s.name)} metadata">
-        <div style="padding:12px 0;">
+      <div class="acc-body" role="region" aria-label="${esc(s.name)} metadata" style="display:grid;grid-template-rows:0fr;opacity:0;border-top:1px solid transparent;">
+        <div style="overflow:hidden;">
+        <div style="padding:12px 14px;">
           <div class="kv" style="display:grid;grid-template-columns:130px 1fr;gap:12px;padding:10px 0;border-bottom:1px solid var(--border);font-size:14px;"><span class="k" style="font-family:var(--mono);font-size:12px;color:var(--text-faint);">description</span><span class="v">${esc(s.description)}</span></div>
           <div class="kv" style="display:grid;grid-template-columns:130px 1fr;gap:12px;padding:10px 0;border-bottom:1px solid var(--border);font-size:14px;"><span class="k" style="font-family:var(--mono);font-size:12px;color:var(--text-faint);">version</span><span class="v">${esc(s.version)}</span></div>
           <div class="kv" style="display:grid;grid-template-columns:130px 1fr;gap:12px;padding:10px 0;border-bottom:1px solid var(--border);font-size:14px;"><span class="k" style="font-family:var(--mono);font-size:12px;color:var(--text-faint);">license</span><span class="v">${esc(s.license) || '—'}</span></div>
           <div class="kv" style="display:grid;grid-template-columns:130px 1fr;gap:12px;padding:10px 0;border-bottom:1px solid var(--border);font-size:14px;"><span class="k" style="font-family:var(--mono);font-size:12px;color:var(--text-faint);">tags</span><span class="v">${(s.tags || []).map((t) => `<span class="tag">${esc(t)}</span>`).join(' ')}</span></div>
           <div class="kv" style="display:grid;grid-template-columns:130px 1fr;gap:12px;padding:10px 0;font-size:14px;"><span class="k" style="font-family:var(--mono);font-size:12px;color:var(--text-faint);">contents</span><span class="v">${esc(s.fileCount)} files · <span style="color:var(--accent-text);">${esc(s.tokenUpfront + s.tokenOndemand)} tokens</span></span></div>
+        </div>
         </div>
       </div>
     </div>
@@ -177,7 +179,7 @@ function renderStep2() {
     )
     .join('');
   container.innerHTML = `
-    <div class="callout" style="margin-bottom:16px;" aria-live="polite" aria-atomic="true"><svg class="ci" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 16v-4M12 8h.01" stroke-linecap="round"/></svg><div><b>${esc(skills.length)} skill${skills.length > 1 ? 's' : ''}</b> found. Everything below is read from each skill's SKILL.md frontmatter.</div></div></div>
+    <div class="callout" style="margin-bottom:16px;" aria-live="polite" aria-atomic="true"><svg class="ci" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 16v-4M12 8h.01" stroke-linecap="round"/></svg><div><b>${esc(skills.length)} skill${skills.length > 1 ? 's' : ''}</b> found. Everything below is read from each skill's SKILL.md frontmatter.</div></div>
     <div class="accs">${items}</div>
     <button class="btn btn-primary" data-continue style="margin-top:18px;">Continue with selected skills</button>
   `;
@@ -227,7 +229,7 @@ function render() {
   });
   const activeStep = steps.find((s) => s.classList.contains('active'));
   if (activeStep) {
-    const title = activeStep.querySelector('.vtitle') as HTMLElement | null;
+    const title = activeStep.querySelector('h3') as HTMLElement | null;
     title?.focus({ preventScroll: true });
   }
   const status = document.getElementById('repoStatus');
