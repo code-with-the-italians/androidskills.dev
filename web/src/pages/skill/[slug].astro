@@ -112,7 +112,7 @@ const fileTree = files?.tree ?? [];
           {fileTree.length > 0 && (
             <div class="card" style="padding:0;overflow:hidden;" role="region" aria-label="File tree">
               <div style="padding:14px 18px;border-bottom:1px solid var(--border);">
-                <h4 style="font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--text-faint);">Files</h4>
+                <span class="section-label">Files</span>
               </div>
               <div style="padding:8px;" role="list">
                 {fileTree.map((node) => (
@@ -138,7 +138,7 @@ const fileTree = files?.tree ?? [];
 
           {versions && versions.versions.length > 0 && (
             <div class="card">
-              <h4 style="font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--text-faint);margin-bottom:12px;">Versions</h4>
+              <span class="section-label" style="margin-bottom:12px;">Versions</span>
               {versions.versions.map((v) => (
                 <div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);">
                   <span style="font-family:var(--mono);font-size:13px;font-weight:600;">v{v.version}</span>
