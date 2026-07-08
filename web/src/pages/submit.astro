@@ -29,21 +29,21 @@ try {
           <div class="vstep" data-step="1">
             <div class="vno">1</div>
             <div class="vbody">
-              <div class="vhead"><h3>Repository</h3></div>
+              <div class="vhead"><h2 class="vtitle">Repository</h2></div>
               <div class="vcontent" id="step1content"></div>
             </div>
           </div>
           <div class="vstep" data-step="2">
             <div class="vno">2</div>
             <div class="vbody">
-              <div class="vhead"><h3>Detected skills</h3></div>
+              <div class="vhead"><h2 class="vtitle">Detected skills</h2></div>
               <div class="vcontent" id="step2content"></div>
             </div>
           </div>
           <div class="vstep" data-step="3">
             <div class="vno">3</div>
             <div class="vbody">
-              <div class="vhead"><h3>Review & submit</h3></div>
+              <div class="vhead"><h2 class="vtitle">Review & submit</h2></div>
               <div class="vcontent" id="step3content"></div>
             </div>
           </div>
@@ -75,6 +75,7 @@ try {
   </noscript>
 
   <style>
+    .vtitle { font-size: 16.5px; font-weight: 600; margin: 0; }
     .vsteps { display: flex; flex-direction: column; }
     .vstep { display: grid; grid-template-columns: 32px 1fr; gap: 16px; position: relative; padding-bottom: 26px; }
     .vstep:last-child { padding-bottom: 0; }

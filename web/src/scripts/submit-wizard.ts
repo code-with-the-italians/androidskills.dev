@@ -229,7 +229,7 @@ function render() {
   });
   const activeStep = steps.find((s) => s.classList.contains('active'));
   if (activeStep) {
-    const title = activeStep.querySelector('h3') as HTMLElement | null;
+    const title = activeStep.querySelector('h2') as HTMLElement | null;
     title?.focus({ preventScroll: true });
   }
   const status = document.getElementById('repoStatus');
