@@ -30,8 +30,10 @@ services:
       # silently defaults to http://localhost:8080 (wrong OAuth redirect_uri, Secure=false).
       PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:?set PUBLIC_BASE_URL in .env.staging}
       TRUSTED_PROXY_COUNT: ${TRUSTED_PROXY_COUNT:-1}
-      # Staging seeds demo data into an empty DB and runs WITHOUT Litestream (R2 unset).
-      SEED_DEMO: "1"
+      # Staging seeds the REAL skills catalogue into an empty DB and runs WITHOUT Litestream
+      # (R2 unset). SEED_REAL loads resources/seed/real-skills.json; SEED_DEMO is the tiny
+      # test fixture and is intentionally NOT set here.
+      SEED_REAL: "1"
     volumes:
       - staging-data:/data
     # Not published to the host — internal compose network only.
