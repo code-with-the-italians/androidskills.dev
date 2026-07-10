@@ -110,6 +110,10 @@ fun Application.module(
     config.auth.sessionCookieDomain ?: "(host-only)",
   )
 
+  // Real skills catalogue (staging) takes precedence over the demo fixture if both are set.
+  if (config.seedReal && transaction { Skills.selectAll().count() == 0L }) {
+    dev.androidskills.api.RealSeed.seed(fileStore)
+  }
   if (config.seedDemo && transaction { Skills.selectAll().count() == 0L }) {
     dev.androidskills.api.DemoData.seed(fileStore)
   }

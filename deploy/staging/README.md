@@ -16,7 +16,7 @@ Browser ──TLS──► Cloudflare edge ──► Cloudflare Tunnel ──►
 ```
 
 - `api` is **never** published to the host — internal compose network only (`api:8080`).
-- Litestream/R2 are **off** in staging; data is ephemeral + `SEED_DEMO=1`.
+- Litestream/R2 are **off** in staging; data is ephemeral + `SEED_REAL=1` (real skills catalogue).
 
 ## Files
 

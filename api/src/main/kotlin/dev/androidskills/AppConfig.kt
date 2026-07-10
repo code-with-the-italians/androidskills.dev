@@ -19,6 +19,8 @@ data class AppConfig(
   val llmModel: String?,
   /** When true, a small demo dataset is seeded into an empty DB (local/dev only). */
   val seedDemo: Boolean = false,
+  /** When true, the real skills catalogue (resources/seed) is seeded into an empty DB (staging). */
+  val seedReal: Boolean = false,
   val auth: AuthConfig = AuthConfig.disabled(),
   /** GitHub App (installation tokens, repo scan, webhooks). null → disabled (spec §13). */
   val githubApp: GithubAppConfig = GithubAppConfig.disabled(),
@@ -28,7 +30,7 @@ data class AppConfig(
   override fun toString(): String =
     "AppConfig(version=$version, dbPath=$dbPath, fileStoreDir=$fileStoreDir, " +
       "llmBaseUrl=$llmBaseUrl, llmApiKey=${if (llmApiKey == null) "null" else "***"}, " +
-      "llmModel=$llmModel, seedDemo=$seedDemo, auth=$auth, githubApp=$githubApp)"
+      "llmModel=$llmModel, seedDemo=$seedDemo, seedReal=$seedReal, auth=$auth, githubApp=$githubApp)"
 
   /**
    * Fail-fast validation for required paths and URLs. This runs after env parsing so the app exits
@@ -100,6 +102,7 @@ data class AppConfig(
         llmApiKey = llmApiKey,
         llmModel = llmModel,
         seedDemo = env("SEED_DEMO")?.equals("1", ignoreCase = true) == true,
+        seedReal = env("SEED_REAL")?.equals("1", ignoreCase = true) == true,
         auth =
           AuthConfig(
             oauth = oauth,
