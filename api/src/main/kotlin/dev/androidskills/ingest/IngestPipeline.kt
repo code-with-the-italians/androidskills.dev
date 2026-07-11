@@ -52,7 +52,7 @@ object IngestPipeline {
   ): IngestResult {
     val scanResult = Discovery.discover(source)
     if (scanResult is ScanResult.NoSkillsDir) {
-      throw IllegalStateException("No top-level 'skills/' directory in archive")
+      throw IllegalStateException("No SKILL.md found in the archive")
     }
     val detected = (scanResult as ScanResult.Found).skills
     if (detected.isEmpty()) throw IllegalStateException("No valid skills discovered")
@@ -60,8 +60,13 @@ object IngestPipeline {
     val extracted = Discovery.extract(source) // raw file bytes for mirroring + zip
     val ingested = mutableListOf<IngestedSkill>()
 
+    // Skip skills whose slug collides within this archive: ingesting both would silently merge the
+    // second onto the first (same bundle+slug is treated as a resync). Discovery flags them via a
+    // parse error so the contributor can rename and re-submit.
+    val dupSlugs = detected.groupingBy { it.slug }.eachCount().filterValues { it > 1 }.keys
     val skillDirs = detected.map { it.sourceDir }
     for (skill in detected) {
+      if (skill.slug in dupSlugs) continue
       val skillDir = skill.sourceDir
       val files = extracted.filter { Discovery.ownerDir(it.path, skillDirs) == skillDir }
       val skillMd = files.firstOrNull { it.path == "$skillDir/SKILL.md" }
@@ -263,7 +268,7 @@ object IngestPipeline {
   ): PromoteResult {
     val scanResult = Discovery.discover(source)
     if (scanResult is ScanResult.NoSkillsDir) {
-      throw IllegalStateException("No top-level 'skills/' directory in archive")
+      throw IllegalStateException("No SKILL.md found in the archive")
     }
     val detected = (scanResult as ScanResult.Found).skills
     val extracted = Discovery.extract(source)
@@ -273,8 +278,15 @@ object IngestPipeline {
         ?: throw IllegalStateException("Skill $skillId not found for promotion")
     val slug = skillRow[Skills.slug]
 
+    val matches = detected.filter { it.slug == slug }
+    if (matches.size > 1) {
+      throw ApiConflictException(
+        "Skill '$slug' is ambiguous: ${matches.size} skills in the archive share this directory name",
+        "duplicate_slug",
+      )
+    }
     val detectedSkill =
-      detected.firstOrNull { it.slug == slug }
+      matches.firstOrNull()
         ?: throw ApiConflictException(
           "Skill '$slug' not found in the archive; contributor may have removed or renamed it",
           "slug_mismatch",

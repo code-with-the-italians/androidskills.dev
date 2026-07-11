@@ -203,28 +203,25 @@ class DiscoveryTest {
   }
 
   @Test
-  fun `duplicate leaf names get distinct, kebab-valid slugs`() {
-    // Two skills sharing a leaf must NOT silently merge. Leaf + -N keeps them distinct AND
-    // kebab-valid. Also covers Bugbot's path-flatten collisions: foo-bar/baz, foo/bar-baz and
-    // foo/bar/baz all flatten to the same string, but leaf + -N does not.
+  fun `duplicate leaf names keep the leaf slug but are flagged`() {
+    // Same leaf in different dirs is NOT renumbered or merged: the slug stays the natural leaf and
+    // every colliding skill is flagged with a `slug` parse error (surfaced by the scan; the ingest
+    // pipeline skips them). Unique slugs are not flagged.
     val zip =
       zip(
         "o-r-s/foo-bar/baz/SKILL.md" to skillMd("a", "A."),
-        "o-r-s/foo/bar-baz/SKILL.md" to skillMd("b", "B."),
-        "o-r-s/foo/bar/baz/SKILL.md" to skillMd("c", "C."),
-        "o-r-s/material/styles/SKILL.md" to skillMd("d", "D."),
+        "o-r-s/foo/bar/baz/SKILL.md" to skillMd("b", "B."), // same leaf 'baz'
+        "o-r-s/material/styles/SKILL.md" to skillMd("c", "C."), // unique
       )
     val found =
       assertIs<ScanResult.Found>(
         Discovery.discover(ArchiveSource.RepoZipball(zip, "owner", "repo", "sha"))
       )
-    val slugs = found.skills.map { it.slug }
-    assertEquals(4, slugs.size)
-    assertEquals(slugs.size, slugs.toSet().size, "slugs must be unique: $slugs")
-    val kebab = Regex("^[a-z0-9]+(-[a-z0-9]+)*$")
-    assertTrue(slugs.all { kebab.matches(it) }, "slugs must be kebab-valid: $slugs")
-    // leaves baz / bar-baz / baz / styles → the two `baz` become baz + baz-2 (sorted dir order).
-    assertEquals(setOf("baz", "bar-baz", "baz-2", "styles"), slugs.toSet())
+    val bazes = found.skills.filter { it.slug == "baz" }
+    assertEquals(2, bazes.size)
+    assertTrue(bazes.all { s -> s.parseErrors.any { it.field == "slug" } }, "both 'baz' flagged")
+    val styles = found.skills.first { it.slug == "styles" }
+    assertTrue(styles.parseErrors.none { it.field == "slug" }, "unique slug not flagged")
   }
 
   @Test

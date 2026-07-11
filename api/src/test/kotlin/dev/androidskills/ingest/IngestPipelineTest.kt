@@ -119,6 +119,30 @@ class IngestPipelineTest {
   }
 
   @Test
+  fun `duplicate-slug skills within an archive are skipped, not merged`() {
+    val (bundleId, userId) = seedBundle()
+    fun md(name: String) =
+      "---\nname: $name\ndescription: d\nlicense: MIT\ntags: [android]\n---\n# $name\n"
+    // Dir leaf is the slug: a/baz and b/baz both → "baz"; c/keep → "keep".
+    val zipBytes =
+      zip(
+        "o-r/a/baz/SKILL.md" to md("baz"),
+        "o-r/b/baz/SKILL.md" to md("baz"),
+        "o-r/c/keep/SKILL.md" to md("keep"),
+      )
+    val result =
+      IngestPipeline.ingest(
+        ArchiveSource.RepoZipball(zipBytes, "o", "r", "sha1234567890"),
+        bundleId,
+        store,
+        userId,
+      )
+    // Only the unique-slug skill is ingested; the two colliding "baz" are skipped (not merged).
+    assertEquals(listOf("keep"), result.skills.map { it.slug })
+    assertEquals(0L, transaction { Skills.selectAll().where { Skills.slug eq "baz" }.count() })
+  }
+
+  @Test
   fun `new skill - writes everything`() {
     val (bundleId, userId) = seedBundle()
     val zipBytes = skillZip("test-mvi", "MVI Scaffold", "A baseline.", "1.0.0")
