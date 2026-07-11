@@ -98,14 +98,17 @@ object Migrations {
   }
 
   /**
-   * v4: `skills.source_dir` — the resync/promote identity, decoupled from `slug`. Backfill legacy
-   * rows (pre-#37 skills all lived at `skills/<slug>`; the SLUG regex forbids `/`, so this is
-   * well-formed and inherits slug's global uniqueness), then add the `(bundle_id, source_dir)`
-   * unique index. Order matters: backfill must precede the unique-index creation.
+   * v4: `skills.source_dir` — the resync/promote identity, decoupled from `slug`. Legacy rows keep
+   * `source_dir` NULL rather than a guessed path: the real archive dir was never stored and can't
+   * be reconstructed (a nested skill's true path is not `skills/<slug>`), so inventing one would
+   * break later identity lookups. A NULL row is reconciled to its real path on the next resync /
+   * promote / re-submit by matching the archive skill whose leaf slug equals the row's slug (see
+   * `IngestPipeline` / `SubmissionQueries`). SQLite treats NULLs as distinct in a unique index, so
+   * multiple legacy rows per bundle coexist under `(bundle_id, source_dir)`; new rows always carry
+   * a non-null, per-bundle-unique source_dir.
    */
   private fun Transaction.migrateV4() {
     addColumnIfNotExists("skills", "source_dir", "TEXT")
-    exec("UPDATE skills SET source_dir = 'skills/' || slug WHERE source_dir IS NULL")
     exec(
       "CREATE UNIQUE INDEX IF NOT EXISTS uq_skills_bundle_sourcedir ON skills(bundle_id, source_dir)"
     )

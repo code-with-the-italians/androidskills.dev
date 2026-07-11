@@ -129,6 +129,26 @@ class MigrationTest {
         }
       }
     }
+
+    // Pre-v4 legacy rows carry a NULL source_dir; SQLite treats NULLs as distinct, so several
+    // coexist in one bundle under uq_skills_bundle_sourcedir (they are reconciled on next ingest).
+    transaction {
+      listOf("legacy-a", "legacy-b").forEachIndexed { i, s ->
+        Skills.insert {
+          it[Skills.id] = "20000000-0000-0000-0000-00000000000$i"
+          it[Skills.bundleId] = bid
+          it[Skills.slug] = s
+          // source_dir omitted (NULL)
+          it[Skills.name] = s
+          it[Skills.description] = "x"
+          it[Skills.version] = "1.0.0"
+          it[Skills.versionSource] = "manifest"
+          it[Skills.createdAt] = now
+          it[Skills.updatedAt] = now
+        }
+      }
+    }
+    assertEquals(3, transaction { Skills.selectAll().where { Skills.bundleId eq bid }.count() })
   }
 
   @Test

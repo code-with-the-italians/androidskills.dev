@@ -280,6 +280,55 @@ class SubmissionQueriesTest {
   }
 
   @Test
+  fun `createDrafts reconciles a pre-v4 legacy shell by leaf slug`(): Unit = runBlocking {
+    setupDb()
+    val (uid, principal) = createUser(42L, "alice")
+    // A pre-v4 unlisted shell in the owner/repo bundle with a NULL source_dir.
+    transaction {
+      Bundles.insert {
+        it[Bundles.id] = "00000000-0000-0000-0000-0000000000aa"
+        it[Bundles.kind] = "repo"
+        it[Bundles.provenance] = "owner/repo"
+        it[Bundles.ownerUserId] = uid
+        it[Bundles.installationId] = 1L
+        it[Bundles.createdAt] = nowIso()
+      }
+      Skills.insert {
+        it[Skills.id] = "00000000-0000-0000-0000-0000000000bb"
+        it[Skills.bundleId] = "00000000-0000-0000-0000-0000000000aa"
+        it[Skills.slug] = "revived"
+        // source_dir omitted (NULL) — legacy state.
+        it[Skills.name] = "Old"
+        it[Skills.description] = "old"
+        it[Skills.license] = "MIT"
+        it[Skills.version] = "1.0.0"
+        it[Skills.versionSource] = "manifest"
+        it[Skills.status] = "unlisted"
+        it[Skills.verified] = false
+        it[Skills.createdAt] = nowIso()
+        it[Skills.updatedAt] = nowIso()
+      }
+    }
+
+    val resp = SubmissionQueries.createDrafts(principal, draftRequest("revived"), fakeGh())
+
+    // Adopted, not duplicated: one skill, slug preserved, source_dir healed to the real path.
+    assertEquals(listOf("revived"), resp.slugs)
+    transaction {
+      assertEquals(
+        1,
+        Skills.selectAll()
+          .where { Skills.bundleId eq "00000000-0000-0000-0000-0000000000aa" }
+          .count(),
+      )
+      assertEquals(
+        "skills/revived",
+        Skills.selectAll().where { Skills.slug eq "revived" }.single()[Skills.sourceDir],
+      )
+    }
+  }
+
+  @Test
   fun `createDrafts 422 when no github app installation for owner`(): Unit = runBlocking {
     setupDb()
     val (_, principal) = createUser(42L, "alice")

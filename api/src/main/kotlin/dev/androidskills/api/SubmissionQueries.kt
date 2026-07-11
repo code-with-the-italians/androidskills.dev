@@ -120,6 +120,9 @@ object SubmissionQueries {
         mapOf("sourceDir" to "must be unique across the selected skills")
       )
     }
+    // Slug multiplicity within the request; a legacy row is only reconciled by a slug that is
+    // unambiguous here, so two same-slug selections can't both try to adopt it.
+    val requestSlugCounts = request.skills.groupingBy { it.slug }.eachCount()
 
     val provenance = "${request.repoOwner}/${request.repoName}"
 
@@ -190,10 +193,25 @@ object SubmissionQueries {
         // Identity is (bundle, source_dir). Re-drafting an unlisted shell is allowed; a published
         // skill or an active submission for it goes through the admin queue. A cross-bundle name
         // clash is fine now — the assigned slug is uniquified, so there is no `slug_conflict`.
+        // Fall back to a pre-v4 legacy row (source_dir NULL) with the same leaf slug so a re-submit
+        // reconciles the existing skill instead of spawning a duplicate; its path is healed below.
+        // Only when the slug is unique in this request, so an ambiguous leaf can't misadopt the
+        // row.
         val existingSkill =
           Skills.selectAll()
             .where { (Skills.bundleId eq bundleId) and (Skills.sourceDir eq sourceDir) }
             .singleOrNull()
+            ?: if (requestSlugCounts[selection.slug] == 1) {
+              Skills.selectAll()
+                .where {
+                  (Skills.bundleId eq bundleId) and
+                    Skills.sourceDir.isNull() and
+                    (Skills.slug eq selection.slug)
+                }
+                .singleOrNull()
+            } else {
+              null
+            }
         if (existingSkill != null && existingSkill[Skills.status] == SkillStatus.published.name) {
           throw ApiConflictException(
             "Skill '${existingSkill[Skills.slug]}' is already published; updates go through the admin queue",
@@ -225,8 +243,10 @@ object SubmissionQueries {
         val skillId =
           if (existingSkill != null) {
             // Same (bundle, source_dir), unlisted shell: refresh from the latest scan metadata.
+            // Also heals a legacy row's source_dir (a no-op when it already matched on source_dir).
             val id = existingSkill[Skills.id]
             Skills.update({ Skills.id eq id }) {
+              it[Skills.sourceDir] = sourceDir
               it[Skills.name] = selection.name
               it[Skills.description] = selection.description
               it[Skills.license] = selection.license
