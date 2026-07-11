@@ -115,11 +115,40 @@ object Discovery {
     // BOTH detection AND file assignment, so their files fall to a valid ancestor consistently with
     // IngestPipeline (which assigns from the same detected set) — no fileCount/tree mismatch.
     val skillDirs = candidateDirs.filterTo(HashSet()) { SLUG.matches(it.substringAfterLast('/')) }
+    // Unique, valid-kebab slug per skill dir: the validated leaf, disambiguated with `-N` on a
+    // same-leaf collision within the archive (deterministic via sorted dir order).
+    val slugByDir = assignSlugs(skillDirs)
     // Assign each file to its DEEPEST containing skill dir (a skill can nest inside another).
     val byDir = skillDirs.associateWith { mutableListOf<Extracted>() }
     for (e in entries) ownerDir(e.path, skillDirs)?.let { byDir.getValue(it).add(e) }
-    val detected = byDir.entries.mapNotNull { (dir, files) -> buildDetected(dir, files, source) }
+    val detected =
+      byDir.entries.mapNotNull { (dir, files) ->
+        buildDetected(dir, slugByDir.getValue(dir), files, source)
+      }
     return ScanResult.Found(detected)
+  }
+
+  /**
+   * Assigns a unique, kebab-valid slug to each skill dir. The base is the dir's leaf (already
+   * validated against [SLUG] by [discover]); a same-leaf collision within the archive gets a `-2`,
+   * `-3`, … suffix. Deterministic: dirs are processed in sorted order, so a given archive always
+   * yields the same slugs. Suffixing the validated leaf keeps every slug kebab-valid (unlike
+   * flattening the full path, which could both collide and produce non-kebab segments).
+   */
+  private fun assignSlugs(skillDirs: Set<String>): Map<String, String> {
+    val used = HashSet<String>()
+    val out = HashMap<String, String>()
+    for (dir in skillDirs.sorted()) {
+      val base = dir.substringAfterLast('/')
+      var slug = base
+      var n = 1
+      while (!used.add(slug)) {
+        n++
+        slug = "$base-$n"
+      }
+      out[dir] = slug
+    }
+    return out
   }
 
   /** The deepest skill dir in [skillDirs] that contains [path] (or IS its SKILL.md), else null. */
@@ -190,16 +219,15 @@ object Discovery {
 
   /**
    * [dir] is the skill's archive-relative directory (any depth, already validated by [discover]);
-   * [files] are the entries assigned to it. The slug is the path (minus a leading `skills/`) with
-   * separators flattened to `-`, so two same-named leaves in different parents never share a slug.
+   * [slug] is its resolved unique slug (see [assignSlugs]); [files] are the entries assigned to it.
    * Returns null only if the directory somehow has no SKILL.md.
    */
   private fun buildDetected(
     dir: String,
+    slug: String,
     files: List<Extracted>,
     source: ArchiveSource,
   ): DetectedSkill? {
-    val slug = dir.removePrefix("skills/").replace('/', '-')
     val skillMd = files.firstOrNull { it.path == "$dir/SKILL.md" } ?: return null
     val manifest = SkillManifestParser.parse(String(skillMd.bytes, Charsets.UTF_8))
     val onDemandFiles = files.filter { isOnDemand(it.path, dir) && !it.binary }

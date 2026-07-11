@@ -176,12 +176,12 @@ class DiscoveryTest {
       assertIs<ScanResult.Found>(
         Discovery.discover(ArchiveSource.RepoZipball(zip, "owner", "repo", "sha1234567890ab"))
       )
-    // Slug is the path (minus a leading skills/) flattened with '-', so it is unique per path.
+    // Slug is the leaf name (unique here) — short and stable.
     assertEquals(
-      setOf("jetpack-compose-adaptive", "recomposition-debugging-recompositions", "testing-deep"),
+      setOf("adaptive", "debugging-recompositions", "deep"),
       found.skills.map { it.slug }.toSet(),
     )
-    val adaptive = found.skills.first { it.slug == "jetpack-compose-adaptive" }
+    val adaptive = found.skills.first { it.slug == "adaptive" }
     assertEquals("jetpack-compose/adaptive", adaptive.sourceDir)
     assertTrue(adaptive.fileCount >= 2, "SKILL.md + references counted")
   }
@@ -199,25 +199,32 @@ class DiscoveryTest {
       assertIs<ScanResult.Found>(
         Discovery.discover(ArchiveSource.RepoZipball(zip, "owner", "repo", "sha"))
       )
-    assertEquals(listOf("lists-optimizing-layouts"), found.skills.map { it.slug })
+    assertEquals(listOf("optimizing-layouts"), found.skills.map { it.slug })
   }
 
   @Test
-  fun `duplicate leaf names in different parents get distinct slugs`() {
-    // Regression: leaf-only slugs silently merged two different skills. Path-based slugs don't.
+  fun `duplicate leaf names get distinct, kebab-valid slugs`() {
+    // Two skills sharing a leaf must NOT silently merge. Leaf + -N keeps them distinct AND
+    // kebab-valid. Also covers Bugbot's path-flatten collisions: foo-bar/baz, foo/bar-baz and
+    // foo/bar/baz all flatten to the same string, but leaf + -N does not.
     val zip =
       zip(
-        "o-r-s/jetpack-compose/theming/styles/SKILL.md" to skillMd("styles", "Compose styles."),
-        "o-r-s/material/styles/SKILL.md" to skillMd("styles", "Material styles."),
+        "o-r-s/foo-bar/baz/SKILL.md" to skillMd("a", "A."),
+        "o-r-s/foo/bar-baz/SKILL.md" to skillMd("b", "B."),
+        "o-r-s/foo/bar/baz/SKILL.md" to skillMd("c", "C."),
+        "o-r-s/material/styles/SKILL.md" to skillMd("d", "D."),
       )
     val found =
       assertIs<ScanResult.Found>(
         Discovery.discover(ArchiveSource.RepoZipball(zip, "owner", "repo", "sha"))
       )
-    assertEquals(
-      setOf("jetpack-compose-theming-styles", "material-styles"),
-      found.skills.map { it.slug }.toSet(),
-    )
+    val slugs = found.skills.map { it.slug }
+    assertEquals(4, slugs.size)
+    assertEquals(slugs.size, slugs.toSet().size, "slugs must be unique: $slugs")
+    val kebab = Regex("^[a-z0-9]+(-[a-z0-9]+)*$")
+    assertTrue(slugs.all { kebab.matches(it) }, "slugs must be kebab-valid: $slugs")
+    // leaves baz / bar-baz / baz / styles → the two `baz` become baz + baz-2 (sorted dir order).
+    assertEquals(setOf("baz", "bar-baz", "baz-2", "styles"), slugs.toSet())
   }
 
   @Test
@@ -233,10 +240,10 @@ class DiscoveryTest {
       assertIs<ScanResult.Found>(
         Discovery.discover(ArchiveSource.RepoZipball(zip, "owner", "repo", "sha"))
       )
-    assertEquals(setOf("outer", "outer-inner"), found.skills.map { it.slug }.toSet())
+    assertEquals(setOf("outer", "inner"), found.skills.map { it.slug }.toSet())
     // outer keeps SKILL.md + notes.md; inner's two files are NOT double-counted under outer.
     assertEquals(2, found.skills.first { it.slug == "outer" }.fileCount)
-    assertEquals(2, found.skills.first { it.slug == "outer-inner" }.fileCount)
+    assertEquals(2, found.skills.first { it.slug == "inner" }.fileCount)
   }
 
   @Test
@@ -253,7 +260,7 @@ class DiscoveryTest {
       assertIs<ScanResult.Found>(
         Discovery.discover(ArchiveSource.RepoZipball(zip, "owner", "repo", "sha"))
       )
-    assertEquals(listOf("tools-valid-skill"), found.skills.map { it.slug })
+    assertEquals(listOf("valid-skill"), found.skills.map { it.slug })
     assertEquals(3, found.skills[0].fileCount) // all 3 files under the one valid skill
   }
 
