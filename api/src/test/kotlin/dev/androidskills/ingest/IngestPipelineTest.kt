@@ -293,6 +293,7 @@ class IngestPipelineTest {
         it[Skills.id] = skillId
         it[Skills.bundleId] = bundleId
         it[Skills.slug] = "guard-test"
+        it[Skills.sourceDir] = "skills/guard-test"
         it[Skills.name] = "Old"
         it[Skills.description] = "Old"
         it[Skills.version] = "0.0.0"
@@ -338,6 +339,7 @@ class IngestPipelineTest {
         it[Skills.id] = skillId
         it[Skills.bundleId] = bundleId
         it[Skills.slug] = "promote-test"
+        it[Skills.sourceDir] = "skills/promote-test"
         it[Skills.name] = "Old"
         it[Skills.description] = "Old"
         it[Skills.version] = "0.0.0"
@@ -367,5 +369,131 @@ class IngestPipelineTest {
     }
     assertTrue(files.contains("SKILL.md"))
     assertTrue(files.contains("references/guide.md"))
+  }
+
+  @Test
+  fun `resync reconciles a pre-v4 legacy row by leaf slug and heals source_dir`() {
+    val (bundleId, userId) = seedBundle()
+    // A pre-v4 row: created before source_dir existed, so it is NULL. Published, slug = leaf.
+    val legacyId = dev.androidskills.util.newId()
+    val now = dev.androidskills.util.nowIso()
+    transaction {
+      Skills.insert {
+        it[Skills.id] = legacyId
+        it[Skills.bundleId] = bundleId
+        it[Skills.slug] = "adaptive"
+        // source_dir intentionally omitted (NULL) — the legacy state.
+        it[Skills.name] = "Adaptive"
+        it[Skills.description] = "Old desc"
+        it[Skills.license] = "MIT"
+        it[Skills.version] = "1.0.0"
+        it[Skills.versionSource] = "manifest"
+        it[Skills.status] = "published"
+        it[Skills.verified] = true
+        it[Skills.createdAt] = now
+        it[Skills.updatedAt] = now
+      }
+    }
+
+    val result =
+      IngestPipeline.ingest(
+        ArchiveSource.UploadedZip(
+          skillZip("adaptive", "Adaptive", "New desc.", "2.0.0"),
+          "h-legacy",
+        ),
+        bundleId,
+        store,
+        userId,
+      )
+
+    // The legacy row is adopted (no duplicate) and its real path is stamped in.
+    assertEquals(1, result.skills.size)
+    assertEquals(legacyId, result.skills[0].skillId)
+    assertFalse(result.skills[0].isNew)
+    assertEquals(
+      1,
+      transaction { Skills.selectAll().where { Skills.bundleId eq bundleId }.count() },
+    )
+    assertEquals("skills/adaptive", skillRow("adaptive")[Skills.sourceDir])
+  }
+
+  @Test
+  fun `promote reconciles a pre-v4 legacy row by leaf slug`() {
+    val (bundleId, userId) = seedBundle()
+    val skillId = dev.androidskills.util.newId()
+    val now = dev.androidskills.util.nowIso()
+    transaction {
+      Skills.insert {
+        it[Skills.id] = skillId
+        it[Skills.bundleId] = bundleId
+        it[Skills.slug] = "legacy-promote"
+        // source_dir intentionally omitted (NULL) — the legacy state.
+        it[Skills.name] = "Old"
+        it[Skills.description] = "Old"
+        it[Skills.version] = "0.0.0"
+        it[Skills.versionSource] = "manifest"
+        it[Skills.status] = "unlisted"
+        it[Skills.verified] = false
+        it[Skills.createdAt] = now
+        it[Skills.updatedAt] = now
+      }
+    }
+
+    IngestPipeline.promote(
+      skillId,
+      ArchiveSource.UploadedZip(
+        skillZip("legacy-promote", "Legacy Promote", "New", "1.0.0"),
+        "hash",
+      ),
+      bundleId,
+      store,
+      userId,
+    )
+
+    val row = transaction { Skills.selectAll().where { Skills.id eq skillId }.single() }
+    assertEquals("Legacy Promote", row[Skills.name])
+    assertEquals("skills/legacy-promote", row[Skills.sourceDir])
+  }
+
+  @Test
+  fun `resync does not adopt a legacy row when the leaf slug is ambiguous`() {
+    val (bundleId, userId) = seedBundle()
+    val legacyId = dev.androidskills.util.newId()
+    val now = dev.androidskills.util.nowIso()
+    transaction {
+      Skills.insert {
+        it[Skills.id] = legacyId
+        it[Skills.bundleId] = bundleId
+        it[Skills.slug] = "dup"
+        // source_dir omitted (NULL) — legacy state.
+        it[Skills.name] = "Legacy Dup"
+        it[Skills.description] = "old"
+        it[Skills.version] = "1.0.0"
+        it[Skills.versionSource] = "manifest"
+        it[Skills.status] = "published"
+        it[Skills.verified] = true
+        it[Skills.createdAt] = now
+        it[Skills.updatedAt] = now
+      }
+    }
+    // Two archive dirs share the leaf "dup" — the legacy source dir is genuinely ambiguous.
+    val bodyA = "---\nname: dup\ndescription: A.\nlicense: MIT\ntags: [android]\n---\n# A\n"
+    val bodyB = "---\nname: dup\ndescription: B.\nlicense: MIT\ntags: [android]\n---\n# B\n"
+    val zipBytes =
+      zip("owner-repo-sha/skills/dup/SKILL.md" to bodyA, "owner-repo-sha/lib/dup/SKILL.md" to bodyB)
+    IngestPipeline.ingest(
+      ArchiveSource.RepoZipball(zipBytes, "owner", "repo", "abcdef1234567890"),
+      bundleId,
+      store,
+      userId,
+    )
+
+    // The legacy row is left untouched (still NULL, not misattributed); both dirs become new rows.
+    val legacyAfter = transaction { Skills.selectAll().where { Skills.id eq legacyId }.single() }
+    assertEquals(null, legacyAfter[Skills.sourceDir])
+    assertEquals(
+      3,
+      transaction { Skills.selectAll().where { Skills.bundleId eq bundleId }.count() },
+    )
   }
 }

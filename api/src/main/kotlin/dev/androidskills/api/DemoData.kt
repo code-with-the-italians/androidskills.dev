@@ -292,6 +292,7 @@ object DemoData {
       it[Skills.id] = skillId
       it[Skills.bundleId] = bundleId
       it[Skills.slug] = s.slug
+      it[Skills.sourceDir] = "skills/${s.slug}"
       it[Skills.name] = s.name
       it[Skills.description] = s.description
       it[Skills.license] = s.license

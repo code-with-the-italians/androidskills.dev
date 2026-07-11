@@ -160,6 +160,7 @@ class AdminQueueDecisionTest {
         it[Skills.id] = skillId
         it[Skills.bundleId] = bundleId
         it[Skills.slug] = slug
+        it[Skills.sourceDir] = "skills/$slug"
         it[Skills.name] = "Old name"
         it[Skills.description] = "Old description"
         it[Skills.version] = "0.0.0"
@@ -415,9 +416,9 @@ class AdminQueueDecisionTest {
   }
 
   @Test
-  fun `approve fails with slug_mismatch if contributor renamed slug`() {
+  fun `approve fails with sourcedir_mismatch if contributor moved or renamed the skill dir`() {
     val s = seed("test-skill")
-    // The zip contains skills/wrong-slug, not the expected test-skill.
+    // The zip contains skills/wrong-slug, not the expected skills/test-skill dir.
     val zip = makeZipball("wrong-slug")
 
     val ex =
@@ -432,7 +433,7 @@ class AdminQueueDecisionTest {
           )
         }
       }
-    assertEquals("slug_mismatch", ex.code)
+    assertEquals("sourcedir_mismatch", ex.code)
   }
 
   @Test

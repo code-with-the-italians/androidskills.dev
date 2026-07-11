@@ -61,16 +61,36 @@ object IngestPipeline {
     val ingested = mutableListOf<IngestedSkill>()
 
     val skillDirs = detected.map { it.sourceDir }
+    // Leaf-slug multiplicity across the archive. Legacy reconciliation (below) matches a pre-v4 row
+    // by its leaf slug, so it may only fire when that leaf is unambiguous — otherwise we can't tell
+    // which dir the legacy row came from and would graft its identity onto the wrong skill.
+    val leafCounts = detected.groupingBy { it.slug }.eachCount()
     for (skill in detected) {
       val skillDir = skill.sourceDir
       val files = extracted.filter { Discovery.ownerDir(it.path, skillDirs) == skillDir }
       val skillMd = files.firstOrNull { it.path == "$skillDir/SKILL.md" }
       val body = skillMd?.bytes?.toString(Charsets.UTF_8) ?: ""
 
+      // Identity is (bundle, source_dir) — stable across re-scans even if the leaf slug collided
+      // and was suffixed. Fall back to a pre-v4 legacy row (source_dir NULL) with the same, unique
+      // leaf slug and reconcile it to its real path below. A slug is only matched against a row
+      // with
+      // no source_dir yet, so a confirmed row is never re-adopted by a same-leaf skill.
       val existing = transaction {
         Skills.selectAll()
-          .where { (Skills.bundleId eq bundleId) and (Skills.slug eq skill.slug) }
+          .where { (Skills.bundleId eq bundleId) and (Skills.sourceDir eq skill.sourceDir) }
           .singleOrNull()
+          ?: if (leafCounts[skill.slug] == 1) {
+            Skills.selectAll()
+              .where {
+                (Skills.bundleId eq bundleId) and
+                  Skills.sourceDir.isNull() and
+                  (Skills.slug eq skill.slug)
+              }
+              .singleOrNull()
+          } else {
+            null
+          }
       }
 
       val version = skill.version
@@ -98,12 +118,16 @@ object IngestPipeline {
 
       transaction {
         val now = nowIso()
+        // Resync keeps the stored slug (stable); a new skill gets a globally-unique slug (the leaf,
+        // or leaf-N on a real collision) assigned once, here.
+        val slug = if (isNew) uniqueSlug(skill.slug) else existing!![Skills.slug]
         if (isNew) {
           // Insert the skill row (unlisted, unverified — Q1).
           Skills.insert {
             it[Skills.id] = skillId
             it[Skills.bundleId] = bundleId
-            it[Skills.slug] = skill.slug
+            it[Skills.slug] = slug
+            it[Skills.sourceDir] = skill.sourceDir
             it[Skills.name] = skill.name
             it[Skills.description] = skill.description
             it[Skills.license] = skill.license
@@ -131,6 +155,10 @@ object IngestPipeline {
               it[SkillFiles.r2Key] = "skills/$skillId/files/$safePath"
             }
           }
+        } else if (existing!![Skills.sourceDir] == null) {
+          // Reconcile a pre-v4 legacy row: stamp its real archive path exactly once, so future
+          // resyncs match on (bundle, source_dir) like any other row.
+          Skills.update({ Skills.id eq skillId }) { it[Skills.sourceDir] = skill.sourceDir }
         }
         // Append the version row (INSERT OR IGNORE — idempotent for reclaim, issue 2).
         Versions.insertIgnore {
@@ -170,7 +198,7 @@ object IngestPipeline {
           }
         }
 
-        ingested += IngestedSkill(skillId, skill.slug, isNew, version)
+        ingested += IngestedSkill(skillId, slug, isNew, version)
       }
     }
     return IngestResult(ingested)
@@ -272,13 +300,50 @@ object IngestPipeline {
       transaction { Skills.selectAll().where { Skills.id eq skillId }.singleOrNull() }
         ?: throw IllegalStateException("Skill $skillId not found for promotion")
     val slug = skillRow[Skills.slug]
-
+    // Identity is source_dir, not slug (which may have been suffixed). A pre-v4 legacy row (null
+    // source_dir) is reconciled once, here, by matching the archive skill whose leaf slug equals
+    // the
+    // row's slug — but only when that leaf is unique in the archive (else the source dir is
+    // genuinely
+    // ambiguous) and the resolved path isn't already claimed by another skill in the bundle. Its
+    // path is healed into source_dir by the update below; confirmed rows match on their stored
+    // path.
+    val storedSourceDir = skillRow[Skills.sourceDir]
     val detectedSkill =
-      detected.firstOrNull { it.slug == slug }
-        ?: throw ApiConflictException(
-          "Skill '$slug' not found in the archive; contributor may have removed or renamed it",
-          "slug_mismatch",
-        )
+      if (storedSourceDir != null) {
+        detected.firstOrNull { it.sourceDir == storedSourceDir }
+          ?: throw ApiConflictException(
+            "Skill dir '$storedSourceDir' not found in the archive; it may have been removed or renamed",
+            "sourcedir_mismatch",
+          )
+      } else {
+        val candidates = detected.filter { it.slug == slug }
+        val only =
+          candidates.singleOrNull()
+            ?: throw ApiConflictException(
+              if (candidates.isEmpty())
+                "Skill '$slug' not found in the archive; it may have been removed or renamed"
+              else "Skill '$slug' matches more than one directory in the archive; resolve manually",
+              "sourcedir_mismatch",
+            )
+        val pathTaken = transaction {
+          Skills.selectAll()
+            .where {
+              (Skills.bundleId eq bundleId) and
+                (Skills.sourceDir eq only.sourceDir) and
+                (Skills.id neq skillId)
+            }
+            .empty()
+            .not()
+        }
+        if (pathTaken) {
+          throw ApiConflictException(
+            "Skill dir '${only.sourceDir}' is already claimed by another skill in this bundle",
+            "sourcedir_conflict",
+          )
+        }
+        only
+      }
 
     val skillDir = detectedSkill.sourceDir
     val skillDirs = detected.map { it.sourceDir }
@@ -323,8 +388,10 @@ object IngestPipeline {
         }
       }
 
-      // Update live skill metadata from the archive (source-of-truth fields).
+      // Update live skill metadata from the archive (source-of-truth fields). Also heals a legacy
+      // row's source_dir (a no-op for confirmed rows, which matched on it exactly).
       Skills.update({ Skills.id eq skillId }) {
+        it[Skills.sourceDir] = detectedSkill.sourceDir
         it[Skills.name] = detectedSkill.name
         it[Skills.description] = detectedSkill.description
         it[Skills.license] = detectedSkill.license
@@ -353,6 +420,20 @@ object IngestPipeline {
   }
 
   data class PromoteResult(val skillId: String, val slug: String, val version: String)
+
+  /**
+   * A globally-unique slug for a NEW skill: the detected leaf, or leaf-`N` if that slug is already
+   * taken. Must run inside a transaction. Per-skill transactions in the ingest loop commit before
+   * the next check, so intra-archive duplicates resolve to distinct slugs; a rare cross-transaction
+   * race is caught by the `uq_skills_slug` constraint (the caller's job/request retries).
+   */
+  internal fun uniqueSlug(base: String): String {
+    fun taken(s: String) = !Skills.selectAll().where { Skills.slug eq s }.empty()
+    if (!taken(base)) return base
+    var n = 2
+    while (taken("$base-$n")) n++
+    return "$base-$n"
+  }
 
   private fun isProbablyBinary(bytes: ByteArray): Boolean {
     val n = minOf(bytes.size, 2048)

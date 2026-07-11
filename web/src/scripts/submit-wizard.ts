@@ -12,6 +12,7 @@ interface ReposResponse {
 }
 interface DetectedSkill {
   slug: string;
+  sourceDir: string;
   name: string;
   description: string;
   license: string | null;
@@ -158,7 +159,7 @@ function renderStep2() {
         <input type="checkbox" data-skill-idx="${i}" checked style="width:18px;height:18px;flex:none;" aria-label="Select ${esc(s.name)} for submission">
         <div style="flex:1;min-width:0;">
           <div class="nm" style="font-weight:600;font-size:14.5px;">${esc(s.name)}</div>
-          <div class="sl" style="font-family:var(--mono);font-size:11.5px;color:var(--text-faint);">skills/${esc(s.slug)}/</div>
+          <div class="sl" style="font-family:var(--mono);font-size:11.5px;color:var(--text-faint);">${esc(s.sourceDir)}/</div>
         </div>
         <span class="tag" style="flex:none;">${esc(s.tokenUpfront + s.tokenOndemand)} tok</span>
         <svg class="chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
@@ -193,7 +194,7 @@ function renderStep3() {
     <p class="hint" style="margin-bottom:14px;">On submit, automated checks run and the selected skills enter the review queue. Drafts you save appear under <a href="/submissions" style="color:var(--accent-text);">My submissions</a>.</p>
     <div class="card" style="margin-bottom:16px;">
       <div class="kicker" style="margin-bottom:10px;"><span class="tick">//</span> SELECTED</div>
-      ${skills.map((s) => `<div style="padding:8px 0;border-bottom:1px solid var(--border);"><b>${esc(s.name)}</b> <span class="hint">skills/${esc(s.slug)}/</span></div>`).join('')}
+      ${skills.map((s) => `<div style="padding:8px 0;border-bottom:1px solid var(--border);"><b>${esc(s.name)}</b> <span class="hint">${esc(s.sourceDir)}/</span></div>`).join('')}
     </div>
     <div class="row" style="gap:10px;">
       <button class="btn btn-ghost" data-save-draft>Save draft</button>
@@ -262,6 +263,7 @@ async function createDrafts(submit: boolean) {
     ref: state.scan.commitSha,
     skills: skills.map((s) => ({
       slug: s.slug,
+      sourceDir: s.sourceDir,
       name: s.name,
       description: s.description,
       license: s.license || '',

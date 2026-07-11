@@ -36,6 +36,10 @@ object Migrations {
         migrateV3()
         writeVersion(3)
       }
+      if (version < 4) {
+        migrateV4()
+        writeVersion(4)
+      }
     }
 
   /** v1: the full initial schema (spec §4) + default category taxonomy. */
@@ -90,6 +94,23 @@ object Migrations {
     }
     exec(
       "INSERT OR IGNORE INTO platform_settings(key, value) VALUES ('settings', '${appJson.encodeToString(default)}');"
+    )
+  }
+
+  /**
+   * v4: `skills.source_dir` — the resync/promote identity, decoupled from `slug`. Legacy rows keep
+   * `source_dir` NULL rather than a guessed path: the real archive dir was never stored and can't
+   * be reconstructed (a nested skill's true path is not `skills/<slug>`), so inventing one would
+   * break later identity lookups. A NULL row is reconciled to its real path on the next resync /
+   * promote / re-submit by matching the archive skill whose leaf slug equals the row's slug (see
+   * `IngestPipeline` / `SubmissionQueries`). SQLite treats NULLs as distinct in a unique index, so
+   * multiple legacy rows per bundle coexist under `(bundle_id, source_dir)`; new rows always carry
+   * a non-null, per-bundle-unique source_dir.
+   */
+  private fun Transaction.migrateV4() {
+    addColumnIfNotExists("skills", "source_dir", "TEXT")
+    exec(
+      "CREATE UNIQUE INDEX IF NOT EXISTS uq_skills_bundle_sourcedir ON skills(bundle_id, source_dir)"
     )
   }
 

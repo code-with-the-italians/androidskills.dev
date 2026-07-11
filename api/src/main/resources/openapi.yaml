@@ -1317,6 +1317,7 @@ components:
       type: object
       required:
       - slug
+      - sourceDir
       - name
       - description
       - license
@@ -1330,6 +1331,8 @@ components:
       - fileCount
       properties:
         slug:
+          type: string
+        sourceDir:
           type: string
         name:
           type: string
@@ -1383,6 +1386,9 @@ components:
       properties:
         slug:
           type: string
+        sourceDir:
+          type: string
+          nullable: true
         name:
           type: string
         description:
@@ -1420,6 +1426,10 @@ components:
       - submissionIds
       properties:
         submissionIds:
+          type: array
+          items:
+            type: string
+        slugs:
           type: array
           items:
             type: string
