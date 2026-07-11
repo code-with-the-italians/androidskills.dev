@@ -67,9 +67,11 @@ object IngestPipeline {
       val skillMd = files.firstOrNull { it.path == "$skillDir/SKILL.md" }
       val body = skillMd?.bytes?.toString(Charsets.UTF_8) ?: ""
 
+      // Identity is (bundle, source_dir) — stable across re-scans even if the leaf slug collided
+      // and was suffixed. Never match on the re-derived slug.
       val existing = transaction {
         Skills.selectAll()
-          .where { (Skills.bundleId eq bundleId) and (Skills.slug eq skill.slug) }
+          .where { (Skills.bundleId eq bundleId) and (Skills.sourceDir eq skill.sourceDir) }
           .singleOrNull()
       }
 
@@ -98,12 +100,16 @@ object IngestPipeline {
 
       transaction {
         val now = nowIso()
+        // Resync keeps the stored slug (stable); a new skill gets a globally-unique slug (the leaf,
+        // or leaf-N on a real collision) assigned once, here.
+        val slug = if (isNew) uniqueSlug(skill.slug) else existing!![Skills.slug]
         if (isNew) {
           // Insert the skill row (unlisted, unverified — Q1).
           Skills.insert {
             it[Skills.id] = skillId
             it[Skills.bundleId] = bundleId
-            it[Skills.slug] = skill.slug
+            it[Skills.slug] = slug
+            it[Skills.sourceDir] = skill.sourceDir
             it[Skills.name] = skill.name
             it[Skills.description] = skill.description
             it[Skills.license] = skill.license
@@ -170,7 +176,7 @@ object IngestPipeline {
           }
         }
 
-        ingested += IngestedSkill(skillId, skill.slug, isNew, version)
+        ingested += IngestedSkill(skillId, slug, isNew, version)
       }
     }
     return IngestResult(ingested)
@@ -272,12 +278,17 @@ object IngestPipeline {
       transaction { Skills.selectAll().where { Skills.id eq skillId }.singleOrNull() }
         ?: throw IllegalStateException("Skill $skillId not found for promotion")
     val slug = skillRow[Skills.slug]
+    // Identity is source_dir, not slug (which may have been suffixed). Every row has one
+    // post-backfill; guard the impossible null explicitly rather than 409 opaquely.
+    val storedSourceDir =
+      skillRow[Skills.sourceDir]
+        ?: throw ApiConflictException("Skill '$slug' has no source directory", "missing_source_dir")
 
     val detectedSkill =
-      detected.firstOrNull { it.slug == slug }
+      detected.firstOrNull { it.sourceDir == storedSourceDir }
         ?: throw ApiConflictException(
-          "Skill '$slug' not found in the archive; contributor may have removed or renamed it",
-          "slug_mismatch",
+          "Skill dir '$storedSourceDir' not found in the archive; it may have been removed or renamed",
+          "sourcedir_mismatch",
         )
 
     val skillDir = detectedSkill.sourceDir
@@ -353,6 +364,20 @@ object IngestPipeline {
   }
 
   data class PromoteResult(val skillId: String, val slug: String, val version: String)
+
+  /**
+   * A globally-unique slug for a NEW skill: the detected leaf, or leaf-`N` if that slug is already
+   * taken. Must run inside a transaction. Per-skill transactions in the ingest loop commit before
+   * the next check, so intra-archive duplicates resolve to distinct slugs; a rare cross-transaction
+   * race is caught by the `uq_skills_slug` constraint (the caller's job/request retries).
+   */
+  internal fun uniqueSlug(base: String): String {
+    fun taken(s: String) = !Skills.selectAll().where { Skills.slug eq s }.empty()
+    if (!taken(base)) return base
+    var n = 2
+    while (taken("$base-$n")) n++
+    return "$base-$n"
+  }
 
   private fun isProbablyBinary(bytes: ByteArray): Boolean {
     val n = minOf(bytes.size, 2048)

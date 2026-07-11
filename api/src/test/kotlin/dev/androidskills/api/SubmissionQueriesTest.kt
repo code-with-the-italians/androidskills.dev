@@ -98,6 +98,7 @@ class SubmissionQueriesTest {
           listOf(
             SubmissionQueries.SelectedSkill(
               slug = "my-skill",
+              sourceDir = "skills/my-skill",
               name = "My Skill",
               description = "A skill",
               license = "MIT",
@@ -187,7 +188,7 @@ class SubmissionQueriesTest {
   }
 
   @Test
-  fun `createDrafts 409 when slug used by another bundle`(): Unit = runBlocking {
+  fun `createDrafts uniquifies a slug reused across bundles`(): Unit = runBlocking {
     setupDb()
     val (_, alice) = createUser(42L, "alice")
     SubmissionQueries.createDrafts(
@@ -195,15 +196,87 @@ class SubmissionQueriesTest {
       draftRequest("shared-slug", repoName = "repo-a"),
       fakeGh(),
     )
-    val ex =
-      assertFailsWith<ApiConflictException> {
-        SubmissionQueries.createDrafts(
-          alice,
-          draftRequest("shared-slug", repoName = "repo-b"),
-          fakeGh(listOf(Installation(2L, 42L, "owner", "User"))),
-        )
-      }
-    assertEquals("slug_conflict", ex.code)
+    // Same skill name from a different repo is no longer a conflict — it gets a unique -N slug.
+    val resp =
+      SubmissionQueries.createDrafts(
+        alice,
+        draftRequest("shared-slug", repoName = "repo-b"),
+        fakeGh(listOf(Installation(2L, 42L, "owner", "User"))),
+      )
+    assertEquals(listOf("shared-slug-2"), resp.slugs)
+  }
+
+  @Test
+  fun `createDrafts uniquifies same-leaf skills within one request`(): Unit = runBlocking {
+    setupDb()
+    val (_, principal) = createUser(42L, "alice")
+    // Two skills discovered at different dirs that derive the same leaf slug. They are distinct
+    // identities (bundle, source_dir) and must land under distinct slugs in a single request.
+    val request =
+      SubmissionQueries.CreateDraftsRequest(
+        repoOwner = "owner",
+        repoName = "repo",
+        ref = "abc123",
+        skills =
+          listOf(
+            SubmissionQueries.SelectedSkill(
+              slug = "adaptive",
+              sourceDir = "features/adaptive",
+              name = "Adaptive One",
+              description = "d",
+              license = "MIT",
+            ),
+            SubmissionQueries.SelectedSkill(
+              slug = "adaptive",
+              sourceDir = "ui/adaptive",
+              name = "Adaptive Two",
+              description = "d",
+              license = "MIT",
+            ),
+          ),
+      )
+    val response = SubmissionQueries.createDrafts(principal, request, fakeGh())
+    assertEquals(listOf("adaptive", "adaptive-2"), response.slugs)
+    assertEquals(2, response.submissionIds.size)
+    transaction {
+      assertEquals(2, Skills.selectAll().count())
+      assertEquals(
+        setOf("features/adaptive", "ui/adaptive"),
+        Skills.selectAll().map { it[Skills.sourceDir] }.toSet(),
+      )
+    }
+  }
+
+  @Test
+  fun `createDrafts 422 on duplicate source dir within one request`(): Unit = runBlocking {
+    setupDb()
+    val (_, principal) = createUser(42L, "alice")
+    val request =
+      SubmissionQueries.CreateDraftsRequest(
+        repoOwner = "owner",
+        repoName = "repo",
+        ref = "abc123",
+        skills =
+          listOf(
+            SubmissionQueries.SelectedSkill(
+              slug = "one",
+              sourceDir = "skills/dup",
+              name = "One",
+              description = "d",
+              license = "MIT",
+            ),
+            SubmissionQueries.SelectedSkill(
+              slug = "two",
+              sourceDir = "skills/dup",
+              name = "Two",
+              description = "d",
+              license = "MIT",
+            ),
+          ),
+      )
+    assertFailsWith<ApiValidationException> {
+      SubmissionQueries.createDrafts(principal, request, fakeGh())
+    }
   }
 
   @Test
@@ -268,6 +341,7 @@ class SubmissionQueriesTest {
           listOf(
             SubmissionQueries.SelectedSkill(
               slug = "skill-one",
+              sourceDir = "skills/skill-one",
               name = "",
               description = "",
               license = "",
@@ -361,6 +435,7 @@ class SubmissionQueriesTest {
         listOf(
           SubmissionQueries.SelectedSkill(
             slug = slug,
+            sourceDir = "skills/$slug",
             name = "Skill",
             description = "Desc",
             license = "MIT",
@@ -421,6 +496,7 @@ class SubmissionQueriesTest {
         it[Skills.id] = "00000000-0000-0000-0000-000000000002"
         it[Skills.bundleId] = "00000000-0000-0000-0000-000000000001"
         it[Skills.slug] = "skill-one"
+        it[Skills.sourceDir] = "skills/skill-one"
         it[Skills.name] = "Skill"
         it[Skills.description] = "Desc"
         it[Skills.license] = "MIT"

@@ -57,7 +57,7 @@ class MigrationTest {
   }
 
   @Test
-  fun `schema_meta version is 3 after migration`() {
+  fun `schema_meta version is 4 after migration`() {
     Database.init(TestSupport.newConfig(dir))
     transaction {
       val v =
@@ -65,7 +65,69 @@ class MigrationTest {
           rs.next()
           rs.getString(1).toInt()
         }
-      assertEquals(3, v)
+      assertEquals(4, v)
+    }
+  }
+
+  @Test
+  fun `v4 adds source_dir and enforces bundle plus source_dir uniqueness`() {
+    Database.init(TestSupport.newConfig(dir))
+    val now = nowIso()
+    val uid = "10000000-0000-0000-0000-000000000001"
+    val bid = "10000000-0000-0000-0000-000000000002"
+    transaction {
+      val cols =
+        exec("PRAGMA table_info(skills)") { rs ->
+          val out = mutableListOf<String>()
+          while (rs.next()) out += rs.getString(2)
+          out
+        } ?: emptyList()
+      assertTrue("source_dir column missing") { "source_dir" in cols }
+
+      Users.insert {
+        it[Users.id] = uid
+        it[Users.githubId] = 900
+        it[Users.handle] = "srcdir-user"
+        it[Users.createdAt] = now
+        it[Users.updatedAt] = now
+      }
+      Bundles.insert {
+        it[Bundles.id] = bid
+        it[Bundles.kind] = "zip"
+        it[Bundles.provenance] = "upload-srcdir"
+        it[Bundles.ownerUserId] = uid
+        it[Bundles.createdAt] = now
+      }
+      Skills.insert {
+        it[Skills.id] = "10000000-0000-0000-0000-000000000003"
+        it[Skills.bundleId] = bid
+        it[Skills.slug] = "srcdir-a"
+        it[Skills.sourceDir] = "skills/dup"
+        it[Skills.name] = "A"
+        it[Skills.description] = "x"
+        it[Skills.version] = "1.0.0"
+        it[Skills.versionSource] = "manifest"
+        it[Skills.createdAt] = now
+        it[Skills.updatedAt] = now
+      }
+    }
+    // Same bundle + same source_dir but a different slug must be rejected by
+    // uq_skills_bundle_sourcedir — identity is the pair, not the slug.
+    assertFailsWith<Exception> {
+      transaction {
+        Skills.insert {
+          it[Skills.id] = "10000000-0000-0000-0000-000000000004"
+          it[Skills.bundleId] = bid
+          it[Skills.slug] = "srcdir-b"
+          it[Skills.sourceDir] = "skills/dup"
+          it[Skills.name] = "B"
+          it[Skills.description] = "x"
+          it[Skills.version] = "1.0.0"
+          it[Skills.versionSource] = "manifest"
+          it[Skills.createdAt] = now
+          it[Skills.updatedAt] = now
+        }
+      }
     }
   }
 
@@ -93,7 +155,7 @@ class MigrationTest {
           rs.next()
           rs.getString(1).toInt()
         }
-      assertEquals(3, v)
+      assertEquals(4, v)
     }
   }
 

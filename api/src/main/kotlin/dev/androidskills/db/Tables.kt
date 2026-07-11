@@ -77,6 +77,10 @@ object Skills : Table("skills") {
   val id = varchar("id", 36)
   val bundleId = varchar("bundle_id", 36).references(Bundles.id, onDelete = ReferenceOption.CASCADE)
   val slug = text("slug")
+  // Archive-relative directory (e.g. "skills/mvi", "jetpack-compose/adaptive"). The stable identity
+  // for resync/promote. Nullable in DDL (SQLite can't add NOT NULL in place) but a non-blank
+  // app-layer invariant — legacy rows are backfilled in migrateV4.
+  val sourceDir = text("source_dir").nullable()
   val name = text("name")
   val description = text("description")
   val license = text("license").nullable()
@@ -102,6 +106,9 @@ object Skills : Table("skills") {
 
   init {
     uniqueIndex("uq_skills_slug", slug)
+    // Resync/promote identity: one skill per (bundle, source dir). Declared here for fresh DBs;
+    // migrateV4 creates it (IF NOT EXISTS) for already-migrated DBs after backfill.
+    uniqueIndex("uq_skills_bundle_sourcedir", bundleId, sourceDir)
     index("ix_skills_bundle", false, bundleId)
     index("ix_skills_category", false, categoryId)
     index("ix_skills_status_verified", false, status, verified)

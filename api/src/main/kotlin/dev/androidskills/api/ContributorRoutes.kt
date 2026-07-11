@@ -177,6 +177,8 @@ data class RepoDto(
 @Serializable
 data class DetectedSkillDto(
   val slug: String,
+  // Archive-relative skill dir — the stable identity the submit wizard sends back with each skill.
+  val sourceDir: String,
   val name: String,
   val description: String,
   val license: String?,
@@ -207,6 +209,7 @@ private const val MAX_COMPRESSED_ZIPBALL = 50 * 1024 * 1024
 private fun DetectedSkill.toDto() =
   DetectedSkillDto(
     slug,
+    sourceDir,
     name,
     description,
     license,

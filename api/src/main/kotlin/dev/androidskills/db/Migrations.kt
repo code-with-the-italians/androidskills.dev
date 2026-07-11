@@ -36,6 +36,10 @@ object Migrations {
         migrateV3()
         writeVersion(3)
       }
+      if (version < 4) {
+        migrateV4()
+        writeVersion(4)
+      }
     }
 
   /** v1: the full initial schema (spec §4) + default category taxonomy. */
@@ -90,6 +94,20 @@ object Migrations {
     }
     exec(
       "INSERT OR IGNORE INTO platform_settings(key, value) VALUES ('settings', '${appJson.encodeToString(default)}');"
+    )
+  }
+
+  /**
+   * v4: `skills.source_dir` — the resync/promote identity, decoupled from `slug`. Backfill legacy
+   * rows (pre-#37 skills all lived at `skills/<slug>`; the SLUG regex forbids `/`, so this is
+   * well-formed and inherits slug's global uniqueness), then add the `(bundle_id, source_dir)`
+   * unique index. Order matters: backfill must precede the unique-index creation.
+   */
+  private fun Transaction.migrateV4() {
+    addColumnIfNotExists("skills", "source_dir", "TEXT")
+    exec("UPDATE skills SET source_dir = 'skills/' || slug WHERE source_dir IS NULL")
+    exec(
+      "CREATE UNIQUE INDEX IF NOT EXISTS uq_skills_bundle_sourcedir ON skills(bundle_id, source_dir)"
     )
   }
 

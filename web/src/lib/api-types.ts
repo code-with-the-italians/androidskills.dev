@@ -1334,46 +1334,6 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
-  '/gh/webhooks': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    /** GitHub App webhook receiver. */
-    post: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path?: never;
-        cookie?: never;
-      };
-      requestBody: {
-        content: {
-          'application/json': Record<string, never>;
-        };
-      };
-      responses: {
-        /** @description Webhook accepted */
-        202: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': Record<string, never>;
-          };
-        };
-      };
-    };
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -1605,6 +1565,7 @@ export interface components {
     };
     DetectedSkillDto: {
       slug: string;
+      sourceDir: string;
       name: string;
       description: string;
       license: string | null;
@@ -1624,6 +1585,7 @@ export interface components {
     };
     SelectedSkill: {
       slug: string;
+      sourceDir?: string | null;
       name: string;
       description: string;
       license: string;
@@ -1638,6 +1600,7 @@ export interface components {
     };
     CreateDraftsResponse: {
       submissionIds: string[];
+      slugs?: string[];
     };
     SubmissionSummary: {
       id: string;

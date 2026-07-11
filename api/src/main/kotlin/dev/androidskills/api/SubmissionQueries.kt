@@ -11,6 +11,7 @@ import dev.androidskills.db.VersionSource
 import dev.androidskills.db.Versions
 import dev.androidskills.github.GitHubAppClient
 import dev.androidskills.github.GitHubAppException
+import dev.androidskills.ingest.IngestPipeline
 import dev.androidskills.ingest.ManifestValidator
 import dev.androidskills.ingest.StagedPayload
 import dev.androidskills.ingest.SubmissionPayload
@@ -52,6 +53,9 @@ object SubmissionQueries {
   @Serializable
   data class SelectedSkill(
     val slug: String,
+    // Archive-relative skill dir; the stable identity. Nullable on the wire for older clients, but
+    // required (rejected if blank) by createDrafts.
+    val sourceDir: String? = null,
     val name: String,
     val description: String,
     val license: String,
@@ -59,7 +63,12 @@ object SubmissionQueries {
     val version: String? = null,
   )
 
-  @Serializable data class CreateDraftsResponse(val submissionIds: List<String>)
+  @Serializable
+  data class CreateDraftsResponse(
+    val submissionIds: List<String>,
+    // The slug each skill actually landed under (may be `-N`-suffixed on a name clash).
+    val slugs: List<String> = emptyList(),
+  )
 
   @Serializable
   data class SubmissionSummary(
@@ -102,6 +111,15 @@ object SubmissionQueries {
     if (request.skills.isEmpty()) {
       throw ApiValidationException(mapOf("skills" to "at least one skill is required"))
     }
+    // Each selection maps to a distinct skill identity (bundle, source_dir). Two selections sharing
+    // a source_dir in one request would silently merge (read-your-writes) or trip the unique index
+    // as a raw 500 — reject them up front with a clean 4xx.
+    val requestDirs = request.skills.map { validateSourceDir(it.sourceDir) }
+    if (requestDirs.toSet().size != requestDirs.size) {
+      throw ApiValidationException(
+        mapOf("sourceDir" to "must be unique across the selected skills")
+      )
+    }
 
     val provenance = "${request.repoOwner}/${request.repoName}"
 
@@ -132,7 +150,7 @@ object SubmissionQueries {
         )
 
     val now = nowIso()
-    val submissionIds = transaction {
+    val drafts = transaction {
       // First-come-first-served bundle ownership (§3.4).
       val existingBundle =
         Bundles.selectAll()
@@ -163,26 +181,22 @@ object SubmissionQueries {
 
       request.skills.map { selection ->
         validateSlug(selection.slug)
+        val sourceDir = validateSourceDir(selection.sourceDir)
         val version = selection.version ?: request.ref.take(12)
         val versionSource =
           if (selection.version != null) VersionSource.manifest.name
           else VersionSource.git_head.name
 
-        // Slug must not already belong to a different bundle. If it belongs to
-        // the same bundle, we only allow re-drafting an unlisted shell; a published
-        // skill or an active submission must be handled via the admin queue (Bugbot
-        // high + medium findings).
+        // Identity is (bundle, source_dir). Re-drafting an unlisted shell is allowed; a published
+        // skill or an active submission for it goes through the admin queue. A cross-bundle name
+        // clash is fine now — the assigned slug is uniquified, so there is no `slug_conflict`.
         val existingSkill =
-          Skills.selectAll().where { Skills.slug eq selection.slug }.singleOrNull()
-        if (existingSkill != null && existingSkill[Skills.bundleId] != bundleId) {
-          throw ApiConflictException(
-            "Skill slug '${selection.slug}' is already used by another repository",
-            code = "slug_conflict",
-          )
-        }
+          Skills.selectAll()
+            .where { (Skills.bundleId eq bundleId) and (Skills.sourceDir eq sourceDir) }
+            .singleOrNull()
         if (existingSkill != null && existingSkill[Skills.status] == SkillStatus.published.name) {
           throw ApiConflictException(
-            "Skill '${selection.slug}' is already published; updates go through the admin queue",
+            "Skill '${existingSkill[Skills.slug]}' is already published; updates go through the admin queue",
             code = "skill_already_published",
           )
         }
@@ -198,15 +212,19 @@ object SubmissionQueries {
               .singleOrNull()
           if (activeSub != null) {
             throw ApiConflictException(
-              "An active submission already exists for '${selection.slug}'",
+              "An active submission already exists for '${existingSkill[Skills.slug]}'",
               code = "submission_already_active",
             )
           }
         }
 
+        // Resync keeps the stored slug; a new shell gets a globally-unique slug assigned once.
+        val assignedSlug =
+          existingSkill?.get(Skills.slug) ?: IngestPipeline.uniqueSlug(selection.slug)
+
         val skillId =
           if (existingSkill != null) {
-            // Same bundle, unlisted shell: update the shell from the latest scan metadata.
+            // Same (bundle, source_dir), unlisted shell: refresh from the latest scan metadata.
             val id = existingSkill[Skills.id]
             Skills.update({ Skills.id eq id }) {
               it[Skills.name] = selection.name
@@ -223,7 +241,8 @@ object SubmissionQueries {
             Skills.insert {
               it[Skills.id] = id
               it[Skills.bundleId] = bundleId
-              it[Skills.slug] = selection.slug
+              it[Skills.slug] = assignedSlug
+              it[Skills.sourceDir] = sourceDir
               it[Skills.name] = selection.name
               it[Skills.description] = selection.description
               it[Skills.license] = selection.license
@@ -283,10 +302,10 @@ object SubmissionQueries {
             }
             id
           }
-        subId
+        subId to assignedSlug
       }
     }
-    return CreateDraftsResponse(submissionIds)
+    return CreateDraftsResponse(drafts.map { it.first }, drafts.map { it.second })
   }
 
   fun mySubmissions(principal: Principal): List<GroupedSubmissions> = transaction {
@@ -363,11 +382,11 @@ object SubmissionQueries {
       val staged =
         payload?.staged
           ?: throw IllegalStateException("Draft submission $submissionId has no staged payload")
+      val skillRow = Skills.selectAll().where { Skills.id eq skillId }.singleOrNull()
       val selection =
         SelectedSkill(
-          slug =
-            Skills.selectAll().where { Skills.id eq skillId }.singleOrNull()?.get(Skills.slug)
-              ?: "",
+          slug = skillRow?.get(Skills.slug) ?: "",
+          sourceDir = skillRow?.get(Skills.sourceDir),
           name = staged.name,
           description = staged.description,
           license = staged.license ?: "",
@@ -522,6 +541,24 @@ object SubmissionQueries {
     if (!SLUG_RE.matches(slug)) {
       throw ApiValidationException(mapOf("slug" to "must be lowercase kebab-case"))
     }
+  }
+
+  /** The skill's identity path; required, and a clean relative path (no dot/empty segments). */
+  private fun validateSourceDir(dir: String?): String {
+    val d = dir?.trim().orEmpty()
+    val segs = d.split('/')
+    if (
+      d.isEmpty() ||
+        d.startsWith("/") ||
+        d.endsWith("/") ||
+        d.contains('\\') ||
+        segs.any { it.isEmpty() || it.startsWith(".") }
+    ) {
+      throw ApiValidationException(
+        mapOf("sourceDir" to "is required and must be a clean relative directory path")
+      )
+    }
+    return d
   }
 
   @Serializable private data class ReviewPayload(val skillId: String, val submissionId: String)

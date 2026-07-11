@@ -293,6 +293,7 @@ class IngestPipelineTest {
         it[Skills.id] = skillId
         it[Skills.bundleId] = bundleId
         it[Skills.slug] = "guard-test"
+        it[Skills.sourceDir] = "skills/guard-test"
         it[Skills.name] = "Old"
         it[Skills.description] = "Old"
         it[Skills.version] = "0.0.0"
@@ -338,6 +339,7 @@ class IngestPipelineTest {
         it[Skills.id] = skillId
         it[Skills.bundleId] = bundleId
         it[Skills.slug] = "promote-test"
+        it[Skills.sourceDir] = "skills/promote-test"
         it[Skills.name] = "Old"
         it[Skills.description] = "Old"
         it[Skills.version] = "0.0.0"
