@@ -60,9 +60,10 @@ object IngestPipeline {
     val extracted = Discovery.extract(source) // raw file bytes for mirroring + zip
     val ingested = mutableListOf<IngestedSkill>()
 
+    val skillDirs = detected.map { it.sourceDir }
     for (skill in detected) {
-      val skillDir = "skills/${skill.slug}"
-      val files = extracted.filter { Discovery.topDir(it.path) == skillDir }
+      val skillDir = skill.sourceDir
+      val files = extracted.filter { Discovery.ownerDir(it.path, skillDirs) == skillDir }
       val skillMd = files.firstOrNull { it.path == "$skillDir/SKILL.md" }
       val body = skillMd?.bytes?.toString(Charsets.UTF_8) ?: ""
 
@@ -271,7 +272,6 @@ object IngestPipeline {
       transaction { Skills.selectAll().where { Skills.id eq skillId }.singleOrNull() }
         ?: throw IllegalStateException("Skill $skillId not found for promotion")
     val slug = skillRow[Skills.slug]
-    val skillDir = "skills/$slug"
 
     val detectedSkill =
       detected.firstOrNull { it.slug == slug }
@@ -280,7 +280,9 @@ object IngestPipeline {
           "slug_mismatch",
         )
 
-    val files = extracted.filter { Discovery.topDir(it.path) == skillDir }
+    val skillDir = detectedSkill.sourceDir
+    val skillDirs = detected.map { it.sourceDir }
+    val files = extracted.filter { Discovery.ownerDir(it.path, skillDirs) == skillDir }
     val skillMd = files.firstOrNull { it.path == "$skillDir/SKILL.md" }
     val body = skillMd?.bytes?.toString(Charsets.UTF_8) ?: ""
     val fileEntries = files.map { it.path.removePrefix("$skillDir/") to it.bytes }

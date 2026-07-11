@@ -18,7 +18,7 @@ class DiscoveryTest {
     // every entry is under the wrapper and a literal top-level skills/ lookup fails.
     val zip =
       zip(
-        "alice-repo-abc123/.github/SKILL.md" to ignored, // ignored (not under skills/)
+        "alice-repo-abc123/.github/SKILL.md" to ignored, // ignored (dot-directory)
         "alice-repo-abc123/.claude/SKILL.md" to ignored,
         "alice-repo-abc123/.agents/SKILL.md" to ignored,
         "alice-repo-abc123/SKILL.md" to ignored, // ignored (repo root)
@@ -65,7 +65,7 @@ class DiscoveryTest {
 
   @Test
   fun `all four ignored locations are not treated as skills`() {
-    // §3.1: SKILL.md anywhere but under top-level skills/ is ignored.
+    // Dot-directories (.github/.claude/.agents) and a bare root SKILL.md are never skills.
     val zip =
       zip(
         "o-r-s/.github/SKILL.md" to ignored,
@@ -159,6 +159,65 @@ class DiscoveryTest {
         Discovery.discover(ArchiveSource.RepoZipball(zip, "owner", "repo", "sha"))
       )
     assertTrue(found.skills.isEmpty(), "Bad_Slug is not a valid slug; got ${found.skills}")
+  }
+
+  @Test
+  fun `skills are discovered at any depth, not only under a skills dir`() {
+    // Real repos vary: android/skills groups by category dir; skydoves puts skill dirs at the root.
+    val zip =
+      zip(
+        "o-r-s/jetpack-compose/adaptive/SKILL.md" to skillMd("adaptive", "Adaptive UI."),
+        "o-r-s/jetpack-compose/adaptive/references/grid.md" to "Grid API notes.\n",
+        "o-r-s/recomposition/debugging-recompositions/SKILL.md" to
+          skillMd("debug", "Find recompositions."),
+        "o-r-s/testing/deep/SKILL.md" to skillMd("deep", "Deeply nested."),
+      )
+    val found =
+      assertIs<ScanResult.Found>(
+        Discovery.discover(ArchiveSource.RepoZipball(zip, "owner", "repo", "sha1234567890ab"))
+      )
+    assertEquals(
+      setOf("adaptive", "debugging-recompositions", "deep"),
+      found.skills.map { it.slug }.toSet(),
+    )
+    val adaptive = found.skills.first { it.slug == "adaptive" }
+    assertEquals("jetpack-compose/adaptive", adaptive.sourceDir)
+    assertTrue(adaptive.fileCount >= 2, "SKILL.md + references counted")
+  }
+
+  @Test
+  fun `dot-directories at any depth are excluded`() {
+    val zip =
+      zip(
+        "o-r-s/.claude-plugin/foo/SKILL.md" to ignored, // dot-dir ancestor
+        "o-r-s/.opencode/SKILL.md" to ignored,
+        "o-r-s/tools/.hidden/SKILL.md" to ignored, // dot segment mid-path
+        "o-r-s/lists/optimizing-layouts/SKILL.md" to skillMd("opt", "Real one."),
+      )
+    val found =
+      assertIs<ScanResult.Found>(
+        Discovery.discover(ArchiveSource.RepoZipball(zip, "owner", "repo", "sha"))
+      )
+    assertEquals(listOf("optimizing-layouts"), found.skills.map { it.slug })
+  }
+
+  @Test
+  fun `a skill nested inside another assigns files to the deepest skill dir`() {
+    val zip =
+      zip(
+        "o-r-s/outer/SKILL.md" to skillMd("outer", "Outer."),
+        "o-r-s/outer/notes.md" to "outer notes\n",
+        "o-r-s/outer/inner/SKILL.md" to skillMd("inner", "Inner."),
+        "o-r-s/outer/inner/refs.md" to "inner refs\n",
+      )
+    val found =
+      assertIs<ScanResult.Found>(
+        Discovery.discover(ArchiveSource.RepoZipball(zip, "owner", "repo", "sha"))
+      )
+    assertEquals(setOf("outer", "inner"), found.skills.map { it.slug }.toSet())
+    // outer keeps SKILL.md + notes.md; inner's two files are NOT double-counted under outer.
+    assertEquals(2, found.skills.first { it.slug == "outer" }.fileCount)
+    assertEquals(2, found.skills.first { it.slug == "inner" }.fileCount)
   }
 
   // ---- helpers ----

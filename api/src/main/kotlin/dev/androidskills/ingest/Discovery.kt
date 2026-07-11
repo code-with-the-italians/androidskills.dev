@@ -5,15 +5,19 @@ import java.io.ByteArrayInputStream
 import java.util.zip.ZipInputStream
 
 /**
- * Read-only skill discovery from a fetched archive (spec §5 core; the *write* half — file
- * mirroring, skill/version upsert, review enqueue — is deferred to step 5 per the plan's issue B,
- * so this writes nothing: no DB, no FileStore).
+ * Read-only skill discovery from a fetched archive (spec §5 core; no DB / FileStore writes here).
+ *
+ * A **skill** is any directory that directly contains a `SKILL.md`, at ANY depth — real-world skill
+ * repos vary in layout (`skills/mvi/`, `jetpack-compose/adaptive/`, `recomposition/debugging/`), so
+ * discovery is layout-agnostic. Two exclusions keep tooling and stray files out of the scan:
+ * - **dot-directories** — any path segment starting with `.` (`.github`, `.claude`, `.agents`,
+ *   `.codex-plugin`, …) is never a skill;
+ * - **the archive root** — a bare top-level `SKILL.md` (no containing directory) is ignored.
  *
  * Shared by repo scans and uploaded-zip scans. Extraction is one JDK-native `java.util.zip` path
  * for both sources (deviation A: GitHub `/zipball`, not `/tarball`); **root-normalization differs
  * by source** (gotcha #1): a GitHub zipball wraps the repo in a single `{owner}-{repo}-{sha}/` dir,
- * so a literal top-level `skills/` lookup matches nothing. `RepoZipball` peels exactly one leading
- * segment; `UploadedZip` peels one only if `skills/` isn't already at the root.
+ * which is peeled; `UploadedZip` peels one leading segment only if `skills/` isn't already at root.
  *
  * Security guards: the compressed body is size-bounded by the caller; here we bound the
  * **inflated** stream (count bytes as read, never trust entry sizes), cap entry count, and reject
@@ -60,6 +64,10 @@ sealed interface ArchiveSource {
 /** The read-only metadata for one detected skill (§9: "Detected metadata (read-only)"). */
 data class DetectedSkill(
   val slug: String,
+  /**
+   * Archive-relative directory the skill lives in, e.g. "skills/mvi" or "jetpack-compose/adaptive".
+   */
+  val sourceDir: String,
   val name: String,
   val description: String,
   val license: String?,
@@ -92,14 +100,26 @@ object Discovery {
 
   fun discover(source: ArchiveSource): ScanResult {
     val entries = extract(source) // guarded + root-normalized per-source
-    if (entries.none { it.path.startsWith("skills/") }) return ScanResult.NoSkillsDir
-    val grouped =
+    // Every directory that directly holds a SKILL.md is a skill, at any depth — minus dot-dirs and
+    // the archive root (a bare "SKILL.md" has no '/', so it drops out of the endsWith filter).
+    val skillDirs =
       entries
-        .filter { it.path.startsWith("skills/") }
-        .groupBy { topDir(it.path) } // "skills/<slug>" -> all files under it
-    val detected = grouped.mapNotNull { (dir, files) -> buildDetected(dir, files, source) }
+        .asSequence()
+        .filter { it.path.endsWith("/SKILL.md") }
+        .map { it.path.substringBeforeLast('/') }
+        .filter { dir -> dir.isNotEmpty() && dir.split('/').none { seg -> seg.startsWith(".") } }
+        .toSet()
+    if (skillDirs.isEmpty()) return ScanResult.NoSkillsDir
+    // Assign each file to its DEEPEST containing skill dir (a skill can nest inside another).
+    val byDir = skillDirs.associateWith { mutableListOf<Extracted>() }
+    for (e in entries) ownerDir(e.path, skillDirs)?.let { byDir.getValue(it).add(e) }
+    val detected = byDir.entries.mapNotNull { (dir, files) -> buildDetected(dir, files, source) }
     return ScanResult.Found(detected)
   }
+
+  /** The deepest skill dir in [skillDirs] that contains [path] (or IS its SKILL.md), else null. */
+  internal fun ownerDir(path: String, skillDirs: Collection<String>): String? =
+    skillDirs.filter { path == "$it/SKILL.md" || path.startsWith("$it/") }.maxByOrNull { it.length }
 
   /** Extracts + applies the source-specific root-normalization (gotcha #1). */
   internal fun extract(source: ArchiveSource): List<Extracted> {
@@ -149,7 +169,7 @@ object Discovery {
   /**
    * Root-normalize (gotcha #1):
    * - RepoZipball: GitHub wraps the repo in `{owner}-{repo}-{sha}/`. Peel exactly one leading
-   *   segment unconditionally → `skills/...` lands at the root.
+   *   segment unconditionally → the real tree lands at the root.
    * - UploadedZip: may be rooted at `skills/...` (no peel) OR under a single wrapper dir (peel
    *   one). Peel only if `skills/` is NOT already at the root.
    */
@@ -164,15 +184,16 @@ object Discovery {
   }
 
   /**
-   * `dir` is "skills/<slug>". Files are the entries under it. Returns null if the directory has no
-   * SKILL.md (not a skill) or the slug is malformed.
+   * [dir] is the skill's archive-relative directory (any depth); [files] are the entries assigned
+   * to it. The slug is the leaf directory name. Returns null if the directory has no SKILL.md (not
+   * a skill) or the leaf name isn't a valid slug.
    */
   private fun buildDetected(
     dir: String,
     files: List<Extracted>,
     source: ArchiveSource,
   ): DetectedSkill? {
-    val slug = dir.removePrefix("skills/")
+    val slug = dir.substringAfterLast('/')
     if (slug.isEmpty() || !SLUG.matches(slug)) return null
     val skillMd = files.firstOrNull { it.path == "$dir/SKILL.md" } ?: return null
     val manifest = SkillManifestParser.parse(String(skillMd.bytes, Charsets.UTF_8))
@@ -204,6 +225,7 @@ object Discovery {
         }
     return DetectedSkill(
       slug = slug,
+      sourceDir = dir,
       name = manifest.name,
       description = manifest.description,
       license = manifest.license,
@@ -222,13 +244,6 @@ object Discovery {
   private fun isOnDemand(path: String, dir: String): Boolean {
     val rel = path.removePrefix("$dir/").substringBefore('/', "")
     return rel in setOf("references", "examples", "scripts")
-  }
-
-  internal fun topDir(path: String): String {
-    // path is normalized like "skills/foo/bar.md"; top dir under skills/ is "skills/foo".
-    val after = path.removePrefix("skills/")
-    val next = after.indexOf('/')
-    return if (next >= 0) "skills/${after.substring(0, next)}" else "skills/$after"
   }
 
   private fun isProbablyBinary(bytes: ByteArray): Boolean {

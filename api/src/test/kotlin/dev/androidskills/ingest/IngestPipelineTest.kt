@@ -88,6 +88,37 @@ class IngestPipelineTest {
   }
 
   @Test
+  fun `ingests a skill from a non-skills layout (any-depth discovery)`() {
+    val (bundleId, userId) = seedBundle()
+    // android/skills-style: skill under a category dir, not under a top-level skills/.
+    val body =
+      "---\nname: adaptive\ndescription: Adaptive UI.\nlicense: Apache-2.0\ntags: [android]\n---\n# Adaptive\n"
+    val zipBytes =
+      zip(
+        "owner-repo-sha/jetpack-compose/adaptive/SKILL.md" to body,
+        "owner-repo-sha/jetpack-compose/adaptive/references/grid.md" to "grid notes\n",
+      )
+    val result =
+      IngestPipeline.ingest(
+        ArchiveSource.RepoZipball(zipBytes, "owner", "repo", "abcdef1234567890"),
+        bundleId,
+        store,
+        userId,
+      )
+    assertEquals(1, result.skills.size)
+    assertEquals("adaptive", result.skills[0].slug)
+    val skillId = result.skills[0].skillId
+    val files = transaction {
+      SkillFiles.selectAll().where { SkillFiles.skillId eq skillId }.toList()
+    }
+    assertTrue(
+      files.size >= 2,
+      "SKILL.md + references mirrored under the real dir; got ${files.size}",
+    )
+    assertTrue(skillRow("adaptive")[Skills.readmeMd]?.contains("Adaptive") == true)
+  }
+
+  @Test
   fun `new skill - writes everything`() {
     val (bundleId, userId) = seedBundle()
     val zipBytes = skillZip("test-mvi", "MVI Scaffold", "A baseline.", "1.0.0")
