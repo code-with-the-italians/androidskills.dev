@@ -280,10 +280,12 @@ class SubmissionQueriesTest {
   }
 
   @Test
-  fun `createDrafts reconciles a pre-v4 legacy shell by leaf slug`(): Unit = runBlocking {
+  fun `createDrafts does not reconcile a legacy row - deferred to resync`(): Unit = runBlocking {
     setupDb()
     val (uid, principal) = createUser(42L, "alice")
-    // A pre-v4 unlisted shell in the owner/repo bundle with a NULL source_dir.
+    // A pre-v4 unlisted shell in the owner/repo bundle with a NULL source_dir. createDrafts only
+    // sees the selected subset, not the whole archive, so it deliberately does NOT adopt this by
+    // slug — it mints a fresh (uniquified) shell and leaves the legacy row untouched.
     transaction {
       Bundles.insert {
         it[Bundles.id] = "00000000-0000-0000-0000-0000000000aa"
@@ -312,17 +314,17 @@ class SubmissionQueriesTest {
 
     val resp = SubmissionQueries.createDrafts(principal, draftRequest("revived"), fakeGh())
 
-    // Adopted, not duplicated: one skill, slug preserved, source_dir healed to the real path.
-    assertEquals(listOf("revived"), resp.slugs)
+    // A fresh shell is minted (slug uniquified); the legacy row is left untouched (still NULL).
+    assertEquals(listOf("revived-2"), resp.slugs)
     transaction {
       assertEquals(
-        1,
+        2,
         Skills.selectAll()
           .where { Skills.bundleId eq "00000000-0000-0000-0000-0000000000aa" }
           .count(),
       )
       assertEquals(
-        "skills/revived",
+        null,
         Skills.selectAll().where { Skills.slug eq "revived" }.single()[Skills.sourceDir],
       )
     }
