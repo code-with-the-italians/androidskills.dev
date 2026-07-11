@@ -106,7 +106,7 @@ class IngestPipelineTest {
         userId,
       )
     assertEquals(1, result.skills.size)
-    assertEquals("adaptive", result.skills[0].slug)
+    assertEquals("jetpack-compose-adaptive", result.skills[0].slug)
     val skillId = result.skills[0].skillId
     val files = transaction {
       SkillFiles.selectAll().where { SkillFiles.skillId eq skillId }.toList()
@@ -115,7 +115,7 @@ class IngestPipelineTest {
       files.size >= 2,
       "SKILL.md + references mirrored under the real dir; got ${files.size}",
     )
-    assertTrue(skillRow("adaptive")[Skills.readmeMd]?.contains("Adaptive") == true)
+    assertTrue(skillRow("jetpack-compose-adaptive")[Skills.readmeMd]?.contains("Adaptive") == true)
   }
 
   @Test

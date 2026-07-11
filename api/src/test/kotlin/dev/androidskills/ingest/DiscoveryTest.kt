@@ -176,11 +176,12 @@ class DiscoveryTest {
       assertIs<ScanResult.Found>(
         Discovery.discover(ArchiveSource.RepoZipball(zip, "owner", "repo", "sha1234567890ab"))
       )
+    // Slug is the path (minus a leading skills/) flattened with '-', so it is unique per path.
     assertEquals(
-      setOf("adaptive", "debugging-recompositions", "deep"),
+      setOf("jetpack-compose-adaptive", "recomposition-debugging-recompositions", "testing-deep"),
       found.skills.map { it.slug }.toSet(),
     )
-    val adaptive = found.skills.first { it.slug == "adaptive" }
+    val adaptive = found.skills.first { it.slug == "jetpack-compose-adaptive" }
     assertEquals("jetpack-compose/adaptive", adaptive.sourceDir)
     assertTrue(adaptive.fileCount >= 2, "SKILL.md + references counted")
   }
@@ -198,7 +199,25 @@ class DiscoveryTest {
       assertIs<ScanResult.Found>(
         Discovery.discover(ArchiveSource.RepoZipball(zip, "owner", "repo", "sha"))
       )
-    assertEquals(listOf("optimizing-layouts"), found.skills.map { it.slug })
+    assertEquals(listOf("lists-optimizing-layouts"), found.skills.map { it.slug })
+  }
+
+  @Test
+  fun `duplicate leaf names in different parents get distinct slugs`() {
+    // Regression: leaf-only slugs silently merged two different skills. Path-based slugs don't.
+    val zip =
+      zip(
+        "o-r-s/jetpack-compose/theming/styles/SKILL.md" to skillMd("styles", "Compose styles."),
+        "o-r-s/material/styles/SKILL.md" to skillMd("styles", "Material styles."),
+      )
+    val found =
+      assertIs<ScanResult.Found>(
+        Discovery.discover(ArchiveSource.RepoZipball(zip, "owner", "repo", "sha"))
+      )
+    assertEquals(
+      setOf("jetpack-compose-theming-styles", "material-styles"),
+      found.skills.map { it.slug }.toSet(),
+    )
   }
 
   @Test
@@ -214,10 +233,28 @@ class DiscoveryTest {
       assertIs<ScanResult.Found>(
         Discovery.discover(ArchiveSource.RepoZipball(zip, "owner", "repo", "sha"))
       )
-    assertEquals(setOf("outer", "inner"), found.skills.map { it.slug }.toSet())
+    assertEquals(setOf("outer", "outer-inner"), found.skills.map { it.slug }.toSet())
     // outer keeps SKILL.md + notes.md; inner's two files are NOT double-counted under outer.
     assertEquals(2, found.skills.first { it.slug == "outer" }.fileCount)
-    assertEquals(2, found.skills.first { it.slug == "inner" }.fileCount)
+    assertEquals(2, found.skills.first { it.slug == "outer-inner" }.fileCount)
+  }
+
+  @Test
+  fun `an invalid-slug nested dir is not a skill and its files stay with the parent`() {
+    // Fix: bad-slug dirs are excluded from BOTH detection and file assignment, so Discovery's
+    // fileCount matches what IngestPipeline mirrors (which assigns from the same detected set).
+    val zip =
+      zip(
+        "o-r-s/tools/valid-skill/SKILL.md" to skillMd("valid", "Valid."),
+        "o-r-s/tools/valid-skill/Bad_Slug/SKILL.md" to ignored, // invalid leaf → not a skill
+        "o-r-s/tools/valid-skill/Bad_Slug/extra.md" to "extra\n",
+      )
+    val found =
+      assertIs<ScanResult.Found>(
+        Discovery.discover(ArchiveSource.RepoZipball(zip, "owner", "repo", "sha"))
+      )
+    assertEquals(listOf("tools-valid-skill"), found.skills.map { it.slug })
+    assertEquals(3, found.skills[0].fileCount) // all 3 files under the one valid skill
   }
 
   // ---- helpers ----

@@ -100,16 +100,21 @@ object Discovery {
 
   fun discover(source: ArchiveSource): ScanResult {
     val entries = extract(source) // guarded + root-normalized per-source
-    // Every directory that directly holds a SKILL.md is a skill, at any depth — minus dot-dirs and
-    // the archive root (a bare "SKILL.md" has no '/', so it drops out of the endsWith filter).
-    val skillDirs =
+    // Candidate skill dirs: every dir that directly holds a SKILL.md, at any depth, minus
+    // dot-directories and the archive root (a bare "SKILL.md" has no '/', so the endsWith drops
+    // it).
+    val candidateDirs =
       entries
         .asSequence()
         .filter { it.path.endsWith("/SKILL.md") }
         .map { it.path.substringBeforeLast('/') }
         .filter { dir -> dir.isNotEmpty() && dir.split('/').none { seg -> seg.startsWith(".") } }
         .toSet()
-    if (skillDirs.isEmpty()) return ScanResult.NoSkillsDir
+    if (candidateDirs.isEmpty()) return ScanResult.NoSkillsDir
+    // A candidate is a *skill* only if its leaf is a valid slug. Bad-slug dirs are excluded from
+    // BOTH detection AND file assignment, so their files fall to a valid ancestor consistently with
+    // IngestPipeline (which assigns from the same detected set) — no fileCount/tree mismatch.
+    val skillDirs = candidateDirs.filterTo(HashSet()) { SLUG.matches(it.substringAfterLast('/')) }
     // Assign each file to its DEEPEST containing skill dir (a skill can nest inside another).
     val byDir = skillDirs.associateWith { mutableListOf<Extracted>() }
     for (e in entries) ownerDir(e.path, skillDirs)?.let { byDir.getValue(it).add(e) }
@@ -184,17 +189,17 @@ object Discovery {
   }
 
   /**
-   * [dir] is the skill's archive-relative directory (any depth); [files] are the entries assigned
-   * to it. The slug is the leaf directory name. Returns null if the directory has no SKILL.md (not
-   * a skill) or the leaf name isn't a valid slug.
+   * [dir] is the skill's archive-relative directory (any depth, already validated by [discover]);
+   * [files] are the entries assigned to it. The slug is the path (minus a leading `skills/`) with
+   * separators flattened to `-`, so two same-named leaves in different parents never share a slug.
+   * Returns null only if the directory somehow has no SKILL.md.
    */
   private fun buildDetected(
     dir: String,
     files: List<Extracted>,
     source: ArchiveSource,
   ): DetectedSkill? {
-    val slug = dir.substringAfterLast('/')
-    if (slug.isEmpty() || !SLUG.matches(slug)) return null
+    val slug = dir.removePrefix("skills/").replace('/', '-')
     val skillMd = files.firstOrNull { it.path == "$dir/SKILL.md" } ?: return null
     val manifest = SkillManifestParser.parse(String(skillMd.bytes, Charsets.UTF_8))
     val onDemandFiles = files.filter { isOnDemand(it.path, dir) && !it.binary }
