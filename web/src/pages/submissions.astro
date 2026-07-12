@@ -94,6 +94,7 @@ const totalSubmissions = sorted.reduce((sum, g) => sum + g.items.length, 0);
                           {g.state === 'draft' && (
                             <>
                               <button class="btn btn-sm btn-primary" data-action="submit" type="button" aria-label={`Submit ${item.slug} for review`}>Submit</button>
+                              <a class="btn btn-sm btn-outline" href="/submit" aria-label={`Re-scan the repo for ${item.slug} and resubmit`}>Re-scan repo</a>
                               <button class="btn btn-sm btn-ghost" data-action="delete" type="button" aria-label={`Delete ${item.slug} draft`}>Delete</button>
                             </>
                           )}
@@ -111,12 +112,7 @@ const totalSubmissions = sorted.reduce((sum, g) => sum + g.items.length, 0);
                       {item.note && (g.state === 'draft' || g.state === 'changes_requested' || g.state === 'rejected') && (
                         <div class="callout" style="align-items:flex-start;font-size:13px;background:var(--surface-2);">
                           <svg class="ci" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"></circle><path d="M12 16v-4M12 8h.01" stroke-linecap="round"></path></svg>
-                          <div>
-                            <b>Reviewer note:</b> {item.note}
-                            {g.state === 'draft' && (
-                              <div style="margin-top:6px;"><a href="/submit" style="color:var(--accent-text);font-weight:600;">Re-scan your updated repo to resubmit →</a></div>
-                            )}
-                          </div>
+                          <div><b>Reviewer note:</b> {item.note}</div>
                         </div>
                       )}
                     </div>
