@@ -9,6 +9,7 @@ interface Repo {
 }
 interface ReposResponse {
   repos: Repo[];
+  installUrl: string;
 }
 interface DetectedSkill {
   slug: string;
@@ -66,9 +67,15 @@ function renderStep1() {
     return;
   }
   const repos = state.repos.repos || [];
+  const installUrl = esc(state.repos.installUrl);
   if (repos.length === 0) {
-    container.innerHTML =
-      '<div class="state"><p class="muted">No repositories found. Install the GitHub App and grant access to a repo that contains one or more skills (any folder with a <code>SKILL.md</code>).</p></div>';
+    // No granted repos: GitHub only exposes repos you've installed the App on, so the action is to
+    // grant access. GitHub bounces back here (the App's Setup URL) and the list auto-refreshes.
+    container.innerHTML = `
+      <div class="state" style="text-align:left;">
+        <p class="muted" style="margin-bottom:14px;line-height:1.55;">No repositories yet. Grant the GitHub App access to the repos you want to submit from — anything with a <code style="font-family:var(--mono);font-size:11px;">SKILL.md</code>. You'll come right back here.</p>
+        <a class="btn btn-primary" href="${installUrl}">Grant repository access on GitHub →</a>
+      </div>`;
     return;
   }
   container.innerHTML = `
@@ -82,7 +89,10 @@ function renderStep1() {
       </div>
       <div id="repoList"></div>
     </div>
-    <div id="repoStatus" style="margin-top:10px;"></div>
+    <div class="row" style="justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-top:10px;">
+      <span id="repoStatus"></span>
+      <a class="hint" href="${installUrl}" style="color:var(--accent-text);">Don't see your repo? Add another →</a>
+    </div>
   `;
   renderRepoList();
 }
@@ -364,12 +374,25 @@ if (vsteps) {
   // Render the wizard immediately so step 1 is visible with a loading state; otherwise a failed
   // (or slow) repo fetch leaves the step hidden and the page looks blank. Then load + re-render,
   // and surface any error into the now-visible step.
+  const loadAndRender = () =>
+    loadRepos()
+      .then(render)
+      .catch((e) => {
+        // Keep an already-loaded list on a transient refetch failure (e.g. on tab refocus) rather
+        // than replacing it with an error; only surface the error when we have nothing to show.
+        if (state.repos) return;
+        const el = document.getElementById('step1content');
+        if (el)
+          el.innerHTML = `<div class="callout" style="background:var(--danger-soft);border-color:transparent;"><b>Failed to load repositories:</b> ${esc(e.message)}</div>`;
+      });
   render();
-  loadRepos()
-    .then(render)
-    .catch((e) => {
-      const el = document.getElementById('step1content');
-      if (el)
-        el.innerHTML = `<div class="callout" style="background:var(--danger-soft);border-color:transparent;"><b>Failed to load repositories:</b> ${esc(e.message)}</div>`;
-    });
+  loadAndRender();
+
+  // When the user returns to this tab after granting repo access on GitHub (the App's Setup URL
+  // bounces them back, or they switch tabs), refresh the repo list so the new repo appears without
+  // a manual reload. Only while still on the repo-picker step.
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible' && state.step === 1)
+      loadAndRender();
+  });
 }

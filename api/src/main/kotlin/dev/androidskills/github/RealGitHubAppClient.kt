@@ -97,6 +97,26 @@ class RealGitHubAppClient(
     }
   }
 
+  // The App's html_url is static for the app's lifetime; resolve once, then cache. A benign race
+  // just re-fetches the same value.
+  private var cachedInstallUrl: String? = null
+
+  override suspend fun installUrl(): String {
+    cachedInstallUrl?.let {
+      return it
+    }
+    val jwt = AppJwt.build(appId, privateKeyPem)
+    val resp: AppResponse = ghCall {
+      http
+        .get("$githubApiBase/app") {
+          bearerAuth(jwt)
+          header("Accept", "application/vnd.github+json")
+        }
+        .body()
+    }
+    return "${resp.htmlUrl.trimEnd('/')}/installations/new".also { cachedInstallUrl = it }
+  }
+
   override suspend fun listRepos(installationId: Long): List<RepoRef> {
     val token = installToken(installationId)
     val resp: ReposResponse = ghCall {
@@ -250,6 +270,8 @@ private data class TokenResponse(
   val token: String,
   @SerialName("expires_at") val expiresAt: String,
 )
+
+@Serializable private data class AppResponse(@SerialName("html_url") val htmlUrl: String)
 
 @Serializable private data class InstallationDto(val id: Long, val account: AccountDto)
 

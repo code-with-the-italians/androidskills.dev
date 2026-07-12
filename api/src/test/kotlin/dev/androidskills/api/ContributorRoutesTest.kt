@@ -137,6 +137,7 @@ class ContributorRoutesTest {
       val body = res.bodyAsText()
       assertTrue(body.contains("alice/toolkit"), body)
       assertTrue(!body.contains("other/secret"), "personal-only filter (Q3); body=$body")
+      assertTrue(body.contains("\"installUrl\""), "response carries the install URL; body=$body")
     }
 
   @Test

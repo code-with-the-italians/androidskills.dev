@@ -1558,6 +1558,8 @@ export interface components {
     };
     ReposResponse: {
       repos: components['schemas']['RepoDto'][];
+      /** @description GitHub App install/configure page, for granting repo access inline. */
+      installUrl: string;
     };
     DetectedFieldError: {
       field: string;

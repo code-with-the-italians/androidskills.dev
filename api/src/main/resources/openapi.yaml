@@ -1298,11 +1298,15 @@ components:
       type: object
       required:
       - repos
+      - installUrl
       properties:
         repos:
           type: array
           items:
             $ref: '#/components/schemas/RepoDto'
+        installUrl:
+          type: string
+          description: GitHub App install/configure page, for granting repo access inline.
     DetectedFieldError:
       type: object
       required:

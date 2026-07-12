@@ -28,6 +28,10 @@ try {
   repos = null;
   reposError = e instanceof Error ? e.message : 'GitHub App unavailable';
 }
+
+// The App's install/configure page (env-correct, from the API when the App is reachable); falls
+// back to the user's installations page when the App is disabled / the repos call failed.
+const installUrl = repos?.installUrl ?? 'https://github.com/settings/installations';
 ---
 
 <BaseLayout title="Settings" description="Manage your account, preferences, and GitHub access.">
@@ -161,7 +165,7 @@ try {
                     <div>Repository access is controlled on GitHub, not here. We can only read repositories you've granted.</div>
                   </div>
                   <div class="row" style="gap:10px;flex-wrap:wrap;margin-top:14px;">
-                    <a class="btn btn-sm btn-primary" href="https://github.com/settings/installations" target="_blank" rel="noopener">Configure access on GitHub</a>
+                    <a class="btn btn-sm btn-primary" href={installUrl} target="_blank" rel="noopener">Configure access on GitHub</a>
                   </div>
                 </div>
               ) : (
@@ -170,7 +174,7 @@ try {
                   <div>
                     <b>GitHub App not connected.</b> {reposError || 'Install the androidskills GitHub App on your account to import skills from repositories.'}
                     <div class="row" style="gap:10px;margin-top:10px;">
-                      <a class="btn btn-sm btn-primary" href="https://github.com/apps/androidskills" target="_blank" rel="noopener">Install on GitHub</a>
+                      <a class="btn btn-sm btn-primary" href={installUrl} target="_blank" rel="noopener">Install on GitHub</a>
                     </div>
                   </div>
                 </div>
