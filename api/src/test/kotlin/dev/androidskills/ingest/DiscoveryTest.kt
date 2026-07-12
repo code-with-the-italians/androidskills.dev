@@ -220,6 +220,27 @@ class DiscoveryTest {
     assertEquals(2, found.skills.first { it.slug == "inner" }.fileCount)
   }
 
+  @Test
+  fun `invalid-leaf nested dir folds its files into the valid ancestor`() {
+    // skills/mvi is valid; skills/mvi/Bad_Sub has its own SKILL.md but an invalid leaf slug. Its
+    // subtree must fold into mvi (the nearest VALID ancestor) — the exact set IngestPipeline
+    // mirrors from — instead of being siphoned to a dir that never becomes a skill.
+    val zip =
+      zip(
+        "o-r-s/skills/mvi/SKILL.md" to skillMd("MVI", "d"),
+        "o-r-s/skills/mvi/references/guide.md" to "guide\n",
+        "o-r-s/skills/mvi/Bad_Sub/SKILL.md" to skillMd("Bad", "d"),
+        "o-r-s/skills/mvi/Bad_Sub/notes.md" to "notes\n",
+      )
+    val found =
+      assertIs<ScanResult.Found>(
+        Discovery.discover(ArchiveSource.RepoZipball(zip, "owner", "repo", "sha"))
+      )
+    assertEquals(listOf("mvi"), found.skills.map { it.slug })
+    // All four files (mvi's own SKILL.md + references/ plus the Bad_Sub subtree) belong to mvi.
+    assertEquals(4, found.skills[0].fileCount)
+  }
+
   // ---- helpers ----
 
   private val ignored = "name: Ignored\n" + skillMdBody("Ignored", "should not be picked up")

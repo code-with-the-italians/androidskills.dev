@@ -119,6 +119,36 @@ class IngestPipelineTest {
   }
 
   @Test
+  fun `scan fileCount equals files mirrored on ingest (invalid-leaf subtree)`() {
+    val (bundleId, userId) = seedBundle()
+    // A valid skill with a nested invalid-leaf dir that also holds a SKILL.md. Discovery's
+    // fileCount (scan preview) must equal what ingest actually mirrors — the two file-assignment
+    // paths must not drift (without the candidate/valid split this is 2 vs 4).
+    val body = "---\nname: mvi\ndescription: d.\nlicense: MIT\ntags: [android]\n---\n# MVI\n"
+    val bad = "---\nname: bad\ndescription: d.\nlicense: MIT\ntags: [android]\n---\n# Bad\n"
+    val zipBytes =
+      zip(
+        "owner-repo-sha/skills/mvi/SKILL.md" to body,
+        "owner-repo-sha/skills/mvi/references/guide.md" to "guide\n",
+        "owner-repo-sha/skills/mvi/Bad_Sub/SKILL.md" to bad,
+        "owner-repo-sha/skills/mvi/Bad_Sub/notes.md" to "notes\n",
+      )
+    val source = ArchiveSource.RepoZipball(zipBytes, "owner", "repo", "abcdef1234567890")
+
+    val detected = (Discovery.discover(source) as ScanResult.Found).skills
+    assertEquals(1, detected.size)
+    val previewCount = detected[0].fileCount.toLong()
+
+    val result = IngestPipeline.ingest(source, bundleId, store, userId)
+    val skillId = result.skills.single().skillId
+    val mirrored = transaction {
+      SkillFiles.selectAll().where { SkillFiles.skillId eq skillId }.count()
+    }
+    assertEquals(4L, mirrored, "all four files mirrored to mvi")
+    assertEquals(previewCount, mirrored, "scan fileCount must equal mirrored skill_files")
+  }
+
+  @Test
   fun `new skill - writes everything`() {
     val (bundleId, userId) = seedBundle()
     val zipBytes = skillZip("test-mvi", "MVI Scaffold", "A baseline.", "1.0.0")

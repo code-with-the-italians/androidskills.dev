@@ -40,10 +40,10 @@ service, everything else is Astro.
 
 ## 3. Domain rules (binding)
 
-1. **Skill discovery:** skills are found **only** under a **top-level `skills/`
-   directory** in a repo/zip (any depth beneath it). A `SKILL.md` anywhere else
-   (repo root, `.github/`, `.claude/`, `.agents/`) is **intentionally ignored**.
-   A bundle may expose one or many skills.
+1. **Skill discovery:** skills are found **at any depth** in a repo/zip — every
+   directory that directly contains a `SKILL.md` is a skill. A `SKILL.md` in a
+   dot-directory (`.github/`, `.claude/`, `.agents/`) or a bare one at the repo root
+   is **intentionally ignored**. A bundle may expose one or many skills.
 2. **Manifest is source of truth:** `name`, `description`, `tags`, `license`, slug
    come from `SKILL.md` and are **never editable via the UI/API** — changing them
    means editing the file and re-syncing.
@@ -210,12 +210,13 @@ Triggered by (a) a submission being approved, or (b) a `resync` job from a webho
 
 1. **Fetch source.** Repo: download the tarball at the target commit via the GitHub
    App installation token. Zip: read the uploaded archive from `FileStore`.
-2. **Discover skills.** Walk for a **top-level `skills/` directory**; each subtree
-   containing a `SKILL.md` is one skill. Ignore `SKILL.md` outside `skills/`.
+2. **Discover skills.** Walk the archive; each directory that directly contains a
+   `SKILL.md` (at any depth) is one skill. Ignore dot-directories and a bare
+   repo-root `SKILL.md`.
 3. **Parse `SKILL.md`.** Split YAML frontmatter from the Markdown body. Frontmatter
    fields: `name` (req), `description` (req), `tags` (optional list), `license`
-   (req per §10), `metadata.version` (optional SemVer). The **slug** is the skill's
-   directory name under `skills/`.
+   (req per §10), `metadata.version` (optional SemVer). The **slug** is derived from
+   the skill's leaf directory name (uniquified with a `-N` suffix on collision).
 4. **Mirror files** into `FileStore` under the key layout in §11; record each in
    `skill_files` (path, size, binary flag, key). Store the raw body in `skills.readme_md`.
 5. **Compute token estimate** (§ below) → `token_upfront`, `token_ondemand`, `token_band`.
@@ -279,7 +280,7 @@ push webhooks. Store the App id, private key (PEM), and webhook secret as env/se
 - **On-demand scan** (`POST /api/me/repos/{owner}/{repo}/scan`): with an installation
   token, fetch the tree at the default branch's HEAD, apply §3.1 discovery, parse each
   `SKILL.md`, return detected skills as **read-only** metadata + token estimate. If no
-  top-level `skills/` dir → return a "No SKILL.md under skills/" error; submit blocked.
+  `SKILL.md` anywhere → return a "No SKILL.md found" error; submit blocked.
 - **Webhooks** (`POST /gh/webhooks`): verify the HMAC signature against the webhook
   secret. On `push` to a tracked repo's default branch → enqueue a `resync` job (which
   re-ingests and re-reviews before re-publishing). Handle `installation` /

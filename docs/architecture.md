@@ -121,8 +121,8 @@ uploaded zip). A repo is owned first-come-first-served by one account.
   into the agent's skills dir (`~/.claude/skills/`, `~/.codex/skills/`); CLI is
   secondary and is a single static binary (Kotlin Native / Rust / Go), distributed
   via brew/winget/install script — never npm.
-- **Skills discovered only under a top-level `skills/` directory** in a repo;
-  `SKILL.md` elsewhere is intentionally ignored.
+- **Skills discovered at any depth** in a repo — every directory containing a
+  `SKILL.md` is a skill; dot-directories and a bare repo-root `SKILL.md` are ignored.
 - **Manifest (`SKILL.md`) is the source of truth** — name/slug/description/tags are
   read-only in the UI; category is LLM-assigned.
 - **Prototype is deliberately vanilla** (no React, CSS `light-dark()`); keep the

@@ -156,7 +156,8 @@ private suspend fun scan(call: ApplicationCall, gh: GitHubAppClient) {
       ScanResult.NoSkillsDir ->
         throw ApiValidationException(
           mapOf(
-            "repo" to "no top-level 'skills/' directory found; SKILL.md must live under skills/"
+            "repo" to
+              "no SKILL.md found in the repository; a skill is any directory containing a SKILL.md"
           ),
           code = "no_skills_dir",
         )

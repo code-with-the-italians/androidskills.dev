@@ -43,13 +43,12 @@ import BaseLayout from '../layouts/BaseLayout.astro';
       <div class="prose">
         <p>
           A skill is a folder containing a <code>SKILL.md</code> manifest. A single GitHub repo can hold
-          one or many skills — but they must live under a top-level <code>skills/</code> directory. When
-          you submit, androidskills.dev:
+          one or many skills, in whatever layout suits it. When you submit, androidskills.dev:
         </p>
         <ul>
-          <li>looks only inside <code>skills/</code> at the root of the repo;</li>
-          <li>publishes every folder beneath it — at any depth — that contains a <code>SKILL.md</code>;</li>
-          <li>ignores <code>SKILL.md</code> files anywhere else (<code>.github/</code>, <code>.claude/</code>, <code>.agents/</code>, repo root).</li>
+          <li>publishes every folder in the repo — at any depth — that contains a <code>SKILL.md</code>;</li>
+          <li>derives each skill's slug from its folder name;</li>
+          <li>ignores <code>SKILL.md</code> files in dot-directories (<code>.github/</code>, <code>.claude/</code>, <code>.agents/</code>), a bare one at the repo root, and folders whose name isn’t a valid slug.</li>
         </ul>
       </div>
     </div>
