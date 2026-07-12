@@ -29,7 +29,7 @@ interface ScanResponse {
   skills: DetectedSkill[];
 }
 const CHECK =
-  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>';
+  '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>';
 
 /**
  * Escape helper is imported from ../lib/escape so there is one source of truth
@@ -162,8 +162,31 @@ function renderStep2() {
     return;
   }
   const items = skills
-    .map(
-      (s, i) => `
+    .map((s, i) => {
+      // Only show frontmatter fields that are actually present (empty ones are omitted, not shown
+      // blank). description + contents are always present; version/license/tags are optional.
+      const rows: Array<[string, string]> = [
+        ['description', esc(s.description)],
+      ];
+      if (s.version) rows.push(['version', esc(s.version)]);
+      if (s.license) rows.push(['license', esc(s.license)]);
+      if (s.tags && s.tags.length)
+        rows.push([
+          'tags',
+          s.tags.map((t) => `<span class="tag">${esc(t)}</span>`).join(' '),
+        ]);
+      rows.push([
+        'contents',
+        `${esc(s.fileCount)} files · ${esc(s.tokenUpfront + s.tokenOndemand)} tokens`,
+      ]);
+      const kv = rows
+        .map(([k, v], idx) => {
+          const last = idx === rows.length - 1;
+          const style = `display:grid;grid-template-columns:130px 1fr;gap:12px;padding:10px 0${last ? ' 0' : ''};font-size:14px;${last ? '' : 'border-bottom:1px solid var(--border);'}`;
+          return `<div class="kv" style="${style}"><span class="k" style="font-family:var(--mono);font-size:12px;color:var(--text-faint);">${k}</span><span class="v">${v}</span></div>`;
+        })
+        .join('');
+      return `
     <div class="acc" data-acc>
       <div class="acc-h" data-acc-head role="button" tabindex="0" aria-expanded="false" aria-label="${esc(s.name)} skill details">
         <input type="checkbox" data-skill-idx="${i}" checked style="width:18px;height:18px;flex:none;" aria-label="Select ${esc(s.name)} for submission">
@@ -176,20 +199,15 @@ function renderStep2() {
       </div>
       <div class="acc-body" role="region" aria-label="${esc(s.name)} metadata">
         <div style="overflow:hidden;">
-          <div style="padding:12px 14px;">
-            <div class="kv" style="display:grid;grid-template-columns:130px 1fr;gap:12px;padding:10px 0;border-bottom:1px solid var(--border);font-size:14px;"><span class="k" style="font-family:var(--mono);font-size:12px;color:var(--text-faint);">description</span><span class="v">${esc(s.description)}</span></div>
-            <div class="kv" style="display:grid;grid-template-columns:130px 1fr;gap:12px;padding:10px 0;border-bottom:1px solid var(--border);font-size:14px;"><span class="k" style="font-family:var(--mono);font-size:12px;color:var(--text-faint);">version</span><span class="v">${esc(s.version)}</span></div>
-            <div class="kv" style="display:grid;grid-template-columns:130px 1fr;gap:12px;padding:10px 0;border-bottom:1px solid var(--border);font-size:14px;"><span class="k" style="font-family:var(--mono);font-size:12px;color:var(--text-faint);">license</span><span class="v">${esc(s.license) || '—'}</span></div>
-            <div class="kv" style="display:grid;grid-template-columns:130px 1fr;gap:12px;padding:10px 0;border-bottom:1px solid var(--border);font-size:14px;"><span class="k" style="font-family:var(--mono);font-size:12px;color:var(--text-faint);">tags</span><span class="v">${(s.tags || []).map((t) => `<span class="tag">${esc(t)}</span>`).join(' ')}</span></div>
-            <div class="kv" style="display:grid;grid-template-columns:130px 1fr;gap:12px;padding:10px 0;font-size:14px;"><span class="k" style="font-family:var(--mono);font-size:12px;color:var(--text-faint);">contents</span><span class="v">${esc(s.fileCount)} files · <span style="color:var(--accent-text);">${esc(s.tokenUpfront + s.tokenOndemand)} tokens</span></span></div>
-          </div>
+          <div style="padding:8px 14px;">${kv}</div>
         </div>
       </div>
     </div>
-  `,
-    )
+  `;
+    })
     .join('');
   container.innerHTML = `
+    <button type="button" data-back-to-repos style="background:none;border:0;padding:0;margin-bottom:12px;color:var(--accent-text);cursor:pointer;font:inherit;font-size:13px;">← Choose a different repository</button>
     <div class="callout" style="margin-bottom:16px;" aria-live="polite" aria-atomic="true"><svg class="ci" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 16v-4M12 8h.01" stroke-linecap="round"/></svg><div><b>${esc(skills.length)} skill${skills.length > 1 ? 's' : ''}</b> found. Everything below is read from each skill's SKILL.md frontmatter.</div></div>
     <div class="accs">${items}</div>
     <button class="btn btn-primary" data-continue style="margin-top:18px;">Continue with selected skills</button>
@@ -204,10 +222,10 @@ function renderStep3() {
     <p class="hint" style="margin-bottom:14px;">On submit, automated checks run and the selected skills enter the review queue. Drafts you save appear under <a href="/submissions" style="color:var(--accent-text);">My submissions</a>.</p>
     <div class="card" style="margin-bottom:16px;">
       <div class="kicker" style="margin-bottom:10px;"><span class="tick">//</span> SELECTED</div>
-      ${skills.map((s) => `<div style="padding:8px 0;border-bottom:1px solid var(--border);"><b>${esc(s.name)}</b> <span class="hint">${esc(s.sourceDir)}/</span></div>`).join('')}
+      ${skills.map((s, i) => `<div style="padding:8px 0;${i < skills.length - 1 ? 'border-bottom:1px solid var(--border);' : ''}"><b>${esc(s.name)}</b> <span class="hint">${esc(s.sourceDir)}/</span></div>`).join('')}
     </div>
     <div class="row" style="gap:10px;">
-      <button class="btn btn-ghost" data-save-draft>Save draft</button>
+      <button class="btn btn-ghost btn-lg" data-save-draft>Save draft</button>
       <button class="btn btn-primary btn-lg" data-submit aria-busy="false"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/></svg> Submit for review</button>
     </div>
     <div id="submitStatus" class="hint" style="margin-top:10px;" aria-live="polite" aria-atomic="true"></div>
@@ -316,6 +334,22 @@ async function createDrafts(submit: boolean) {
 if (vsteps) {
   vsteps.addEventListener('click', (e) => {
     const target = e.target as HTMLElement;
+    // Go back to the repo picker (explicit link in step 2, or clicking an already-completed step
+    // in the vertical stepper — its header only, since its content is collapsed).
+    if (target.closest('[data-back-to-repos]')) {
+      state.step = 1;
+      render();
+      return;
+    }
+    const head = target.closest('.vhead');
+    if (head) {
+      const n = Number(head.closest('.vstep')?.getAttribute('data-step'));
+      if (n && n < state.step) {
+        state.step = n;
+        render();
+      }
+      return;
+    }
     const repo = target.closest('[data-repo]');
     if (repo && state.repos) {
       const fullName = repo.getAttribute('data-repo');
