@@ -345,8 +345,11 @@ const review =
           const idx = items.findIndex(
             (el) => el.getAttribute('data-queue-id') === currentId,
           );
-          const nextId =
-            idx >= 0 ? items[idx + 1]?.getAttribute('data-queue-id') : undefined;
+          // In-list: go to the next row (undefined if last). Not in the list (the current item was
+          // filtered/searched out): fall back to the first visible row rather than dead-ending.
+          const nextId = (idx >= 0 ? items[idx + 1] : items[0])?.getAttribute(
+            'data-queue-id',
+          );
           if (nextId) loadDetail(nextId);
           else showToast('No more submissions to review');
           return;
