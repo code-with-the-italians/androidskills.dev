@@ -94,7 +94,16 @@ private suspend fun repos(call: ApplicationCall, gh: GitHubAppClient) {
         )
       }
     }
-  call.respond(ReposResponse(repos.map { it.toDto() }))
+  // The App's install/configure page, so the UI can offer "grant repo access" inline (works even
+  // with zero installations, which is exactly when the user needs it). This is ancillary: a failed
+  // `GET /app` must NOT fail the repo list, so degrade to the generic installations page.
+  val installUrl =
+    try {
+      gh.installUrl()
+    } catch (e: GitHubAppException) {
+      "https://github.com/settings/installations"
+    }
+  call.respond(ReposResponse(repos.map { it.toDto() }, installUrl))
 }
 
 private suspend fun scan(call: ApplicationCall, gh: GitHubAppClient) {
@@ -173,7 +182,7 @@ data class RepoDto(
   val defaultBranch: String?,
 )
 
-@Serializable data class ReposResponse(val repos: List<RepoDto>)
+@Serializable data class ReposResponse(val repos: List<RepoDto>, val installUrl: String)
 
 @Serializable
 data class DetectedSkillDto(

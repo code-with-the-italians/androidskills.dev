@@ -151,6 +151,12 @@ class RealGitHubAppClientTest {
   }
 
   @Test
+  fun `installUrl resolves the app html_url and appends the install path`() = runBlocking {
+    val (gh, _) = newClient(body = """{"html_url":"https://github.com/apps/my-app"}""")
+    assertEquals("https://github.com/apps/my-app/installations/new", gh.installUrl())
+  }
+
+  @Test
   fun `listRepos parses repository list`() = runBlocking {
     // The client needs an installation token first — mock a token endpoint response,
     // then the repos endpoint. MockEngine handles both in order via request matching.

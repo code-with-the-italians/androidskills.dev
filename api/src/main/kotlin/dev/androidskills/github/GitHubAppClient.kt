@@ -22,6 +22,12 @@ interface GitHubAppClient {
   /** The App's installations (`GET /app/installations`, App-JWT auth). */
   suspend fun installations(): List<Installation>
 
+  /**
+   * The App's install/configure page — where a user grants repo access. Real impls resolve it from
+   * `GET /app` (`html_url`); the default is a fallback for tests and the disabled client.
+   */
+  suspend fun installUrl(): String = "https://github.com/settings/installations"
+
   /** Repos accessible to an installation (`GET /installation/repositories`). */
   suspend fun listRepos(installationId: Long): List<RepoRef>
 
