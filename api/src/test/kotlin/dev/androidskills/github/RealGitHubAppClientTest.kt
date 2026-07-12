@@ -133,14 +133,21 @@ class RealGitHubAppClientTest {
 
   @Test
   fun `installations parses account info`() = runBlocking {
+    // GitHub's GET /app/installations returns a TOP-LEVEL array, not a wrapped object.
     val (gh, _) =
-      newClient(
-        body = """{"installations":[{"id":1,"account":{"id":42,"login":"alice","type":"User"}}]}"""
-      )
+      newClient(body = """[{"id":1,"account":{"id":42,"login":"alice","type":"User"}}]""")
     val list = gh.installations()
     assertEquals(1, list.size)
     assertEquals(42L, list[0].accountId)
     assertEquals("alice", list[0].accountLogin)
+  }
+
+  @Test
+  fun `installations returns empty for a bare empty array`() = runBlocking {
+    // An app with no installs returns `[]`. Regression: a wrapper-object DTO threw on this,
+    // surfacing as a 502 on /api/me/repos and a blank submit wizard.
+    val (gh, _) = newClient(body = "[]")
+    assertEquals(emptyList(), gh.installations())
   }
 
   @Test
