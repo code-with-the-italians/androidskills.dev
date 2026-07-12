@@ -11,9 +11,14 @@ let grouped: Awaited<ReturnType<typeof api.getSubmissions>> | null = null;
 let error = false;
 
 try {
-  [me, grouped] = await Promise.all([api.getMe(), api.getSubmissions()]);
+  me = await api.getMe();
 } catch {
-  return Astro.redirect('/signin');
+  return Astro.redirect('/signin'); // not signed in
+}
+try {
+  grouped = await api.getSubmissions();
+} catch {
+  error = true; // signed in, but the submissions fetch failed — show an error, not a signin bounce
 }
 
 const stateOrder = ['draft', 'in_review', 'changes_requested', 'published', 'rejected'];
@@ -29,7 +34,11 @@ const sorted = stateOrder
     const g = grouped?.find((x) => x.state === state);
     return g ? { state, label: stateLabels[state], items: g.items } : null;
   })
-  .filter(Boolean) as { state: string; label: string; items: typeof grouped[0]['items'] }[];
+  .filter(Boolean) as {
+  state: string;
+  label: string;
+  items: NonNullable<typeof grouped>[number]['items'];
+}[];
 
 const totalSubmissions = sorted.reduce((sum, g) => sum + g.items.length, 0);
 ---
@@ -72,28 +81,40 @@ const totalSubmissions = sorted.reduce((sum, g) => sum + g.items.length, 0);
               {g.items.length > 0 ? (
                 <div style="display:flex;flex-direction:column;gap:10px;">
                   {g.items.map((item) => (
-                    <div class="submission-row" data-submission-id={item.id} data-state={g.state} style="display:flex;align-items:center;gap:12px;padding:12px 14px;border:1px solid var(--border);border-radius:var(--r-md);">
-                      <div style="flex:1;min-width:0;">
-                        <div style="font-weight:600;font-size:14.5px;">{item.slug}</div>
-                        <div style="font-family:var(--mono);font-size:11px;color:var(--text-faint);margin-top:3px;">
-                          updated {new Date(item.updatedAt).toLocaleDateString()}
-                          {item.lintScore != null && <span> · lint {item.lintScore}</span>}
+                    <div class="submission-row" data-submission-id={item.id} data-state={g.state} style="display:flex;flex-direction:column;gap:10px;padding:12px 14px;border:1px solid var(--border);border-radius:var(--r-md);">
+                      <div style="display:flex;align-items:center;gap:12px;">
+                        <div style="flex:1;min-width:0;">
+                          <div style="font-weight:600;font-size:14.5px;">{item.slug}</div>
+                          <div style="font-family:var(--mono);font-size:11px;color:var(--text-faint);margin-top:3px;">
+                            updated {new Date(item.updatedAt).toLocaleDateString()}
+                            {item.lintScore != null && <span> · lint {item.lintScore}</span>}
+                          </div>
+                        </div>
+                        <div class="actions" style="display:flex;gap:8px;flex-wrap:wrap;">
+                          {g.state === 'draft' && (
+                            <>
+                              <button class="btn btn-sm btn-primary" data-action="submit" type="button" aria-label={`Submit ${item.slug} for review`}>Submit</button>
+                              <a class="btn btn-sm btn-outline" href="/submit" aria-label={`Re-scan the repo for ${item.slug} and resubmit`}>Re-scan repo</a>
+                              <button class="btn btn-sm btn-ghost" data-action="delete" type="button" aria-label={`Delete ${item.slug} draft`}>Delete</button>
+                            </>
+                          )}
+                          {g.state === 'in_review' && (
+                            <button class="btn btn-sm btn-ghost" data-action="withdraw" type="button" aria-label={`Withdraw ${item.slug}`}>Withdraw</button>
+                          )}
+                          {g.state === 'changes_requested' && (
+                            <button class="btn btn-sm btn-primary" data-action="revise" type="button" aria-label={`Revise ${item.slug}`}>Revise</button>
+                          )}
+                          {(g.state === 'published' || g.state === 'rejected') && (
+                            <span class="tag">{stateLabels[g.state]}</span>
+                          )}
                         </div>
                       </div>
-                      <div class="actions" style="display:flex;gap:8px;flex-wrap:wrap;">
-                        {g.state === 'draft' && (
-                          <>
-                            <button class="btn btn-sm btn-primary" data-action="submit" type="button" aria-label={`Submit ${item.slug} for review`}>Submit</button>
-                            <button class="btn btn-sm btn-ghost" data-action="delete" type="button" aria-label={`Delete ${item.slug} draft`}>Delete</button>
-                          </>
-                        )}
-                        {(g.state === 'in_review' || g.state === 'changes_requested') && (
-                          <button class="btn btn-sm btn-ghost" data-action="withdraw" type="button" aria-label={`Withdraw ${item.slug}`}>Withdraw</button>
-                        )}
-                        {(g.state === 'published' || g.state === 'rejected') && (
-                          <span class="tag">{g.state}</span>
-                        )}
-                      </div>
+                      {item.note && (g.state === 'draft' || g.state === 'changes_requested' || g.state === 'rejected') && (
+                        <div class="callout" style="align-items:flex-start;font-size:13px;background:var(--surface-2);">
+                          <svg class="ci" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"></circle><path d="M12 16v-4M12 8h.01" stroke-linecap="round"></path></svg>
+                          <div><b>Reviewer note:</b> {item.note}</div>
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -127,6 +148,12 @@ const totalSubmissions = sorted.reduce((sum, g) => sum + g.items.length, 0);
                 const res = await fetch(`/api/me/submissions/${id}/withdraw`, { method: 'POST' });
                 if (!res.ok) throw new Error(await res.text());
                 showToast('Withdrawn');
+              } else if (action === 'revise') {
+                // Return to draft; the reload shows the draft with the reviewer note + a re-scan
+                // link, so the author can see what to fix and resubmit their updated repo.
+                const res = await fetch(`/api/me/submissions/${id}/withdraw`, { method: 'POST' });
+                if (!res.ok) throw new Error(await res.text());
+                showToast('Returned to draft — see the reviewer note to revise');
               } else if (action === 'delete') {
                 if (!confirm('Delete this draft?')) return;
                 const res = await fetch(`/api/me/submissions/${id}`, { method: 'DELETE' });

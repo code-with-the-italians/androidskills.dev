@@ -1609,6 +1609,8 @@ export interface components {
       slug: string;
       state: string;
       lintScore?: number | null;
+      /** @description The admin's decision note (e.g. requested changes), if any. */
+      note?: string | null;
       createdAt: string;
       updatedAt: string;
     };
