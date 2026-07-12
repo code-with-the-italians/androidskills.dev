@@ -78,7 +78,8 @@ class RealGitHubAppClient(
 
   override suspend fun installations(): List<Installation> {
     val jwt = AppJwt.build(appId, privateKeyPem)
-    val resp: InstallationsResponse = ghCall {
+    // GitHub's `GET /app/installations` returns a TOP-LEVEL JSON array, not a wrapped object.
+    val resp: List<InstallationDto> = ghCall {
       http
         .get("$githubApiBase/app/installations") {
           bearerAuth(jwt)
@@ -86,7 +87,7 @@ class RealGitHubAppClient(
         }
         .body()
     }
-    return resp.installations.map {
+    return resp.map {
       Installation(
         id = it.id,
         accountId = it.account.id,
@@ -249,9 +250,6 @@ private data class TokenResponse(
   val token: String,
   @SerialName("expires_at") val expiresAt: String,
 )
-
-@Serializable
-private data class InstallationsResponse(val installations: List<InstallationDto> = emptyList())
 
 @Serializable private data class InstallationDto(val id: Long, val account: AccountDto)
 

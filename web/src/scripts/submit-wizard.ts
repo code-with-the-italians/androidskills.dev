@@ -361,6 +361,10 @@ if (vsteps) {
     if (target.id === 'repoFilter') renderRepoList();
   });
 
+  // Render the wizard immediately so step 1 is visible with a loading state; otherwise a failed
+  // (or slow) repo fetch leaves the step hidden and the page looks blank. Then load + re-render,
+  // and surface any error into the now-visible step.
+  render();
   loadRepos()
     .then(render)
     .catch((e) => {
