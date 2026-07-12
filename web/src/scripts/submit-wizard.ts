@@ -40,6 +40,9 @@ const state = {
   repo: null as Repo | null,
   repos: null as ReposResponse | null,
   scan: null as ScanResponse | null,
+  // Which detected skills are ticked — the source of truth for the checkboxes, so re-rendering
+  // step 2 (e.g. after jumping back from step 3) preserves the user's selection.
+  selected: new Set<number>(),
   error: null as string | null,
   checking: null as string | null,
 };
@@ -138,6 +141,7 @@ async function scanRepo(repo: Repo) {
     );
     if (!res.ok) throw new Error(await res.text());
     state.scan = (await res.json()) as ScanResponse;
+    state.selected = new Set(state.scan.skills.map((_, i) => i)); // all ticked by default
     state.step = 2;
   } catch (e) {
     state.error = e instanceof Error ? e.message : 'Scan failed';
@@ -189,7 +193,7 @@ function renderStep2() {
       return `
     <div class="acc" data-acc>
       <div class="acc-h" data-acc-head role="button" tabindex="0" aria-expanded="false" aria-label="${esc(s.name)} skill details">
-        <input type="checkbox" data-skill-idx="${i}" checked style="width:18px;height:18px;flex:none;" aria-label="Select ${esc(s.name)} for submission">
+        <input type="checkbox" data-skill-idx="${i}" ${state.selected.has(i) ? 'checked' : ''} style="width:18px;height:18px;flex:none;" aria-label="Select ${esc(s.name)} for submission">
         <div style="flex:1;min-width:0;">
           <div class="nm" style="font-weight:600;font-size:14.5px;">${esc(s.name)}</div>
           <div class="sl" style="font-family:var(--mono);font-size:11.5px;color:var(--text-faint);">${esc(s.sourceDir)}/</div>
@@ -234,12 +238,7 @@ function renderStep3() {
 
 function selectedSkills(): DetectedSkill[] {
   if (!state.scan) return [];
-  const checked = Array.from(
-    document.querySelectorAll('[data-skill-idx]:checked'),
-  ) as HTMLInputElement[];
-  return checked
-    .map((cb) => state.scan!.skills[Number(cb.getAttribute('data-skill-idx'))])
-    .filter(Boolean);
+  return state.scan.skills.filter((_, i) => state.selected.has(i));
 }
 
 function render() {
@@ -380,6 +379,16 @@ if (vsteps) {
       createDrafts(true);
       return;
     }
+  });
+
+  vsteps.addEventListener('change', (e) => {
+    const cb = (e.target as HTMLElement).closest(
+      '[data-skill-idx]',
+    ) as HTMLInputElement | null;
+    if (!cb) return;
+    const idx = Number(cb.getAttribute('data-skill-idx'));
+    if (cb.checked) state.selected.add(idx);
+    else state.selected.delete(idx);
   });
 
   vsteps.addEventListener('keydown', (e) => {
