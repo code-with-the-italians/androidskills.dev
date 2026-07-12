@@ -435,6 +435,31 @@ class SubmissionQueriesTest {
   }
 
   @Test
+  fun `withdraw returns a changes_requested submission to draft (revise)`(): Unit = runBlocking {
+    setupDb()
+    val (_, principal) = createUser(42L, "alice")
+    val response = SubmissionQueries.createDrafts(principal, draftRequest("skill-one"), fakeGh())
+    val subId = response.submissionIds[0]
+    SubmissionQueries.submit(principal, subId)
+    // Simulate the admin requesting changes.
+    transaction {
+      Submissions.update({ Submissions.id eq subId }) {
+        it[Submissions.state] = "changes_requested"
+        it[Submissions.note] = "Please tighten the description."
+      }
+    }
+
+    SubmissionQueries.withdraw(principal, subId)
+
+    transaction {
+      assertEquals(
+        "draft",
+        Submissions.selectAll().where { Submissions.id eq subId }.single()[Submissions.state],
+      )
+    }
+  }
+
+  @Test
   fun `deleteDraft removes submission and shell skill`(): Unit = runBlocking {
     setupDb()
     val (_, principal) = createUser(42L, "alice")

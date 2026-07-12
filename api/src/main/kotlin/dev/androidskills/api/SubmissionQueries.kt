@@ -76,6 +76,9 @@ object SubmissionQueries {
     val slug: String,
     val state: String,
     val lintScore: Int?,
+    // The admin's decision note (e.g. what to change on `changes_requested`), so the dashboard can
+    // tell the submitter what's needed without a separate detail fetch.
+    val note: String? = null,
     val createdAt: String,
     val updatedAt: String,
   )
@@ -326,6 +329,7 @@ object SubmissionQueries {
               } ?: "",
             state = it[Submissions.state],
             lintScore = it[Submissions.lintScore],
+            note = it[Submissions.note],
             createdAt = it[Submissions.createdAt],
             updatedAt = it[Submissions.updatedAt],
           )
@@ -411,8 +415,9 @@ object SubmissionQueries {
   }
 
   /**
-   * Withdraws an `in_review` submission back to `draft`. Clears any queued review job; a running
-   * job is left alone (its output will be merged but ignored until the next submit).
+   * Returns an `in_review` (withdraw) or `changes_requested` (revise) submission to `draft` so the
+   * submitter can edit and resubmit. Clears any queued review job; a running job is left alone (its
+   * output will be merged but ignored until the next submit).
    */
   fun withdraw(principal: Principal, submissionId: String) {
     transaction {
@@ -422,8 +427,11 @@ object SubmissionQueries {
             (Submissions.id eq submissionId) and (Submissions.submitterId eq principal.userId)
           }
           .singleOrNull() ?: throw ApiNotFoundException("Submission not found")
-      if (row[Submissions.state] != "in_review") {
-        throw ApiConflictException("Submission is not in review", code = "invalid_state_transition")
+      if (row[Submissions.state] !in setOf("in_review", "changes_requested")) {
+        throw ApiConflictException(
+          "Only an in-review or changes-requested submission can be returned to draft",
+          code = "invalid_state_transition",
+        )
       }
       Submissions.update({ Submissions.id eq submissionId }) {
         it[Submissions.state] = "draft"

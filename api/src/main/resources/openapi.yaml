@@ -1455,6 +1455,10 @@ components:
         lintScore:
           type: integer
           nullable: true
+        note:
+          type: string
+          nullable: true
+          description: The admin's decision note (e.g. requested changes), if any.
         createdAt:
           type: string
         updatedAt:
