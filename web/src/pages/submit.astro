@@ -90,28 +90,34 @@ try {
     .vcontent { margin-top: 14px; display: none; }
     .vstep.active .vcontent { display: block; }
     .vstep.upcoming { opacity: 0.5; }
-    .repo { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-bottom: 1px solid var(--border); cursor: pointer; transition: background 0.12s; }
-    .repo:last-child { border-bottom: 0; }
-    .repo:hover { background: var(--surface-2); }
-    .repo .radio { width: 18px; height: 18px; border-radius: 999px; border: 2px solid var(--border-2); flex: none; display: grid; place-items: center; }
-    .repo.sel .radio { border-color: var(--accent); }
-    .repo.sel .radio::after { content: ""; width: 9px; height: 9px; border-radius: 999px; background: var(--accent); }
-    .repo.sel { background: var(--accent-soft); }
-    .acc { border: 1px solid var(--border); border-radius: var(--r-md); overflow: hidden; background: var(--surface); }
-    .acc + .acc { margin-top: 10px; }
-    .acc-h { display: flex; align-items: center; gap: 12px; padding: 13px 14px; cursor: pointer; }
-    .acc-h:hover { background: var(--surface-2); }
-    .acc .acc-body { display: grid; grid-template-rows: 0fr; opacity: 0; border-top: 1px solid transparent; transition: grid-template-rows 0.28s ease, opacity 0.22s ease, border-color 0.28s ease; }
-    .acc.open .acc-body { grid-template-rows: 1fr; opacity: 1; border-top-color: var(--border); }
-    .acc .acc-body > div { overflow: hidden; }
-    .acc.open .chev { transform: rotate(180deg); }
-    .seg { display: inline-flex; border: 1px solid var(--border); border-radius: var(--r-md); overflow: hidden; }
-    .seg button { background: var(--surface); border: 0; border-right: 1px solid var(--border); padding: 6px 12px; font-size: 13px; cursor: pointer; }
-    .seg button:last-child { border-right: 0; }
-    .seg button[aria-pressed="true"] { background: var(--accent-soft); color: var(--accent-text); font-weight: 600; }
-    .pref-sw button[aria-pressed="true"]::after { content: ""; position: absolute; inset: 0; margin: auto; width: 7px; height: 7px; border-radius: 999px; background: var(--accent-ink); }
-    .pref-sw button { position: relative; }
     @media (max-width: 880px) { .submit-grid { grid-template-columns: 1fr; } }
+  </style>
+
+  <!-- The wizard's step content (repo list, skill accordions, prefs) is injected by
+       submit-wizard.ts at runtime, so it never receives Astro's scoped-style attribute. These
+       rules must be global; they're pinned to #vsteps (unique to this page) so they don't leak. -->
+  <style is:global>
+    #vsteps .repo { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-bottom: 1px solid var(--border); cursor: pointer; transition: background 0.12s; }
+    #vsteps .repo:last-child { border-bottom: 0; }
+    #vsteps .repo:hover { background: var(--surface-2); }
+    #vsteps .repo .radio { width: 18px; height: 18px; border-radius: 999px; border: 2px solid var(--border-2); flex: none; display: grid; place-items: center; }
+    #vsteps .repo.sel .radio { border-color: var(--accent); }
+    #vsteps .repo.sel .radio::after { content: ""; width: 9px; height: 9px; border-radius: 999px; background: var(--accent); }
+    #vsteps .repo.sel { background: var(--accent-soft); }
+    #vsteps .acc { border: 1px solid var(--border); border-radius: var(--r-md); overflow: hidden; background: var(--surface); }
+    #vsteps .acc + .acc { margin-top: 10px; }
+    #vsteps .acc-h { display: flex; align-items: center; gap: 12px; padding: 13px 14px; cursor: pointer; }
+    #vsteps .acc-h:hover { background: var(--surface-2); }
+    #vsteps .acc .acc-body { display: grid; grid-template-rows: 0fr; opacity: 0; border-top: 1px solid transparent; transition: grid-template-rows 0.28s ease, opacity 0.22s ease, border-color 0.28s ease; }
+    #vsteps .acc.open .acc-body { grid-template-rows: 1fr; opacity: 1; border-top-color: var(--border); }
+    #vsteps .acc .acc-body > div { overflow: hidden; }
+    #vsteps .acc.open .chev { transform: rotate(180deg); }
+    #vsteps .seg { display: inline-flex; border: 1px solid var(--border); border-radius: var(--r-md); overflow: hidden; }
+    #vsteps .seg button { background: var(--surface); border: 0; border-right: 1px solid var(--border); padding: 6px 12px; font-size: 13px; cursor: pointer; }
+    #vsteps .seg button:last-child { border-right: 0; }
+    #vsteps .seg button[aria-pressed="true"] { background: var(--accent-soft); color: var(--accent-text); font-weight: 600; }
+    #vsteps .pref-sw button[aria-pressed="true"]::after { content: ""; position: absolute; inset: 0; margin: auto; width: 7px; height: 7px; border-radius: 999px; background: var(--accent-ink); }
+    #vsteps .pref-sw button { position: relative; }
   </style>
 
   <script>
