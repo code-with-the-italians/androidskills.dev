@@ -88,8 +88,15 @@ try {
     .vbody { min-width: 0; }
     .vhead { display: flex; align-items: center; gap: 12px; min-height: 32px; }
     .vcontent { margin-top: 14px; display: none; }
-    .vstep.active .vcontent { display: block; }
+    /* Reveal the active step's content with a soft fade + slide (animation, not transition, so it
+       runs across the display:none -> block change on step advance). */
+    .vstep.active .vcontent { display: block; animation: stepIn 0.32s cubic-bezier(0.16, 1, 0.3, 1); }
+    @keyframes stepIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+    @media (prefers-reduced-motion: reduce) { .vstep.active .vcontent { animation: none; } }
     .vstep.upcoming { opacity: 0.5; }
+    /* Completed steps are clickable to go back to them. */
+    .vstep.done .vhead { cursor: pointer; }
+    .vstep.done .vhead:hover .vtitle { color: var(--accent-text); }
     @media (max-width: 880px) { .submit-grid { grid-template-columns: 1fr; } }
   </style>
 
