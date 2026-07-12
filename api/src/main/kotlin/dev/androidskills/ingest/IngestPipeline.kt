@@ -52,7 +52,7 @@ object IngestPipeline {
   ): IngestResult {
     val scanResult = Discovery.discover(source)
     if (scanResult is ScanResult.NoSkillsDir) {
-      throw IllegalStateException("No top-level 'skills/' directory in archive")
+      throw IllegalStateException("No SKILL.md found anywhere in the archive")
     }
     val detected = (scanResult as ScanResult.Found).skills
     if (detected.isEmpty()) throw IllegalStateException("No valid skills discovered")
@@ -291,7 +291,7 @@ object IngestPipeline {
   ): PromoteResult {
     val scanResult = Discovery.discover(source)
     if (scanResult is ScanResult.NoSkillsDir) {
-      throw IllegalStateException("No top-level 'skills/' directory in archive")
+      throw IllegalStateException("No SKILL.md found anywhere in the archive")
     }
     val detected = (scanResult as ScanResult.Found).skills
     val extracted = Discovery.extract(source)

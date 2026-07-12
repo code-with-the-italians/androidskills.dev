@@ -68,11 +68,11 @@ function renderStep1() {
   const repos = state.repos.repos || [];
   if (repos.length === 0) {
     container.innerHTML =
-      '<div class="state"><p class="muted">No repositories found. Install the GitHub App and grant access to a repo with a top-level <code>skills/</code> directory.</p></div>';
+      '<div class="state"><p class="muted">No repositories found. Install the GitHub App and grant access to a repo that contains one or more skills (any folder with a <code>SKILL.md</code>).</p></div>';
     return;
   }
   container.innerHTML = `
-    <p class="hint" style="margin-bottom:12px;line-height:1.55;">Pick a repository with one or more skills in a top-level <code style="font-family:var(--mono);font-size:11px;">skills/</code> directory.</p>
+    <p class="hint" style="margin-bottom:12px;line-height:1.55;">Pick a repository that contains one or more skills — any folder with a <code style="font-family:var(--mono);font-size:11px;">SKILL.md</code>.</p>
     <div class="tbl-wrap" style="border:1px solid var(--border);border-radius:var(--r-md);overflow:hidden;">
       <div style="padding:10px 12px;border-bottom:1px solid var(--border);">
         <div class="search search-sm">
@@ -148,7 +148,7 @@ function renderStep2() {
   const skills = state.scan.skills || [];
   if (skills.length === 0) {
     container.innerHTML =
-      '<div class="callout" style="background:var(--danger-soft);border-color:transparent;align-items:flex-start;"><svg class="ci" viewBox="0 0 24 24" fill="none" stroke="var(--danger)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 9v4M12 17h.01M10.3 3.9 2.4 18a2 2 0 0 0 1.7 3h15.8a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg><div><b>No skill found.</b> A skill is a folder containing a SKILL.md inside a top-level skills/ directory.</div></div>';
+      '<div class="callout" style="background:var(--danger-soft);border-color:transparent;align-items:flex-start;"><svg class="ci" viewBox="0 0 24 24" fill="none" stroke="var(--danger)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 9v4M12 17h.01M10.3 3.9 2.4 18a2 2 0 0 0 1.7 3h15.8a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg><div><b>No skill found.</b> A skill is any folder in the repo that contains a SKILL.md (dot-directories are ignored).</div></div>';
     return;
   }
   const items = skills

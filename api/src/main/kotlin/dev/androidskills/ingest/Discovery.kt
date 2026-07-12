@@ -100,19 +100,25 @@ object Discovery {
 
   fun discover(source: ArchiveSource): ScanResult {
     val entries = extract(source) // guarded + root-normalized per-source
-    // Every directory that directly holds a SKILL.md is a skill, at any depth — minus dot-dirs and
-    // the archive root (a bare "SKILL.md" has no '/', so it drops out of the endsWith filter).
-    val skillDirs =
+    // Candidate dirs: every directory that directly holds a SKILL.md, at any depth — minus
+    // dot-dirs and the archive root (a bare "SKILL.md" has no '/', so it drops out of the endsWith
+    // filter). Candidates decide only whether the archive contains any skill at all.
+    val candidateDirs =
       entries
         .asSequence()
         .filter { it.path.endsWith("/SKILL.md") }
         .map { it.path.substringBeforeLast('/') }
         .filter { dir -> dir.isNotEmpty() && dir.split('/').none { seg -> seg.startsWith(".") } }
         .toSet()
-    if (skillDirs.isEmpty()) return ScanResult.NoSkillsDir
-    // Assign each file to its DEEPEST containing skill dir (a skill can nest inside another).
-    val byDir = skillDirs.associateWith { mutableListOf<Extracted>() }
-    for (e in entries) ownerDir(e.path, skillDirs)?.let { byDir.getValue(it).add(e) }
+    if (candidateDirs.isEmpty()) return ScanResult.NoSkillsDir
+    // Valid skill dirs: candidates whose leaf is a real slug. Files are assigned to these dirs
+    // ONLY — the exact set IngestPipeline mirrors from (`detected.map { sourceDir }`) — so a nested
+    // invalid-leaf subtree folds into its nearest valid ancestor consistently in both the scan
+    // preview (fileCount) and on ingest, instead of being counted here but re-homed there.
+    val validDirs = candidateDirs.filter { SLUG.matches(it.substringAfterLast('/')) }.toSet()
+    // Assign each file to its DEEPEST containing valid skill dir (a skill can nest inside another).
+    val byDir = validDirs.associateWith { mutableListOf<Extracted>() }
+    for (e in entries) ownerDir(e.path, validDirs)?.let { byDir.getValue(it).add(e) }
     val detected = byDir.entries.mapNotNull { (dir, files) -> buildDetected(dir, files, source) }
     return ScanResult.Found(detected)
   }
