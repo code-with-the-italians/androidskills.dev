@@ -11,6 +11,26 @@ const api = createAdminApiClient(Astro.request);
 const queue = await api.getQueue('all');
 const selectedId = queue.length > 0 ? queue[0].id : null;
 const detail = selectedId ? await api.getQueueDetail(selectedId).catch(() => null) : null;
+
+const stateLabels: Record<string, string> = {
+  draft: 'Draft',
+  in_review: 'In review',
+  changes_requested: 'Changes requested',
+  published: 'Published',
+  rejected: 'Rejected',
+};
+const stateLabel = (s: string) => stateLabels[s] ?? s;
+
+// The review worker (LLM) writes its assessment into the submission payload. It's opaque in the
+// generated types, so read it defensively; it's absent until the review job completes.
+type ReviewOut = {
+  category?: string;
+  tagsValidated?: string[];
+  securityPassed?: boolean;
+  securityFindings?: string[];
+};
+const review =
+  (detail?.payload as unknown as { review?: ReviewOut } | null | undefined)?.review ?? null;
 ---
 
 <AdminLayout title="Review queue" me={me}>
@@ -32,12 +52,12 @@ const detail = selectedId ? await api.getQueueDetail(selectedId).catch(() => nul
   <div class="admin-split" data-queue-shell>
     <div class="queue-list" data-queue-list>
       {queue.map((item) => (
-        <div class="queue-item" data-queue-id={item.id} data-state={item.state} data-slug={item.slug} data-submitter={item.submitterHandle} role="button" tabindex="0" aria-label={`Review ${item.slug} by ${item.submitterHandle}, ${item.state}`}>
+        <div class="queue-item" data-queue-id={item.id} data-state={item.state} data-slug={item.slug} data-submitter={item.submitterHandle} role="button" tabindex="0" aria-label={`Review ${item.slug} by ${item.submitterHandle}, ${stateLabel(item.state)}`}>
           <span class="avatar sm" style="color: var(--accent-text);" aria-hidden="true">{item.submitterHandle.slice(0, 2).toUpperCase()}</span>
           <div style="flex: 1; min-width: 0;">
             <div class="between">
               <b style="font-size: 14px;">{item.slug}</b>
-              <span class="faint" style="font-family: var(--mono); font-size: 11px;">{item.state}</span>
+              <span class="faint" style="font-size: 11px;">{stateLabel(item.state)}</span>
             </div>
             <div class="slug" style="font-size: 11.5px;">@{item.submitterHandle}</div>
           </div>
@@ -51,9 +71,9 @@ const detail = selectedId ? await api.getQueueDetail(selectedId).catch(() => nul
           <div class="between" style="flex-wrap: wrap; gap: 12px;">
             <div>
               <h2 style="font-size: 22px;">{detail.slug}</h2>
-              <div class="slug" style="margin-top: 4px;">submitted by @{detail.submitterHandle} · {detail.state}</div>
+              <div class="slug" style="margin-top: 4px;">submitted by @{detail.submitterHandle} · {stateLabel(detail.state)}</div>
             </div>
-            <a class="btn btn-sm btn-outline" href={`/skill/${detail.slug}`} target="_blank" rel="noopener">Preview</a>
+            <a class="btn btn-sm btn-outline" href={`https://github.com/${detail.provenance}`} target="_blank" rel="noopener">View source ↗</a>
           </div>
 
           <div class="grid" style="grid-template-columns: repeat(4, 1fr); gap: 14px; margin: 22px 0;">
@@ -63,22 +83,47 @@ const detail = selectedId ? await api.getQueueDetail(selectedId).catch(() => nul
             <div class="stat"><span class="n">{detail.sourceRef.slice(0, 7)}</span><span class="l">Ref</span></div>
           </div>
 
-          <span class="section-label" style="margin-bottom: 10px;">Files</span>
-          <div class="tbl-wrap" style="margin-bottom: 24px;">
-            <div class="scroll">
-              <table class="tbl">
-                <tbody>
-                  {detail.files.map((file) => (
-                    <tr>
-                      <td><span class="row" style="gap: 8px; font-family: var(--mono); font-size: 12.5px;">{file.path}</span></td>
-                      <td class="num faint">{file.size}</td>
-                      <td>{file.isBinary ? 'binary' : 'text'}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+          <span class="section-label" style="margin-bottom: 10px;">Automated review</span>
+          {review ? (
+            <div class="card" style="margin-bottom: 24px;">
+              <div class="grid" style="grid-template-columns: 120px 1fr; gap: 10px 14px; font-size: 14px; align-items: start;">
+                <span class="faint">Category</span>
+                <span>{review.category ?? '—'}</span>
+                <span class="faint">Tags</span>
+                <span class="row" style="flex-wrap: wrap; gap: 6px;">{review.tagsValidated && review.tagsValidated.length > 0 ? review.tagsValidated.map((t) => <span class="tag">{t}</span>) : '—'}</span>
+                <span class="faint">Security</span>
+                <span style={`color: ${review.securityPassed ? 'var(--accent-text)' : 'var(--danger)'}; font-weight: 600;`}>{review.securityPassed ? '✓ Passed' : '✕ Flagged'}</span>
+              </div>
+              {review.securityFindings && review.securityFindings.length > 0 && (
+                <ul style="margin: 12px 0 0; padding-left: 18px; font-size: 13px; color: var(--danger);">
+                  {review.securityFindings.map((f) => <li>{f}</li>)}
+                </ul>
+              )}
             </div>
-          </div>
+          ) : (
+            <div class="callout" style="margin-bottom: 24px;"><div class="muted">Automated review hasn't completed yet — category, tags, and safety checks will appear here once the review job finishes.</div></div>
+          )}
+
+          <span class="section-label" style="margin-bottom: 10px;">Files</span>
+          {detail.files.length > 0 ? (
+            <div class="tbl-wrap" style="margin-bottom: 24px;">
+              <div class="scroll">
+                <table class="tbl">
+                  <tbody>
+                    {detail.files.map((file) => (
+                      <tr>
+                        <td><span class="row" style="gap: 8px; font-family: var(--mono); font-size: 12.5px;">{file.path}</span></td>
+                        <td class="num faint">{file.size}</td>
+                        <td>{file.isBinary ? 'binary' : 'text'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          ) : (
+            <div class="callout" style="margin-bottom: 24px;"><div class="muted">Files are mirrored when the skill is approved — review at this stage is metadata-only.</div></div>
+          )}
 
           <div class="card" style="background: var(--surface-2);">
             <h4 style="font-size: 15px; margin-bottom: 12px;">Decision</h4>
@@ -87,7 +132,7 @@ const detail = selectedId ? await api.getQueueDetail(selectedId).catch(() => nul
               <button class="btn btn-primary" data-decision="approve">Approve &amp; publish</button>
               <button class="btn btn-outline" data-decision="request_changes">Request changes</button>
               <button class="btn btn-danger" data-decision="reject">Reject</button>
-              <button class="btn btn-ghost" style="margin-left: auto;" data-decision="skip">Skip</button>
+              <button class="btn btn-ghost" style="margin-left: auto;" data-skip title="Move to the next submission without deciding">Skip to next →</button>
             </div>
           </div>
         </div>
@@ -101,6 +146,22 @@ const detail = selectedId ? await api.getQueueDetail(selectedId).catch(() => nul
 <script>
   import { esc } from '../../lib/escape';
   import { showToast, showError } from '../../scripts/toast';
+
+  const stateLabels: Record<string, string> = {
+    draft: 'Draft',
+    in_review: 'In review',
+    changes_requested: 'Changes requested',
+    published: 'Published',
+    rejected: 'Rejected',
+  };
+  const stateLabel = (s: string) => stateLabels[s] ?? s;
+
+  type ReviewOut = {
+    category?: string;
+    tagsValidated?: string[];
+    securityPassed?: boolean;
+    securityFindings?: string[];
+  };
 
   const shell = document.querySelector('[data-queue-shell]');
   if (shell) {
@@ -141,12 +202,12 @@ const detail = selectedId ? await api.getQueueDetail(selectedId).catch(() => nul
         list.innerHTML = filtered
           .map(
             (item) => `
-              <div class="queue-item ${selectedId === item.id ? 'active' : ''}" data-queue-id="${esc(item.id)}" data-state="${esc(item.state)}" data-slug="${esc(item.slug)}" data-submitter="${esc(item.submitterHandle)}" role="button" tabindex="0" aria-label="Review ${esc(item.slug)} by ${esc(item.submitterHandle)}, ${esc(item.state)}">
+              <div class="queue-item ${selectedId === item.id ? 'active' : ''}" data-queue-id="${esc(item.id)}" data-state="${esc(item.state)}" data-slug="${esc(item.slug)}" data-submitter="${esc(item.submitterHandle)}" role="button" tabindex="0" aria-label="Review ${esc(item.slug)} by ${esc(item.submitterHandle)}, ${esc(stateLabel(item.state))}">
                 <span class="avatar sm" style="color: var(--accent-text);" aria-hidden="true">${esc(item.submitterHandle.slice(0, 2).toUpperCase())}</span>
                 <div style="flex: 1; min-width: 0;">
                   <div class="between">
                     <b style="font-size: 14px;">${esc(item.slug)}</b>
-                    <span class="faint" style="font-family: var(--mono); font-size: 11px;">${esc(item.state)}</span>
+                    <span class="faint" style="font-size: 11px;">${esc(stateLabel(item.state))}</span>
                   </div>
                   <div class="slug" style="font-size: 11.5px;">@${esc(item.submitterHandle)}</div>
                 </div>
@@ -172,16 +233,33 @@ const detail = selectedId ? await api.getQueueDetail(selectedId).catch(() => nul
           files: Array<{ path: string; size: number; isBinary: boolean }>;
           provenance: string;
           sourceRef: string;
+          payload?: { review?: ReviewOut } | null;
         };
+        const review = d.payload?.review ?? null;
+        const findings = review?.securityFindings ?? [];
+        const tags = review?.tagsValidated ?? [];
+        const reviewHtml = review
+          ? `<div class="card" style="margin-bottom: 24px;">
+              <div class="grid" style="grid-template-columns: 120px 1fr; gap: 10px 14px; font-size: 14px; align-items: start;">
+                <span class="faint">Category</span><span>${esc(review.category ?? '—')}</span>
+                <span class="faint">Tags</span><span class="row" style="flex-wrap: wrap; gap: 6px;">${tags.length ? tags.map((t) => `<span class="tag">${esc(t)}</span>`).join('') : '—'}</span>
+                <span class="faint">Security</span><span style="color: ${review.securityPassed ? 'var(--accent-text)' : 'var(--danger)'}; font-weight: 600;">${review.securityPassed ? '✓ Passed' : '✕ Flagged'}</span>
+              </div>
+              ${findings.length ? `<ul style="margin: 12px 0 0; padding-left: 18px; font-size: 13px; color: var(--danger);">${findings.map((f) => `<li>${esc(f)}</li>`).join('')}</ul>` : ''}
+            </div>`
+          : `<div class="callout" style="margin-bottom: 24px;"><div class="muted">Automated review hasn't completed yet — category, tags, and safety checks will appear here once the review job finishes.</div></div>`;
+        const filesHtml = d.files.length
+          ? `<div class="tbl-wrap" style="margin-bottom: 24px;"><div class="scroll"><table class="tbl"><tbody>${d.files.map((f) => `<tr><td><span class="row" style="gap: 8px; font-family: var(--mono); font-size: 12.5px;">${esc(f.path)}</span></td><td class="num faint">${esc(f.size)}</td><td>${f.isBinary ? 'binary' : 'text'}</td></tr>`).join('')}</tbody></table></div></div>`
+          : `<div class="callout" style="margin-bottom: 24px;"><div class="muted">Files are mirrored when the skill is approved — review at this stage is metadata-only.</div></div>`;
         if (detail) {
           detail.innerHTML = `
             <div data-detail-id="${esc(d.id)}">
               <div class="between" style="flex-wrap: wrap; gap: 12px;">
                 <div>
                   <h2 style="font-size: 22px;">${esc(d.slug)}</h2>
-                  <div class="slug" style="margin-top: 4px;">submitted by @${esc(d.submitterHandle)} · ${esc(d.state)}</div>
+                  <div class="slug" style="margin-top: 4px;">submitted by @${esc(d.submitterHandle)} · ${esc(stateLabel(d.state))}</div>
                 </div>
-                <a class="btn btn-sm btn-outline" href="/skill/${esc(d.slug)}" target="_blank" rel="noopener">Preview</a>
+                <a class="btn btn-sm btn-outline" href="https://github.com/${esc(d.provenance)}" target="_blank" rel="noopener">View source ↗</a>
               </div>
               <div class="grid" style="grid-template-columns: repeat(4, 1fr); gap: 14px; margin: 22px 0;">
                 <div class="stat"><span class="n">${esc(d.lintScore ?? '—')}</span><span class="l">Lint score</span></div>
@@ -189,26 +267,10 @@ const detail = selectedId ? await api.getQueueDetail(selectedId).catch(() => nul
                 <div class="stat"><span class="n">${esc(d.provenance)}</span><span class="l">Source</span></div>
                 <div class="stat"><span class="n">${esc(d.sourceRef.slice(0, 7))}</span><span class="l">Ref</span></div>
               </div>
+              <span class="section-label" style="margin-bottom: 10px;">Automated review</span>
+              ${reviewHtml}
               <span class="section-label" style="margin-bottom: 10px;">Files</span>
-              <div class="tbl-wrap" style="margin-bottom: 24px;">
-                <div class="scroll">
-                  <table class="tbl">
-                    <tbody>
-                      ${d.files
-                        .map(
-                          (f) => `
-                            <tr>
-                              <td><span class="row" style="gap: 8px; font-family: var(--mono); font-size: 12.5px;">${esc(f.path)}</span></td>
-                              <td class="num faint">${esc(f.size)}</td>
-                              <td>${f.isBinary ? 'binary' : 'text'}</td>
-                            </tr>
-                          `,
-                        )
-                        .join('')}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
+              ${filesHtml}
               <div class="card" style="background: var(--surface-2);">
                 <h4 style="font-size: 15px; margin-bottom: 12px;">Decision</h4>
                 <textarea class="textarea" data-decision-note aria-label="Decision note" style="min-height: 84px; background: var(--surface);" placeholder="Optional note to the author…"></textarea>
@@ -216,7 +278,7 @@ const detail = selectedId ? await api.getQueueDetail(selectedId).catch(() => nul
                   <button class="btn btn-primary" data-decision="approve">Approve & publish</button>
                   <button class="btn btn-outline" data-decision="request_changes">Request changes</button>
                   <button class="btn btn-danger" data-decision="reject">Reject</button>
-                  <button class="btn btn-ghost" style="margin-left: auto;" data-decision="skip">Skip</button>
+                  <button class="btn btn-ghost" style="margin-left: auto;" data-skip title="Move to the next submission without deciding">Skip to next →</button>
                 </div>
               </div>
             </div>
@@ -272,6 +334,23 @@ const detail = selectedId ? await api.getQueueDetail(selectedId).catch(() => nul
       });
 
       detail?.addEventListener('click', async (e) => {
+        // Skip = move to the next queue item without deciding anything (no request).
+        if ((e.target as HTMLElement).closest('[data-skip]')) {
+          // Read the current id from the DOM, not the `selectedId` closure — on a fresh page load
+          // the detail is SSR-rendered and loadDetail() hasn't run yet, so the closure is still null.
+          const currentId = detail
+            .querySelector('[data-detail-id]')
+            ?.getAttribute('data-detail-id');
+          const items = Array.from(document.querySelectorAll('[data-queue-id]'));
+          const idx = items.findIndex(
+            (el) => el.getAttribute('data-queue-id') === currentId,
+          );
+          const nextId =
+            idx >= 0 ? items[idx + 1]?.getAttribute('data-queue-id') : undefined;
+          if (nextId) loadDetail(nextId);
+          else showToast('No more submissions to review');
+          return;
+        }
         const btn = (e.target as HTMLElement).closest('[data-decision]');
         if (!btn) return;
         const decision = btn.getAttribute('data-decision')!;

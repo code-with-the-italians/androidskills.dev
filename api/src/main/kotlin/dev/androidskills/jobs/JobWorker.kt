@@ -40,7 +40,7 @@ import org.slf4j.LoggerFactory
  * `startSessionPurge`).
  *
  * **Robustness (review Q3/Q5):**
- * - Per-job **60s** wall-clock timeout (a slow LLM call can't stall the queue).
+ * - Per-job wall-clock timeout ([JOB_TIMEOUT_MS]) so a slow LLM call can't stall the queue forever.
  * - Bad JSON advances the LLM ladder (in the client); transport failure (429/5xx) fails the job to
  *   backoff (step-3 P1-2 lesson).
  * - **Startup reclaim:** on boot, `state='running'` → `'queued'` (safe because there's only one
@@ -53,7 +53,9 @@ import org.slf4j.LoggerFactory
 private val logger = LoggerFactory.getLogger("dev.androidskills.jobs.JobWorker")
 
 private const val POLL_INTERVAL_MS = 10_000L
-private const val JOB_TIMEOUT_MS = 60_000L
+// Covers the review LLM ladder's worst case: up to ~4 sequential calls, each capped at 60s by
+// OpenAiLlmClient's HttpTimeout (4 × 60s < 300s, with headroom for DB writes).
+private const val JOB_TIMEOUT_MS = 300_000L
 private const val MAX_ATTEMPTS = 3
 private const val BACKOFF_BASE_SECONDS = 30.0
 
