@@ -133,7 +133,7 @@ async function scanRepo(repo: Repo) {
   state.repo = repo;
   state.error = null;
   state.checking = repo.fullName;
-  renderStep1();
+  render(); // full render so the #repoStatus "Scanning…" spinner shows during the fetch
   try {
     const res = await fetch(
       `/api/me/repos/${encodeURIComponent(repo.owner)}/${encodeURIComponent(repo.name)}/scan`,
@@ -214,7 +214,7 @@ function renderStep2() {
     <button type="button" data-back-to-repos style="background:none;border:0;padding:0;margin-bottom:12px;color:var(--accent-text);cursor:pointer;font:inherit;font-size:13px;">← Choose a different repository</button>
     <div class="callout" style="margin-bottom:16px;" aria-live="polite" aria-atomic="true"><svg class="ci" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 16v-4M12 8h.01" stroke-linecap="round"/></svg><div><b>${esc(skills.length)} skill${skills.length > 1 ? 's' : ''}</b> found. Everything below is read from each skill's SKILL.md frontmatter.</div></div>
     <div class="accs">${items}</div>
-    <button class="btn btn-primary" data-continue style="margin-top:18px;">Continue with selected skills</button>
+    <button class="btn btn-primary" data-continue ${state.selected.size === 0 ? 'disabled' : ''} style="margin-top:18px;">${state.selected.size === 0 ? 'Select at least one skill' : 'Continue with selected skills'}</button>
   `;
 }
 
@@ -365,6 +365,7 @@ if (vsteps) {
     }
     const cont = target.closest('[data-continue]');
     if (cont) {
+      if (state.selected.size === 0) return;
       state.step = 3;
       render();
       return;
@@ -389,6 +390,17 @@ if (vsteps) {
     const idx = Number(cb.getAttribute('data-skill-idx'));
     if (cb.checked) state.selected.add(idx);
     else state.selected.delete(idx);
+    // Keep the Continue button in sync — you can't proceed with nothing selected.
+    const cont = document.querySelector(
+      '[data-continue]',
+    ) as HTMLButtonElement | null;
+    if (cont) {
+      const none = state.selected.size === 0;
+      cont.disabled = none;
+      cont.textContent = none
+        ? 'Select at least one skill'
+        : 'Continue with selected skills';
+    }
   });
 
   vsteps.addEventListener('keydown', (e) => {
