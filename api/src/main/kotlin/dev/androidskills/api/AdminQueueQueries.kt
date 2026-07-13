@@ -44,7 +44,23 @@ object AdminQueueQueries {
   data class DecisionRequest(
     val decision: String, // approve|request_changes|reject|skip
     val note: String? = null,
+    // The admin's final tags (from the queue's editable, LLM-pre-filled field). Applied on approve
+    // — after promote, so they override the manifest tags. Null leaves the promoted tags untouched.
+    val tags: List<String>? = null,
   )
+
+  /**
+   * Normalise admin-entered tags: trim, drop blanks, dedupe (case-insensitive), cap count/length.
+   */
+  private fun sanitizeTags(tags: List<String>): List<String> {
+    val seen = HashSet<String>()
+    return tags
+      .asSequence()
+      .map { it.trim().take(40) }
+      .filter { it.isNotEmpty() && seen.add(it.lowercase()) }
+      .take(12)
+      .toList()
+  }
 
   @Serializable data class SkillFileSummary(val path: String, val size: Int, val isBinary: Boolean)
 
@@ -283,6 +299,12 @@ object AdminQueueQueries {
             it[Skills.status] = "published"
             it[Skills.verified] = true
             categoryId?.let { cid -> it[Skills.categoryId] = cid }
+            // Admin's final tags win over the manifest tags that promote just wrote. Guard against
+            // an empty/blank list wiping discovery tags — only a non-empty set overrides.
+            request.tags
+              ?.let(::sanitizeTags)
+              ?.takeIf { it.isNotEmpty() }
+              ?.let { clean -> it[Skills.tags] = appJson.encodeToString(clean) }
             it[Skills.updatedAt] = now
           }
           Submissions.update({ Submissions.id eq submissionId }) {

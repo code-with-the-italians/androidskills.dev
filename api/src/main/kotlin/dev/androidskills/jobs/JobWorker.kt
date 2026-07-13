@@ -153,6 +153,17 @@ private suspend fun runReviewJob(payload: String, llm: LlmClient) {
         .getOrNull()
     }
 
+  // The live skill row: the first-ingest manifest source, and — when it's already published — the
+  // source of the existing tags we pass so the reviewer validates its proposal against them and
+  // flags any change as an FYI rather than silently replacing them.
+  val skillRow =
+    transaction { Skills.selectAll().where { Skills.id eq req.skillId }.singleOrNull() }
+      ?: throw IllegalStateException("Skill ${req.skillId} not found for review")
+  fun decodeTags(json: String): List<String> =
+    runCatching { appJson.decodeFromString<List<String>>(json) }.getOrDefault(emptyList())
+  val existingTags =
+    if (skillRow[Skills.status] == "published") decodeTags(skillRow[Skills.tags]) else null
+
   val manifest =
     if (subPayload?.staged != null) {
       // Resync: use the STAGED metadata, not the stale live skill row.
@@ -160,21 +171,15 @@ private suspend fun runReviewJob(payload: String, llm: LlmClient) {
         name = subPayload.staged.name,
         description = subPayload.staged.description,
         tags = subPayload.staged.tags,
+        existingTags = existingTags,
       )
     } else {
       // First ingest: the live skill row IS the new content.
-      val skill =
-        transaction { Skills.selectAll().where { Skills.id eq req.skillId }.singleOrNull() }
-          ?: throw IllegalStateException("Skill ${req.skillId} not found for review")
       SkillManifest(
-        name = skill[Skills.name],
-        description = skill[Skills.description],
-        tags =
-          try {
-            appJson.decodeFromString<List<String>>(skill[Skills.tags])
-          } catch (_: Exception) {
-            emptyList()
-          },
+        name = skillRow[Skills.name],
+        description = skillRow[Skills.description],
+        tags = decodeTags(skillRow[Skills.tags]),
+        existingTags = existingTags,
       )
     }
 
@@ -198,7 +203,7 @@ private suspend fun runReviewJob(payload: String, llm: LlmClient) {
         ?.get(Categories.id)
     Skills.update({ Skills.id eq req.skillId }) {
       if (catId != null) it[Skills.categoryId] = catId
-      it[Skills.tags] = appJson.encodeToString(result.tagsValidated)
+      it[Skills.tags] = appJson.encodeToString(result.tagsProposed)
       it[Skills.updatedAt] = nowIso()
     }
     // B1: merge review output into the submission payload WITHOUT destroying staged.

@@ -195,7 +195,7 @@ class AdminQueueDecisionTest {
                 review =
                   ReviewOutputPayload(
                     category = "kotlin-language",
-                    tagsValidated = listOf("android", "kotlin"),
+                    tagsProposed = listOf("android", "kotlin"),
                     securityPassed = true,
                     securityFindings = emptyList(),
                     lintScore = 85,
@@ -221,6 +221,62 @@ class AdminQueueDecisionTest {
       status = dev.androidskills.db.UserStatus.active,
       createdAt = nowIso(),
     )
+
+  @Test
+  fun `approve applies the admin's edited tags over the manifest`() {
+    val slug = "test-skill"
+    val s = seed(slug)
+    val zip = makeZipball(slug)
+
+    runBlocking {
+      AdminQueueQueries.decision(
+        principal(s.adminId, s.adminHandle),
+        s.submissionId,
+        AdminQueueQueries.DecisionRequest(
+          "approve",
+          tags = listOf("Custom-A", " custom-a ", "custom-b"),
+        ),
+        store,
+        FakeApp(zip),
+      )
+    }
+
+    transaction {
+      val skill = Skills.selectAll().where { Skills.id eq s.skillId }.single()
+      assertEquals("published", skill[Skills.status])
+      // Admin tags win over promote's manifest tags, sanitized (trim + case-insensitive dedupe).
+      assertEquals(
+        listOf("Custom-A", "custom-b"),
+        appJson.decodeFromString<List<String>>(skill[Skills.tags]),
+      )
+    }
+  }
+
+  @Test
+  fun `approve with a blank tags list keeps the manifest tags`() {
+    val slug = "test-skill"
+    val s = seed(slug)
+    val zip = makeZipball(slug)
+
+    runBlocking {
+      AdminQueueQueries.decision(
+        principal(s.adminId, s.adminHandle),
+        s.submissionId,
+        AdminQueueQueries.DecisionRequest("approve", tags = listOf("", "  ")),
+        store,
+        FakeApp(zip),
+      )
+    }
+
+    transaction {
+      val skill = Skills.selectAll().where { Skills.id eq s.skillId }.single()
+      // Blank/empty tags must not wipe the tags promote wrote from the manifest.
+      assertEquals(
+        listOf("android", "kotlin"),
+        appJson.decodeFromString<List<String>>(skill[Skills.tags]),
+      )
+    }
+  }
 
   @Test
   fun `approve promotes files and publishes skill`() {
@@ -338,7 +394,7 @@ class AdminQueueDecisionTest {
               review =
                 ReviewOutputPayload(
                   category = "kotlin-language",
-                  tagsValidated = listOf("android"),
+                  tagsProposed = listOf("android"),
                   securityPassed = true,
                   securityFindings = emptyList(),
                   lintScore = 90,

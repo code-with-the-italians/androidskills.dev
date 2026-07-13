@@ -86,7 +86,7 @@ class AdminQueueQueriesTest {
           review =
             ReviewOutputPayload(
               category = "ui",
-              tagsValidated = listOf("android"),
+              tagsProposed = listOf("android"),
               securityPassed = true,
               securityFindings = emptyList(),
               lintScore = 85,

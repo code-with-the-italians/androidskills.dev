@@ -611,7 +611,7 @@ class SubmissionQueriesTest {
           review =
             dev.androidskills.ingest.ReviewOutputPayload(
               category = "kotlin-language",
-              tagsValidated = listOf("android"),
+              tagsProposed = listOf("android"),
               securityPassed = true,
               securityFindings = emptyList(),
               lintScore = 90,

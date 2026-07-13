@@ -23,14 +23,19 @@ const stateLabel = (s: string) => stateLabels[s] ?? s;
 
 // The review worker (LLM) writes its assessment into the submission payload. It's opaque in the
 // generated types, so read it defensively; it's absent until the review job completes.
+type SecurityFinding = { severity?: string; message?: string };
 type ReviewOut = {
   category?: string;
-  tagsValidated?: string[];
+  tagsProposed?: string[];
   securityPassed?: boolean;
-  securityFindings?: string[];
+  securityFindings?: SecurityFinding[];
 };
 const review =
   (detail?.payload as unknown as { review?: ReviewOut } | null | undefined)?.review ?? null;
+// Fail-closed: only an explicit "fyi" is advisory; "flag" or any unrecognised severity is a flag.
+const flags = (review?.securityFindings ?? []).filter((f) => f.severity !== 'fyi');
+const fyis = (review?.securityFindings ?? []).filter((f) => f.severity === 'fyi');
+const proposedTags = (review?.tagsProposed ?? []).join(', ');
 ---
 
 <AdminLayout title="Review queue" me={me}>
@@ -86,18 +91,29 @@ const review =
           <span class="section-label" style="margin-bottom: 10px;">Automated review</span>
           {review ? (
             <div class="card" style="margin-bottom: 24px;">
-              <div class="grid" style="grid-template-columns: 120px 1fr; gap: 10px 14px; font-size: 14px; align-items: start;">
+              <div class="grid" style="grid-template-columns: 120px 1fr; gap: 10px 14px; font-size: 14px; align-items: center;">
                 <span class="faint">Category</span>
                 <span>{review.category ?? '—'}</span>
                 <span class="faint">Tags</span>
-                <span class="row" style="flex-wrap: wrap; gap: 6px;">{review.tagsValidated && review.tagsValidated.length > 0 ? review.tagsValidated.map((t) => <span class="tag">{t}</span>) : '—'}</span>
+                <input class="input" data-tags-input type="text" value={proposedTags} placeholder="comma-separated tags" aria-label="Tags applied on approve" style="background: var(--surface);" />
                 <span class="faint">Security</span>
                 <span style={`color: ${review.securityPassed ? 'var(--accent-text)' : 'var(--danger)'}; font-weight: 600;`}>{review.securityPassed ? '✓ Passed' : '✕ Flagged'}</span>
               </div>
-              {review.securityFindings && review.securityFindings.length > 0 && (
-                <ul style="margin: 12px 0 0; padding-left: 18px; font-size: 13px; color: var(--danger);">
-                  {review.securityFindings.map((f) => <li>{f}</li>)}
-                </ul>
+              {flags.length > 0 && (
+                <div style="margin-top: 14px;">
+                  <div class="section-label" style="color: var(--danger); margin-bottom: 6px;">Flagged</div>
+                  <ul style="margin: 0; padding-left: 18px; font-size: 13px; color: var(--danger);">
+                    {flags.map((f) => <li>{f.message}</li>)}
+                  </ul>
+                </div>
+              )}
+              {fyis.length > 0 && (
+                <div style="margin-top: 14px;">
+                  <div class="section-label faint" style="margin-bottom: 6px;">FYI · inherent to the skill's purpose</div>
+                  <ul class="muted" style="margin: 0; padding-left: 18px; font-size: 13px;">
+                    {fyis.map((f) => <li>{f.message}</li>)}
+                  </ul>
+                </div>
               )}
             </div>
           ) : (
@@ -156,11 +172,12 @@ const review =
   };
   const stateLabel = (s: string) => stateLabels[s] ?? s;
 
+  type SecurityFinding = { severity?: string; message?: string };
   type ReviewOut = {
     category?: string;
-    tagsValidated?: string[];
+    tagsProposed?: string[];
     securityPassed?: boolean;
-    securityFindings?: string[];
+    securityFindings?: SecurityFinding[];
   };
 
   const shell = document.querySelector('[data-queue-shell]');
@@ -237,15 +254,26 @@ const review =
         };
         const review = d.payload?.review ?? null;
         const findings = review?.securityFindings ?? [];
-        const tags = review?.tagsValidated ?? [];
+        // Fail-closed: only an explicit "fyi" is advisory; anything else counts as a flag.
+        const flags = findings.filter((f) => f.severity !== 'fyi');
+        const fyis = findings.filter((f) => f.severity === 'fyi');
+        const proposedTags = (review?.tagsProposed ?? []).join(', ');
+        const findingList = (items: SecurityFinding[], label: string, danger: boolean) =>
+          items.length
+            ? `<div style="margin-top: 14px;">
+                <div class="section-label${danger ? '' : ' faint'}" style="${danger ? 'color: var(--danger); ' : ''}margin-bottom: 6px;">${esc(label)}</div>
+                <ul class="${danger ? '' : 'muted'}" style="margin: 0; padding-left: 18px; font-size: 13px;${danger ? ' color: var(--danger);' : ''}">${items.map((f) => `<li>${esc(f.message ?? '')}</li>`).join('')}</ul>
+              </div>`
+            : '';
         const reviewHtml = review
           ? `<div class="card" style="margin-bottom: 24px;">
-              <div class="grid" style="grid-template-columns: 120px 1fr; gap: 10px 14px; font-size: 14px; align-items: start;">
+              <div class="grid" style="grid-template-columns: 120px 1fr; gap: 10px 14px; font-size: 14px; align-items: center;">
                 <span class="faint">Category</span><span>${esc(review.category ?? '—')}</span>
-                <span class="faint">Tags</span><span class="row" style="flex-wrap: wrap; gap: 6px;">${tags.length ? tags.map((t) => `<span class="tag">${esc(t)}</span>`).join('') : '—'}</span>
+                <span class="faint">Tags</span><input class="input" data-tags-input type="text" value="${esc(proposedTags)}" placeholder="comma-separated tags" aria-label="Tags applied on approve" style="background: var(--surface);" />
                 <span class="faint">Security</span><span style="color: ${review.securityPassed ? 'var(--accent-text)' : 'var(--danger)'}; font-weight: 600;">${review.securityPassed ? '✓ Passed' : '✕ Flagged'}</span>
               </div>
-              ${findings.length ? `<ul style="margin: 12px 0 0; padding-left: 18px; font-size: 13px; color: var(--danger);">${findings.map((f) => `<li>${esc(f)}</li>`).join('')}</ul>` : ''}
+              ${findingList(flags, 'Flagged', true)}
+              ${findingList(fyis, "FYI · inherent to the skill's purpose", false)}
             </div>`
           : `<div class="callout" style="margin-bottom: 24px;"><div class="muted">Automated review hasn't completed yet — category, tags, and safety checks will appear here once the review job finishes.</div></div>`;
         const filesHtml = d.files.length
@@ -360,10 +388,22 @@ const review =
         const note = (detail.querySelector('[data-decision-note]') as HTMLTextAreaElement | null)?.value;
         const id = detail.querySelector('[data-detail-id]')?.getAttribute('data-detail-id');
         if (!id) return;
+        // Only send tags when the (review-gated) editable field parses to at least one real tag —
+        // omit it otherwise (empty, whitespace, or only commas) so the backend leaves the promoted
+        // tags untouched rather than wiping them to [].
+        const tagsInput = detail.querySelector('[data-tags-input]') as HTMLInputElement | null;
+        const body: Record<string, unknown> = { decision, note };
+        if (tagsInput) {
+          const parsedTags = tagsInput.value
+            .split(',')
+            .map((t) => t.trim())
+            .filter(Boolean);
+          if (parsedTags.length) body.tags = parsedTags;
+        }
         const res = await fetch(`/api/admin/queue/${encodeURIComponent(id)}/decision`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ decision, note }),
+          body: JSON.stringify(body),
         });
         if (res.ok) {
           showToast(`Decision: ${decision}`);
