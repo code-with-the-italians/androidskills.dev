@@ -614,6 +614,21 @@ object PublicQueries {
     return Facets(categoryFacet, tagFacet, sizeFacet)
   }
 
+  /**
+   * Full skill cards for the given published skill [ids], returned in the same order as [ids]
+   * (unknown or non-published IDs are silently dropped). Shares the [buildCards] projection so the
+   * starred library renders cards identical to search results.
+   */
+  fun cardsByIds(ids: List<String>): List<SkillCard> = transaction {
+    if (ids.isEmpty()) return@transaction emptyList()
+    val rows =
+      Skills.selectAll()
+        .where { (Skills.id inList ids) and (Skills.status eq "published") }
+        .toList()
+    val byId = buildCards(rows).associateBy { it.id }
+    ids.mapNotNull { byId[it] }
+  }
+
   private fun buildCards(rows: List<ResultRow>): List<SkillCard> {
     if (rows.isEmpty()) return emptyList()
     val bundles =
