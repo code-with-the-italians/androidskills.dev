@@ -388,15 +388,17 @@ const proposedTags = (review?.tagsProposed ?? []).join(', ');
         const note = (detail.querySelector('[data-decision-note]') as HTMLTextAreaElement | null)?.value;
         const id = detail.querySelector('[data-detail-id]')?.getAttribute('data-detail-id');
         if (!id) return;
-        // Only send tags when the (review-gated) editable field has a non-empty value — otherwise
-        // omit it so the backend leaves the promoted tags untouched rather than wiping them to [].
+        // Only send tags when the (review-gated) editable field parses to at least one real tag —
+        // omit it otherwise (empty, whitespace, or only commas) so the backend leaves the promoted
+        // tags untouched rather than wiping them to [].
         const tagsInput = detail.querySelector('[data-tags-input]') as HTMLInputElement | null;
         const body: Record<string, unknown> = { decision, note };
-        if (tagsInput && tagsInput.value.trim()) {
-          body.tags = tagsInput.value
+        if (tagsInput) {
+          const parsedTags = tagsInput.value
             .split(',')
             .map((t) => t.trim())
             .filter(Boolean);
+          if (parsedTags.length) body.tags = parsedTags;
         }
         const res = await fetch(`/api/admin/queue/${encodeURIComponent(id)}/decision`, {
           method: 'POST',

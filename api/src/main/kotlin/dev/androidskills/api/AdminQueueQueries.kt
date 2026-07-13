@@ -299,10 +299,12 @@ object AdminQueueQueries {
             it[Skills.status] = "published"
             it[Skills.verified] = true
             categoryId?.let { cid -> it[Skills.categoryId] = cid }
-            // Admin's final tags win over the manifest tags that promote just wrote.
-            request.tags?.let { tags ->
-              it[Skills.tags] = appJson.encodeToString(sanitizeTags(tags))
-            }
+            // Admin's final tags win over the manifest tags that promote just wrote. Guard against
+            // an empty/blank list wiping discovery tags — only a non-empty set overrides.
+            request.tags
+              ?.let(::sanitizeTags)
+              ?.takeIf { it.isNotEmpty() }
+              ?.let { clean -> it[Skills.tags] = appJson.encodeToString(clean) }
             it[Skills.updatedAt] = now
           }
           Submissions.update({ Submissions.id eq submissionId }) {

@@ -253,6 +253,32 @@ class AdminQueueDecisionTest {
   }
 
   @Test
+  fun `approve with a blank tags list keeps the manifest tags`() {
+    val slug = "test-skill"
+    val s = seed(slug)
+    val zip = makeZipball(slug)
+
+    runBlocking {
+      AdminQueueQueries.decision(
+        principal(s.adminId, s.adminHandle),
+        s.submissionId,
+        AdminQueueQueries.DecisionRequest("approve", tags = listOf("", "  ")),
+        store,
+        FakeApp(zip),
+      )
+    }
+
+    transaction {
+      val skill = Skills.selectAll().where { Skills.id eq s.skillId }.single()
+      // Blank/empty tags must not wipe the tags promote wrote from the manifest.
+      assertEquals(
+        listOf("android", "kotlin"),
+        appJson.decodeFromString<List<String>>(skill[Skills.tags]),
+      )
+    }
+  }
+
+  @Test
   fun `approve promotes files and publishes skill`() {
     val slug = "test-skill"
     val s = seed(slug)
