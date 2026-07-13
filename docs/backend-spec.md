@@ -241,18 +241,27 @@ A coroutine worker started with the app polls `jobs WHERE state='queued' AND run
    ```
    ReviewResult {
      category: String,          // one of the existing categories' slugs
-     tagsValidated: List<String>,
-     security: { passed: Boolean, findings: List<String> },
+     tagsProposed: List<String>,        // tags the reviewer proposes for discovery
+     security: {
+       passed: Boolean,
+       findings: List<{ severity: "flag" | "fyi", message: String }>,
+     },
      lintScore: Int             // 0..100
    }
    ```
+   Findings judge each risk **relative to the skill's declared purpose**: risks inherent
+   to what the skill openly does are `fyi` (advisory); unexpected/avoidable/hidden ones
+   are `flag`. Pass/fail is derived **fail-closed** — a review passes only when every
+   finding is `fyi`. If the skill is already published, its current tags are passed in as
+   `existingTags` so the reviewer validates against them and flags any change as an `fyi`.
    The impl speaks the **OpenAI-compatible** chat-completions API. Obtain the JSON via
    the fallback ladder: strict `response_format:json_schema` → tool calling →
    JSON-in-prompt + validate + one retry. Config: `LLM_BASE_URL`, `LLM_API_KEY`,
    `LLM_MODEL` (absent locally → the stub returns a benign result).
-3. Apply results: set `skills.category_id`, `skills.tags` (validated), record
-   `lint_score` on the submission. `security.passed == false` blocks auto-verify and
-   surfaces findings to the admin queue.
+3. Apply results: set `skills.category_id`, `skills.tags` (proposed), record
+   `lint_score` on the submission. On approve, the admin's final (editable) tags override
+   these. A `flag` finding surfaces to the admin queue as blocking; `fyi` findings are
+   advisory. The review never auto-verifies.
 4. **Verification** = automated checks passed **and** a maintainer approved (§9 admin
    queue). The review never auto-publishes; it prepares the submission for a human.
 

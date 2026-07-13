@@ -15,6 +15,7 @@ import dev.androidskills.github.Installation
 import dev.androidskills.github.RepoRef
 import dev.androidskills.llm.LlmClient
 import dev.androidskills.llm.ReviewResult
+import dev.androidskills.llm.SecurityFinding
 import dev.androidskills.llm.SecurityResult
 import dev.androidskills.llm.SkillManifest
 import dev.androidskills.storage.LocalFsStore
@@ -225,7 +226,7 @@ class JobWorkerTest {
         ReviewResult(
           "uncategorized",
           emptyList(),
-          SecurityResult(false, listOf("prompt injection")),
+          SecurityResult(false, listOf(SecurityFinding("flag", "prompt injection"))),
           20,
         )
       )
@@ -237,7 +238,46 @@ class JobWorkerTest {
       sub[Submissions.payload]?.contains("prompt injection") == true,
       "findings must be in payload",
     )
+    val review =
+      appJson
+        .decodeFromString(
+          dev.androidskills.ingest.SubmissionPayload.serializer(),
+          sub[Submissions.payload]!!,
+        )
+        .review
+    assertEquals(false, review?.securityPassed, "a flag finding must fail the review")
     assertEquals(20, sub[Submissions.lintScore])
+  }
+
+  @Test
+  fun `fyi-only findings still pass the review`() {
+    val (skillId, subId) = seedSkillAndSubmission()
+    enqueueReview(skillId, subId)
+    val llm =
+      FakeLlm(
+        ReviewResult(
+          "developer-workflow",
+          listOf("provenance"),
+          SecurityResult(
+            false,
+            listOf(SecurityFinding("fyi", "Injection is inherent to purpose.")),
+          ),
+          70,
+        )
+      )
+
+    runBlocking { processOneJob(llm, store, FakeApp()) }
+
+    val sub = transaction { Submissions.selectAll().where { Submissions.id eq subId }.single() }
+    val review =
+      appJson
+        .decodeFromString(
+          dev.androidskills.ingest.SubmissionPayload.serializer(),
+          sub[Submissions.payload]!!,
+        )
+        .review
+    assertEquals(true, review?.securityPassed, "fyi-only findings must not fail the review")
+    assertEquals(listOf("provenance"), review?.tagsProposed)
   }
 
   @Test

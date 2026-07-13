@@ -30,7 +30,10 @@ class OpenAiLlmClientTest {
     )
 
   private val validReviewJson =
-    """{"category":"kotlin-language","tagsValidated":["kotlin","testing"],"security":{"passed":true,"findings":[]},"lintScore":85}"""
+    """{"category":"kotlin-language","tagsProposed":["kotlin","testing"],"security":{"passed":true,"findings":[]},"lintScore":85}"""
+
+  private val fyiReviewJson =
+    """{"category":"developer-workflow","tagsProposed":["provenance"],"security":{"passed":true,"findings":[{"severity":"fyi","message":"Injection is inherent to this skill's purpose."}]},"lintScore":70}"""
 
   private fun chatResponse(content: String? = null, toolCallArgs: String? = null): String {
     val msg = buildString {
@@ -72,8 +75,21 @@ class OpenAiLlmClientTest {
     val gh = newClient(listOf(chatResponse(content = validReviewJson)))
     val result = gh.review(input)
     assertEquals("kotlin-language", result.category)
+    assertEquals(listOf("kotlin", "testing"), result.tagsProposed)
     assertTrue(result.security.passed)
     assertEquals(85, result.lintScore)
+  }
+
+  @Test
+  fun `parses structured security findings with severity`() = runBlocking {
+    val gh = newClient(listOf(chatResponse(content = fyiReviewJson)))
+    val result = gh.review(input)
+    assertEquals(1, result.security.findings.size)
+    assertEquals("fyi", result.security.findings[0].severity)
+    assertEquals(
+      "Injection is inherent to this skill's purpose.",
+      result.security.findings[0].message,
+    )
   }
 
   @Test
