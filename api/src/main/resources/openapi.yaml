@@ -846,6 +846,7 @@ components:
         - readmeMd
         - fileCount
         - totalSize
+        - securityNotes
         properties:
           readmeMd:
             type: string
@@ -855,6 +856,11 @@ components:
           totalSize:
             type: integer
             format: int64
+          securityNotes:
+            type: array
+            description: Advisory review notes (risks inherent to the skill's purpose).
+            items:
+              type: string
     FacetCount:
       type: object
       required:

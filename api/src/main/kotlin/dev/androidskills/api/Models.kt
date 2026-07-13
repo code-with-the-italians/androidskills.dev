@@ -77,6 +77,8 @@ data class SkillDetail(
   val readmeMd: String? = null,
   val fileCount: Int,
   val totalSize: Long,
+  /** Advisory review notes (risks inherent to the skill's purpose), shown to users. */
+  val securityNotes: List<String> = emptyList(),
   val createdAt: String,
   val updatedAt: String,
 )

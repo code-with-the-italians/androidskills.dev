@@ -143,7 +143,19 @@ class PublicReadTest {
     assertEquals("manifest", d.versionSource)
     assertTrue(d.tags.contains("compose"))
     assertTrue(d.fileCount > 0)
+    assertTrue(d.securityNotes.isEmpty(), "no notes by default")
     assertFailsWith<ApiNotFoundException> { PublicQueries.skillDetail("does-not-exist") }
+  }
+
+  @Test
+  fun `detail exposes stored security notes`() {
+    transaction {
+      Skills.update({ Skills.slug eq "jetpack-compose-mvi" }) {
+        it[Skills.security] = """["Runs Gradle tasks in your project."]"""
+      }
+    }
+    val d = PublicQueries.skillDetail("jetpack-compose-mvi")
+    assertEquals(listOf("Runs Gradle tasks in your project."), d.securityNotes)
   }
 
   @Test

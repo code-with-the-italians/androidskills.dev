@@ -148,6 +148,16 @@ const fileTree = files?.tree ?? [];
               ))}
             </div>
           )}
+
+          {skill.securityNotes.length > 0 && (
+            <div class="card" role="region" aria-label="Security review notes">
+              <span class="section-label" style="margin-bottom:6px;">Security review</span>
+              <p class="faint" style="font-size:12px;margin-bottom:10px;">Things to be aware of, inherent to what this skill does.</p>
+              <ul style="margin:0;padding-left:18px;font-size:13px;color:var(--text-dim);display:flex;flex-direction:column;gap:6px;">
+                {skill.securityNotes.map((note) => <li>{note}</li>)}
+              </ul>
+            </div>
+          )}
         </aside>
       </div>
     </div>
