@@ -108,8 +108,11 @@ class StarsQueriesTest {
     val stars = StarsQueries.listStars(principal)
     assertEquals(2, stars.size)
     val bySlug = stars.associateBy { it.slug }
-    assertEquals("UI", bySlug["skill-one"]?.category)
+    assertEquals("UI", bySlug["skill-one"]?.category?.name)
     assertEquals(null, bySlug["skill-two"]?.category)
+    // Full SkillCard projection — the /starred page renders these, so author must be present
+    // (a lean DTO here previously crashed the page on the first star).
+    assertEquals("alice", bySlug["skill-one"]?.author?.handle)
   }
 
   @Test
