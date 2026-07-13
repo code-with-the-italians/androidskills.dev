@@ -299,6 +299,7 @@ class AdminQueueDecisionTest {
           ReviewOutputPayload(
             category = "kotlin-language",
             tagsProposed = listOf("android"),
+            tagNotes = listOf("dropped 'ui' — moderator-only, must not be published"),
             securityPassed = true,
             securityFindings =
               listOf(
