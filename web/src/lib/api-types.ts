@@ -1401,6 +1401,8 @@ export interface components {
       fileCount: number;
       /** Format: int64 */
       totalSize: number;
+      /** @description Advisory review notes (risks inherent to the skill's purpose). */
+      securityNotes: string[];
     };
     FacetCount: {
       key: string;

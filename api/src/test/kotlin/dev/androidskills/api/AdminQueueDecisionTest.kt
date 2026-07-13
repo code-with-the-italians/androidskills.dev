@@ -17,6 +17,7 @@ import dev.androidskills.github.RepoRef
 import dev.androidskills.ingest.ReviewOutputPayload
 import dev.androidskills.ingest.StagedPayload
 import dev.androidskills.ingest.SubmissionPayload
+import dev.androidskills.llm.SecurityFinding
 import dev.androidskills.storage.LocalFsStore
 import dev.androidskills.util.appJson
 import dev.androidskills.util.newId
@@ -274,6 +275,58 @@ class AdminQueueDecisionTest {
       assertEquals(
         listOf("android", "kotlin"),
         appJson.decodeFromString<List<String>>(skill[Skills.tags]),
+      )
+    }
+  }
+
+  @Test
+  fun `approve stores only fyi notes as the skill's public security notes`() {
+    val slug = "test-skill"
+    val ref = "abc123"
+    val custom =
+      SubmissionPayload(
+        staged =
+          StagedPayload(
+            version = "1.0.0",
+            versionSource = "manifest",
+            name = "Old name",
+            description = "Old description",
+            license = "Apache-2.0",
+            tags = listOf("android", "kotlin"),
+            sourceRef = StagedPayload.SourceRef("owner", "repo", ref),
+          ),
+        review =
+          ReviewOutputPayload(
+            category = "kotlin-language",
+            tagsProposed = listOf("android"),
+            tagNotes = listOf("dropped 'ui' — moderator-only, must not be published"),
+            securityPassed = true,
+            securityFindings =
+              listOf(
+                SecurityFinding("fyi", "Reads files in your project."),
+                SecurityFinding("flag", "excluded — flags never reach a published skill"),
+              ),
+            lintScore = 80,
+          ),
+      )
+    val s = seed(slug, ref, custom)
+
+    runBlocking {
+      AdminQueueQueries.decision(
+        principal(s.adminId, s.adminHandle),
+        s.submissionId,
+        AdminQueueQueries.DecisionRequest("approve"),
+        store,
+        FakeApp(makeZipball(slug)),
+      )
+    }
+
+    transaction {
+      val security = Skills.selectAll().where { Skills.id eq s.skillId }.single()[Skills.security]
+      // Only the fyi note is carried to the public skill; the flag is dropped.
+      assertEquals(
+        listOf("Reads files in your project."),
+        appJson.decodeFromString<List<String>>(assertNotNull(security)),
       )
     }
   }

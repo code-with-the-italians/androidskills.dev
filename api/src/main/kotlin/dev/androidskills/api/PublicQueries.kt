@@ -170,6 +170,10 @@ object PublicQueries {
       readmeMd = row[Skills.readmeMd],
       fileCount = count,
       totalSize = totalSize,
+      securityNotes =
+        row[Skills.security]?.let {
+          runCatching { appJson.decodeFromString<List<String>>(it) }.getOrDefault(emptyList())
+        } ?: emptyList(),
       createdAt = card.createdAt,
       updatedAt = card.updatedAt,
     )

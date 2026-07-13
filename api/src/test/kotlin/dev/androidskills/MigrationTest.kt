@@ -57,7 +57,7 @@ class MigrationTest {
   }
 
   @Test
-  fun `schema_meta version is 4 after migration`() {
+  fun `schema_meta version is 5 after migration`() {
     Database.init(TestSupport.newConfig(dir))
     transaction {
       val v =
@@ -65,7 +65,21 @@ class MigrationTest {
           rs.next()
           rs.getString(1).toInt()
         }
-      assertEquals(4, v)
+      assertEquals(5, v)
+    }
+  }
+
+  @Test
+  fun `v5 adds the skills security column`() {
+    Database.init(TestSupport.newConfig(dir))
+    transaction {
+      val cols =
+        exec("PRAGMA table_info(skills)") { rs ->
+          val out = mutableListOf<String>()
+          while (rs.next()) out += rs.getString(2)
+          out
+        } ?: emptyList()
+      assertTrue("security column missing") { "security" in cols }
     }
   }
 
@@ -175,7 +189,7 @@ class MigrationTest {
           rs.next()
           rs.getString(1).toInt()
         }
-      assertEquals(4, v)
+      assertEquals(5, v)
     }
   }
 

@@ -24,8 +24,12 @@ data class SkillManifest(
  *   submitter per §3.3).
  * @param tagsProposed The tags the LLM proposes for discovery — proposing good tags is the
  *   reviewer's job, so this is populated even when the submitter gave none.
+ * @param tagNotes Moderator-only notes about tag changes vs. an existing published skill's tags
+ *   (add/drop rationale). Kept separate from [security] so they are never shown publicly — they are
+ *   review annotations, not security observations.
  * @param security Automated security findings, each with a [SecurityFinding.severity]. Only
- *   `"flag"` findings fail a review; `"fyi"` findings are advisory context for the admin queue.
+ *   `"flag"` findings fail a review; `"fyi"` findings are advisory context (and the only ones
+ *   surfaced to users on the public skill page).
  * @param lintScore 0..100; recorded on the submission for the admin queue.
  */
 @Serializable
@@ -34,6 +38,7 @@ data class ReviewResult(
   val tagsProposed: List<String> = emptyList(),
   val security: SecurityResult,
   val lintScore: Int,
+  val tagNotes: List<String> = emptyList(),
 )
 
 /**

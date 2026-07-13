@@ -40,6 +40,10 @@ object Migrations {
         migrateV4()
         writeVersion(4)
       }
+      if (version < 5) {
+        migrateV5()
+        writeVersion(5)
+      }
     }
 
   /** v1: the full initial schema (spec §4) + default category taxonomy. */
@@ -112,6 +116,11 @@ object Migrations {
     exec(
       "CREATE UNIQUE INDEX IF NOT EXISTS uq_skills_bundle_sourcedir ON skills(bundle_id, source_dir)"
     )
+  }
+
+  /** v5: `skills.security` — advisory (fyi) review notes surfaced on the public skill page. */
+  private fun Transaction.migrateV5() {
+    addColumnIfNotExists("skills", "security", "TEXT")
   }
 
   private fun Transaction.addColumnIfNotExists(table: String, column: String, type: String) {

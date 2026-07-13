@@ -295,6 +295,12 @@ object AdminQueueQueries {
                 ?.get(Categories.id)
             }
 
+          // Advisory (fyi) notes surface on the public skill page; hard flags never reach a
+          // published skill, so only the advisory notes are carried over.
+          val advisoryNotes =
+            review?.securityFindings?.filter { it.severity == "fyi" }?.map { it.message }
+              ?: emptyList()
+
           Skills.update({ Skills.id eq skillId }) {
             it[Skills.status] = "published"
             it[Skills.verified] = true
@@ -305,6 +311,8 @@ object AdminQueueQueries {
               ?.let(::sanitizeTags)
               ?.takeIf { it.isNotEmpty() }
               ?.let { clean -> it[Skills.tags] = appJson.encodeToString(clean) }
+            it[Skills.security] =
+              advisoryNotes.takeIf { it.isNotEmpty() }?.let(appJson::encodeToString)
             it[Skills.updatedAt] = now
           }
           Submissions.update({ Submissions.id eq submissionId }) {

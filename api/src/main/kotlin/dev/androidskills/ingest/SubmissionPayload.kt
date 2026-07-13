@@ -45,6 +45,8 @@ data class StagedPayload(
 data class ReviewOutputPayload(
   val category: String,
   val tagsProposed: List<String> = emptyList(),
+  // Moderator-only tag-change annotations — shown in the admin queue, never published.
+  val tagNotes: List<String> = emptyList(),
   val securityPassed: Boolean,
   @Serializable(with = SecurityFindingsSerializer::class)
   val securityFindings: List<SecurityFinding> = emptyList(),
@@ -55,6 +57,7 @@ data class ReviewOutputPayload(
       ReviewOutputPayload(
         category = result.category,
         tagsProposed = result.tagsProposed,
+        tagNotes = result.tagNotes,
         // Authoritative pass/fail, fail-closed: a review passes only when every finding is
         // explicitly advisory ("fyi", inherent to the skill's declared purpose). Anything else —
         // "flag", or an unrecognised severity — fails it.

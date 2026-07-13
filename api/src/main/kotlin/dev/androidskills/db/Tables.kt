@@ -99,6 +99,7 @@ object Skills : Table("skills") {
   val featured = bool("featured").default(false)
   val installs = integer("installs").default(0)
   val readmeMd = text("readme_md").nullable()
+  val security = text("security").nullable() // JSON array of advisory (fyi) review notes
   val createdAt = text("created_at")
   val updatedAt = text("updated_at")
 

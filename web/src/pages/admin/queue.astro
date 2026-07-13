@@ -27,11 +27,13 @@ type SecurityFinding = { severity?: string; message?: string };
 type ReviewOut = {
   category?: string;
   tagsProposed?: string[];
+  tagNotes?: string[];
   securityPassed?: boolean;
   securityFindings?: SecurityFinding[];
 };
 const review =
   (detail?.payload as unknown as { review?: ReviewOut } | null | undefined)?.review ?? null;
+const tagNotes = review?.tagNotes ?? [];
 // Fail-closed: only an explicit "fyi" is advisory; "flag" or any unrecognised severity is a flag.
 const flags = (review?.securityFindings ?? []).filter((f) => f.severity !== 'fyi');
 const fyis = (review?.securityFindings ?? []).filter((f) => f.severity === 'fyi');
@@ -96,6 +98,14 @@ const proposedTags = (review?.tagsProposed ?? []).join(', ');
                 <span>{review.category ?? '—'}</span>
                 <span class="faint">Tags</span>
                 <input class="input" data-tags-input type="text" value={proposedTags} placeholder="comma-separated tags" aria-label="Tags applied on approve" style="background: var(--surface);" />
+                {tagNotes.length > 0 && (
+                  <>
+                    <span class="faint">Tag notes</span>
+                    <ul class="muted" style="margin: 0; padding-left: 16px; font-size: 12.5px; display: flex; flex-direction: column; gap: 3px;">
+                      {tagNotes.map((n) => <li>{n}</li>)}
+                    </ul>
+                  </>
+                )}
                 <span class="faint">Security</span>
                 <span style={`color: ${review.securityPassed ? 'var(--accent-text)' : 'var(--danger)'}; font-weight: 600;`}>{review.securityPassed ? '✓ Passed' : '✕ Flagged'}</span>
               </div>
@@ -176,6 +186,7 @@ const proposedTags = (review?.tagsProposed ?? []).join(', ');
   type ReviewOut = {
     category?: string;
     tagsProposed?: string[];
+    tagNotes?: string[];
     securityPassed?: boolean;
     securityFindings?: SecurityFinding[];
   };
@@ -258,6 +269,10 @@ const proposedTags = (review?.tagsProposed ?? []).join(', ');
         const flags = findings.filter((f) => f.severity !== 'fyi');
         const fyis = findings.filter((f) => f.severity === 'fyi');
         const proposedTags = (review?.tagsProposed ?? []).join(', ');
+        const tagNotes = review?.tagNotes ?? [];
+        const tagNotesRow = tagNotes.length
+          ? `<span class="faint">Tag notes</span><ul class="muted" style="margin: 0; padding-left: 16px; font-size: 12.5px; display: flex; flex-direction: column; gap: 3px;">${tagNotes.map((n) => `<li>${esc(n)}</li>`).join('')}</ul>`
+          : '';
         const findingList = (items: SecurityFinding[], label: string, danger: boolean) =>
           items.length
             ? `<div style="margin-top: 14px;">
@@ -270,6 +285,7 @@ const proposedTags = (review?.tagsProposed ?? []).join(', ');
               <div class="grid" style="grid-template-columns: 120px 1fr; gap: 10px 14px; font-size: 14px; align-items: center;">
                 <span class="faint">Category</span><span>${esc(review.category ?? '—')}</span>
                 <span class="faint">Tags</span><input class="input" data-tags-input type="text" value="${esc(proposedTags)}" placeholder="comma-separated tags" aria-label="Tags applied on approve" style="background: var(--surface);" />
+                ${tagNotesRow}
                 <span class="faint">Security</span><span style="color: ${review.securityPassed ? 'var(--accent-text)' : 'var(--danger)'}; font-weight: 600;">${review.securityPassed ? '✓ Passed' : '✕ Flagged'}</span>
               </div>
               ${findingList(flags, 'Flagged', true)}
