@@ -16,6 +16,13 @@ api/.kotlin/
 api/build/
 .gradle/
 
+# Rust / Cloudflare Worker build output
+api-rs/build/
+api-rs/target/
+api-rs/node_modules/
+api-rs/.wrangler/
+api-rs/wrangler.local*.log
+
 # OS / editor
 .DS_Store
 Thumbs.db

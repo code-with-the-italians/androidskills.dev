@@ -1,0 +1,22 @@
+name = "androidskills-api"
+main = "build/worker/shim.mjs"
+compatibility_date = "2026-07-16"
+workers_dev = true
+
+[build]
+command = "worker-build --release"
+
+# Resource bindings are intentionally added in the provisioning change. Keeping this
+# starter deployable without account-specific IDs lets CI run entirely locally.
+#
+# [[d1_databases]]
+# binding = "DB"
+# database_name = "androidskills"
+# database_id = "<provisioned-d1-id>"
+#
+# [[r2_buckets]]
+# binding = "FILES"
+# bucket_name = "androidskills-files"
+
+# Queue and cron resource configuration belongs to the Cloudflare-authorized integration slice.
+# The Rust entrypoints compile now, but they intentionally have no named resources in this slice.

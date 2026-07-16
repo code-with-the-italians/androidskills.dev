@@ -1,0 +1,5 @@
+{
+  "name": "unknown API routes remain not found",
+  "request": { "method": "GET", "path": "/api/phase-0-missing" },
+  "response": { "status": 404 }
+}

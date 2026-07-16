@@ -1,0 +1,8 @@
+{
+  "name": "androidskills-api-worker-tools",
+  "private": true,
+  "version": "0.1.0",
+  "devDependencies": {
+    "wrangler": "4.111.0"
+  }
+}
