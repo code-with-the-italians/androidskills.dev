@@ -117,7 +117,9 @@ jobs:
         run: |
           chmod +x ./gradlew
           ./gradlew run --no-daemon > ktor.log 2>&1 &
-          for attempt in {1..60}; do
+          # This job has no Gradle cache from the API test job, so the first Ktor compile can
+          # legitimately take longer than one minute before the server opens its health port.
+          for attempt in {1..180}; do
             if curl --fail --silent http://127.0.0.1:8080/api/health > /dev/null; then exit 0; fi
             sleep 1
           done
