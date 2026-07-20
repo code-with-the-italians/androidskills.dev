@@ -90,6 +90,10 @@ jobs:
           cargo clippy --locked --target wasm32-unknown-unknown -- -D warnings
           cargo test --locked --lib
           python3 tests/schema_test.py
+      - name: Apply and inspect migrations in the local D1 emulator
+        run: |
+          npx wrangler d1 migrations apply androidskills --local --config wrangler.d1.local.toml
+          node tests/d1_catalogue_test.mjs
       - name: Build the Wasm Worker
         run: npx wrangler deploy --dry-run
       - name: Start the local Workers runtime

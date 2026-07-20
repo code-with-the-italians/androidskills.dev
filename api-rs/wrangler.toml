@@ -6,13 +6,8 @@ workers_dev = true
 [build]
 command = "worker-build --release"
 
-# Resource bindings are intentionally added in the provisioning change. Keeping this
-# starter deployable without account-specific IDs lets CI run entirely locally.
-#
-# [[d1_databases]]
-# binding = "DB"
-# database_name = "androidskills"
-# database_id = "<provisioned-d1-id>"
+# D1 is deliberately configured only after account provisioning. The CI-only local
+# emulator configuration lives in wrangler.d1.local.toml and has no deploy role.
 #
 # [[r2_buckets]]
 # binding = "FILES"

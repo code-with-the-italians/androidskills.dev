@@ -1,0 +1,11 @@
+# CI-only Wrangler configuration for the account-free local D1 emulator. This is not
+# the deploy configuration: the all-zero ID must be replaced only in the authorized
+# Cloudflare provisioning change.
+name = "androidskills-api-d1-local"
+compatibility_date = "2026-07-16"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "androidskills"
+database_id = "00000000-0000-0000-0000-000000000003"
+migrations_dir = "migrations"

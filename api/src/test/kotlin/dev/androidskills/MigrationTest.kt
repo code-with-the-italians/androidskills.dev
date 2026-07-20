@@ -15,6 +15,10 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.transactions.transaction
@@ -53,6 +57,38 @@ class MigrationTest {
           "schema_meta",
         )
         .forEach { assertTrue("$it table missing: $tables") { tables.contains(it) } }
+    }
+  }
+
+  @Test
+  fun `fresh SQLite migration matches the shared v5 compatibility snapshot`() {
+    val snapshot =
+      Json.parseToJsonElement(
+          requireNotNull(javaClass.getResourceAsStream("/schema-v5-compatibility.json"))
+            .bufferedReader()
+            .readText()
+        )
+        .jsonObject
+    Database.init(TestSupport.newConfig(dir))
+    transaction {
+      snapshot.getValue("tables").jsonObject.forEach { (table, expected) ->
+        val columns =
+          exec("PRAGMA table_info($table)") { rs ->
+            buildList {
+              while (rs.next()) add(rs.getString("name"))
+            }
+          } ?: emptyList()
+        assertEquals(expected.jsonArray.map { it.jsonPrimitive.content }, columns, table)
+      }
+      val indexes =
+        exec("SELECT name FROM sqlite_master WHERE type='index' AND name NOT LIKE 'sqlite_autoindex%' AND name NOT LIKE 'uq_%'") {
+          rs -> buildSet { while (rs.next()) add(rs.getString(1)) }
+        } ?: emptySet()
+      assertEquals(snapshot.getValue("indexes").jsonArray.map { it.jsonPrimitive.content }.toSet(), indexes)
+      assertEquals(
+        snapshot.getValue("categories").jsonObject.keys,
+        Categories.selectAll().map { it[Categories.slug] }.toSet(),
+      )
     }
   }
 
