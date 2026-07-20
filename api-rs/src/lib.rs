@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+pub mod domain;
 use worker::{
     event, Context, Env, MessageBatch, Method, Request, Response, Result, ScheduleContext,
     ScheduledEvent,
