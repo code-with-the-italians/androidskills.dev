@@ -1,0 +1,20 @@
+{
+  "tables": {
+    "users": ["id","github_id","handle","name","avatar_url","role","status","settings_json","deleted_at","created_at","updated_at"],
+    "categories": ["id","slug","name"],
+    "bundles": ["id","kind","provenance","owner_user_id","source_ref","installation_id","synced_at","created_at"],
+    "skills": ["id","bundle_id","slug","source_dir","name","description","license","tags","category_id","version","version_source","token_upfront","token_ondemand","token_band","verified","status","featured","installs","readme_md","security","created_at","updated_at"],
+    "skill_files": ["id","skill_id","path","size","is_binary","r2_key"],
+    "versions": ["id","skill_id","version","source_ref","r2_zip_key","created_at"],
+    "submissions": ["id","bundle_id","skill_id","submitter_id","state","lint_score","note","payload","created_at","updated_at"],
+    "stars": ["user_id","skill_id","created_at"],
+    "sessions": ["id","user_id","created_at","expires_at"],
+    "jobs": ["id","type","payload","state","attempts","run_after","last_error","created_at","updated_at"],
+    "audit_log": ["id","actor_id","action","target","meta","created_at"],
+    "platform_settings": ["key","value"],
+    "reports": ["id","skill_id","reporter_id","reason","created_at"]
+  },
+  "indexes": ["ix_users_role_status","ix_bundles_owner","ix_skills_bundle","ix_skills_category","ix_skills_status_verified","ix_skills_featured","ix_skills_installs","ix_skills_updated","ix_skills_created","ix_skills_name","ix_skill_files_skill","ix_versions_skill","ix_versions_created","ix_submissions_submitter","ix_submissions_state","ix_submissions_bundle","ix_submissions_skill","ix_sessions_user","ix_sessions_expires","ix_jobs_state_runafter","ix_audit_created","ix_audit_action","ix_reports_skill","ix_reports_created"],
+  "categories": {"jetpack-compose":"3c9572b4-3e39-4e0a-a0cb-0a7078522e00","kotlin-language":"4b9e4761-94e8-48db-9a6b-2f3555f9bcd8","architecture":"421ed6d4-ff58-48af-9315-051db7ba3b31","testing-qa":"6028413c-4582-449c-9efb-d876a4fc6a4f","material-design":"5bd6da47-3748-4200-b224-1b4b0924ec80","data-persistence":"1fddf36b-f9c0-4c2c-aa6b-ea02a4b43c01","networking":"be867da8-5c59-49b4-9c0b-8b1e2214e326","performance":"0e303da2-b47f-4a84-9e02-2266633c9441","accessibility":"1e7a245d-1e99-4760-9ca8-92cefb3a0e1a","build-ci":"6a36388d-3c1a-44b1-91e4-0c5b5171ff6b","uncategorized":"c1f8196c-0e43-4ab3-82b6-d12ca4625d07"},
+  "catalogue": {"authors":4,"bundles":6,"skills":121,"sha256":"b807022d942c6633b72a09a0588efdadb2a2c3e89963e3e65407687ccb189b27"}
+}
