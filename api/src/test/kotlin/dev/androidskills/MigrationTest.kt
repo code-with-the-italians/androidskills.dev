@@ -74,17 +74,20 @@ class MigrationTest {
       snapshot.getValue("tables").jsonObject.forEach { (table, expected) ->
         val columns =
           exec("PRAGMA table_info($table)") { rs ->
-            buildList {
-              while (rs.next()) add(rs.getString("name"))
-            }
+            buildList { while (rs.next()) add(rs.getString("name")) }
           } ?: emptyList()
         assertEquals(expected.jsonArray.map { it.jsonPrimitive.content }, columns, table)
       }
       val indexes =
-        exec("SELECT name FROM sqlite_master WHERE type='index' AND name NOT LIKE 'sqlite_autoindex%' AND name NOT LIKE 'uq_%'") {
-          rs -> buildSet { while (rs.next()) add(rs.getString(1)) }
+        exec(
+          "SELECT name FROM sqlite_master WHERE type='index' AND name NOT LIKE 'sqlite_autoindex%' AND name NOT LIKE 'uq_%'"
+        ) { rs ->
+          buildSet { while (rs.next()) add(rs.getString(1)) }
         } ?: emptySet()
-      assertEquals(snapshot.getValue("indexes").jsonArray.map { it.jsonPrimitive.content }.toSet(), indexes)
+      assertEquals(
+        snapshot.getValue("indexes").jsonArray.map { it.jsonPrimitive.content }.toSet(),
+        indexes,
+      )
       assertEquals(
         snapshot.getValue("categories").jsonObject.keys,
         Categories.selectAll().map { it[Categories.slug] }.toSet(),
