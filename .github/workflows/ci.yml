@@ -61,3 +61,71 @@ jobs:
       - name: Build Astro
         working-directory: ./web
         run: npm run build
+
+  rust-worker:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./api-rs
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+      - uses: dtolnay/rust-toolchain@1.88.0
+        with:
+          targets: wasm32-unknown-unknown
+          components: rustfmt, clippy
+      - name: Install pinned Worker tooling
+        run: npm ci
+      - name: Install the pinned Worker builder
+        run: cargo install worker-build --version 0.8.3 --locked
+      - name: Format and type-check the Wasm target
+        run: |
+          cargo fmt --check
+          cargo check --locked --target wasm32-unknown-unknown
+          cargo clippy --locked --target wasm32-unknown-unknown -- -D warnings
+          cargo test --locked --lib
+      - name: Build the Wasm Worker
+        run: npx wrangler deploy --dry-run
+      - name: Start the local Workers runtime
+        run: |
+          npx wrangler dev --local --port 8787 > wrangler.log 2>&1 &
+          for attempt in {1..30}; do
+            if curl --fail --silent http://127.0.0.1:8787/api/health > /dev/null; then exit 0; fi
+            sleep 1
+          done
+          cat wrangler.log
+          exit 1
+      - name: Run black-box contract fixtures against the Worker
+        run: CONTRACT_BASE_URL=http://127.0.0.1:8787 node tests/contract/run.mjs
+
+  ktor-contract:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./api
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          java-version: "21"
+          distribution: "temurin"
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+      - name: Start Ktor
+        run: |
+          chmod +x ./gradlew
+          ./gradlew run --no-daemon > ktor.log 2>&1 &
+          # This job has no Gradle cache from the API test job, so the first Ktor compile can
+          # legitimately take longer than one minute before the server opens its health port.
+          for attempt in {1..180}; do
+            if curl --fail --silent http://127.0.0.1:8080/api/health > /dev/null; then exit 0; fi
+            sleep 1
+          done
+          cat ktor.log
+          exit 1
+      - name: Run shared black-box contract fixtures against Ktor
+        working-directory: ./api-rs
+        run: CONTRACT_BASE_URL=http://127.0.0.1:8080 node tests/contract/run.mjs

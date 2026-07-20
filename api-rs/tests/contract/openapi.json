@@ -1,0 +1,10 @@
+{
+  "name": "public OpenAPI contract is served",
+  "request": { "method": "GET", "path": "/api/openapi.yaml" },
+  "response": {
+    "status": 200,
+    "contentType": "application/yaml",
+    "bodyIncludes": ["openapi: 3.0.3", "/api/health:"],
+    "bodySha256": "7df038919f2eac7e950b9b63a93a662723fddb359fd43128ffa699a3c76170d7"
+  }
+}

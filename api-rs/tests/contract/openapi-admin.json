@@ -1,0 +1,10 @@
+{
+  "name": "admin OpenAPI contract is served",
+  "request": { "method": "GET", "path": "/api/openapi-admin.yaml" },
+  "response": {
+    "status": 200,
+    "contentType": "application/yaml",
+    "bodyIncludes": ["openapi: 3.0.3", "/api/admin/stats:"],
+    "bodySha256": "5bf416459ca9999e37dc732c58179b96d622e02b491e5c5e983b035321638514"
+  }
+}

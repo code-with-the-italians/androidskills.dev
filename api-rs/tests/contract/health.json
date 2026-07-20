@@ -1,0 +1,28 @@
+{
+  "name": "health endpoint exposes the compatibility shape",
+  "request": { "method": "GET", "path": "/api/health" },
+  "response": {
+    "status": 200,
+    "contentType": "application/json",
+    "json": {
+      "ok": "boolean",
+      "version": "string",
+      "db": "string",
+      "fileStore": "string",
+      "llm": "string",
+      "auth": "string"
+    },
+    "jsonEquals": {
+      "ok": true
+    },
+    "jsonAllowedValues": {
+      "db": ["wal", "delete", "unknown", "unconfigured"],
+      "fileStore": ["local-fs", "r2", "unconfigured"],
+      "llm": ["stub", "openai", "disabled"],
+      "auth": ["oauth", "disabled"]
+    },
+    "jsonPatterns": {
+      "version": "\\S+"
+    }
+  }
+}
