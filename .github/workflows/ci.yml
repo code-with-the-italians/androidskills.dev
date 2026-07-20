@@ -72,6 +72,9 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version-file: .node-version
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
       - uses: dtolnay/rust-toolchain@1.88.0
         with:
           targets: wasm32-unknown-unknown
@@ -86,6 +89,7 @@ jobs:
           cargo check --locked --target wasm32-unknown-unknown
           cargo clippy --locked --target wasm32-unknown-unknown -- -D warnings
           cargo test --locked --lib
+          python3 tests/schema_test.py
       - name: Build the Wasm Worker
         run: npx wrangler deploy --dry-run
       - name: Start the local Workers runtime
