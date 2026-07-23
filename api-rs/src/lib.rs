@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 pub mod domain;
+pub mod repositories;
 use worker::{
     event, Context, Env, MessageBatch, Method, Request, Response, Result, ScheduleContext,
     ScheduledEvent,
@@ -11,6 +12,16 @@ const ADMIN_OPENAPI: &str = include_str!("../../api/src/main/resources/openapi-a
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct JobMessage {
     pub job_id: String,
+}
+
+#[cfg(debug_assertions)]
+#[derive(Serialize)]
+struct RepositorySmokeResponse {
+    operations: usize,
+    exactly_one: bool,
+    zero_returning_rejected: bool,
+    multiple_returning_rejected: bool,
+    decoded_value: String,
 }
 
 #[derive(Serialize)]
@@ -27,9 +38,28 @@ struct HealthResponse<'a> {
 /// Phase 0 route surface. It intentionally stays free of account bindings so it can run in
 /// Wrangler's local runtime and provide a stable target for the contract harness.
 #[event(fetch, respond_with_errors)]
-pub async fn fetch(request: Request, _env: Env, _ctx: Context) -> Result<Response> {
+pub async fn fetch(request: Request, env: Env, _ctx: Context) -> Result<Response> {
     if request.method() != Method::Get {
         return Response::error("Method Not Allowed", 405);
+    }
+
+    #[cfg(debug_assertions)]
+    if request.path() == "/__ci/repositories" {
+        let db = env.d1("DB")?;
+        let (
+            operations,
+            exactly_one,
+            zero_returning_rejected,
+            multiple_returning_rejected,
+            decoded_value,
+        ) = repositories::local_worker_smoke(&db).await?;
+        return Response::from_json(&RepositorySmokeResponse {
+            operations,
+            exactly_one,
+            zero_returning_rejected,
+            multiple_returning_rejected,
+            decoded_value,
+        });
     }
 
     match request.path().as_str() {
