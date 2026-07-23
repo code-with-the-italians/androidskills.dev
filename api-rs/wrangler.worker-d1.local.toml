@@ -1,0 +1,14 @@
+# CI-only Worker configuration: combines the generated Worker entrypoint with the account-free
+# local D1 emulator. It must never be used for deployment.
+name = "androidskills-api-worker-d1-local"
+main = "build/worker/shim.mjs"
+compatibility_date = "2026-07-16"
+
+[build]
+command = "worker-build --dev"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "androidskills"
+database_id = "00000000-0000-0000-0000-000000000003"
+migrations_dir = "migrations"

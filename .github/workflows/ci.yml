@@ -94,6 +94,15 @@ jobs:
         run: |
           npx wrangler d1 migrations apply androidskills --local --config wrangler.d1.local.toml
           node tests/d1_catalogue_test.mjs
+          node tests/d1_repository_contract_test.mjs
+      - name: Exercise repositories through the local Worker D1 binding
+        run: |
+          npx wrangler dev --local --config wrangler.worker-d1.local.toml --port 8788 > repository-wrangler.log 2>&1 &
+          for attempt in {1..30}; do
+            if curl --fail --silent http://127.0.0.1:8788/__ci/repositories > /dev/null; then break; fi
+            sleep 1
+          done
+          node tests/d1_repository_worker_test.mjs
       - name: Build the Wasm Worker
         run: npx wrangler deploy --dry-run
       - name: Start the local Workers runtime
