@@ -111,6 +111,7 @@ jobs:
           fi
           node tests/d1_repository_worker_test.mjs
           node tests/d1_public_read_worker_test.mjs
+          node tests/d1_skill_read_worker_test.mjs
       - name: Build the Wasm Worker
         run: npx wrangler deploy --dry-run
       - name: Start the local Workers runtime
