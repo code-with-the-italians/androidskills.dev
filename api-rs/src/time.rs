@@ -14,12 +14,16 @@ pub fn format_iso(value: DateTime<Utc>) -> Timestamp {
     value.to_rfc3339_opts(SecondsFormat::Nanos, true)
 }
 
-/// Parses only canonical UTC timestamps accepted by the D1 persistence layer.
+/// Parses UTC RFC3339 timestamps from both existing Kotlin fixtures and new fixed-width D1 rows.
+/// Persistence writers must still use [format_iso] so new D1 TEXT values remain sortable.
 pub fn parse_iso(value: &str) -> Option<DateTime<Utc>> {
+    if value.ends_with("-00:00") {
+        return None;
+    }
     DateTime::parse_from_rfc3339(value)
         .ok()
+        .filter(|timestamp| timestamp.offset().local_minus_utc() == 0)
         .map(|timestamp| timestamp.with_timezone(&Utc))
-        .filter(|timestamp| format_iso(*timestamp) == value)
 }
 
 #[cfg(test)]
@@ -37,10 +41,11 @@ mod tests {
     }
 
     #[test]
-    fn rejects_noncanonical_timestamp_spellings() {
-        assert!(parse_iso("2026-07-23T12:34:56Z").is_none());
-        assert!(parse_iso("2026-07-23T12:34:56.000Z").is_none());
+    fn accepts_existing_kotlin_utc_spellings_and_rejects_non_utc_values() {
+        assert!(parse_iso("2026-07-23T12:34:56Z").is_some());
+        assert!(parse_iso("2026-07-23T12:34:56.000Z").is_some());
         assert!(parse_iso("2026-07-23T14:34:56+02:00").is_none());
+        assert!(parse_iso("2026-07-23T12:34:56-00:00").is_none());
         assert!(parse_iso("not-a-timestamp").is_none());
         assert!(parse_iso(&now_iso()).is_some());
     }
