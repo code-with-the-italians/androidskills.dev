@@ -73,6 +73,13 @@ impl ApiError {
     pub fn internal() -> Self {
         Self::new(500, "internal", "Internal server error")
     }
+    pub fn service_unavailable() -> Self {
+        Self::new(
+            503,
+            "service_unavailable",
+            "Service temporarily unavailable",
+        )
+    }
 
     pub fn status(&self) -> u16 {
         self.status
@@ -109,5 +116,6 @@ mod tests {
         assert_eq!(ApiError::unauthorized().status(), 401);
         assert_eq!(ApiError::forbidden().status(), 403);
         assert_eq!(ApiError::internal().status(), 500);
+        assert_eq!(ApiError::service_unavailable().status(), 503);
     }
 }

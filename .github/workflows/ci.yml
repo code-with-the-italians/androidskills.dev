@@ -110,6 +110,7 @@ jobs:
             exit 1
           fi
           node tests/d1_repository_worker_test.mjs
+          node tests/d1_public_read_worker_test.mjs
       - name: Build the Wasm Worker
         run: npx wrangler deploy --dry-run
       - name: Start the local Workers runtime
@@ -122,7 +123,9 @@ jobs:
           cat wrangler.log
           exit 1
       - name: Run black-box contract fixtures against the Worker
-        run: CONTRACT_BASE_URL=http://127.0.0.1:8787 node tests/contract/run.mjs
+        run: |
+          CONTRACT_BASE_URL=http://127.0.0.1:8787 node tests/contract/run.mjs
+          CONTRACT_BASE_URL=http://127.0.0.1:8787 node tests/unconfigured_public_read_worker_test.mjs
 
   ktor-contract:
     runs-on: ubuntu-latest
