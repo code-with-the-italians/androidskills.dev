@@ -1533,7 +1533,7 @@ export interface components {
     ErrorBody: {
       code: string;
       message: string;
-      details?: {
+      fields?: {
         [key: string]: string;
       } | null;
     };

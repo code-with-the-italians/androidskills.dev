@@ -1238,7 +1238,7 @@ components:
           type: string
         message:
           type: string
-        details:
+        fields:
           type: object
           additionalProperties:
             type: string
