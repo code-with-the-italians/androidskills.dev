@@ -5,6 +5,6 @@
     "status": 200,
     "contentType": "application/yaml",
     "bodyIncludes": ["openapi: 3.0.3", "/api/health:"],
-    "bodySha256": "7df038919f2eac7e950b9b63a93a662723fddb359fd43128ffa699a3c76170d7"
+    "bodySha256": "d15d82c5c94885af22c1e07878a1be1a41871487226d80b6521a36732f0d574b"
   }
 }
