@@ -3,6 +3,7 @@ pub mod domain;
 pub mod error;
 pub mod ids;
 pub mod json_column;
+pub mod public_read;
 pub mod repositories;
 pub mod time;
 use worker::{
@@ -79,6 +80,14 @@ pub async fn fetch(request: Request, env: Env, _ctx: Context) -> Result<Response
             .map(|response| response.with_headers(content_type("application/yaml"))),
         "/api/openapi-admin.yaml" => Response::ok(ADMIN_OPENAPI)
             .map(|response| response.with_headers(content_type("application/yaml"))),
+        "/api/stats" => match env.d1("DB") {
+            Ok(db) => Response::from_json(&public_read::stats(&db).await?),
+            Err(_) => error::ApiError::service_unavailable().response(),
+        },
+        "/api/categories" => match env.d1("DB") {
+            Ok(db) => Response::from_json(&public_read::categories(&db).await?),
+            Err(_) => error::ApiError::service_unavailable().response(),
+        },
         _ => Response::error("Not Found", 404),
     }
 }
