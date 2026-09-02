@@ -73,6 +73,9 @@ impl ApiError {
     pub fn internal() -> Self {
         Self::new(500, "internal", "Internal server error")
     }
+    pub fn storage(message: impl Into<String>) -> Self {
+        Self::new(500, "storage_error", message)
+    }
     pub fn service_unavailable() -> Self {
         Self::new(
             503,
@@ -116,6 +119,7 @@ mod tests {
         assert_eq!(ApiError::unauthorized().status(), 401);
         assert_eq!(ApiError::forbidden().status(), 403);
         assert_eq!(ApiError::internal().status(), 500);
+        assert_eq!(ApiError::storage("File bytes missing").status(), 500);
         assert_eq!(ApiError::service_unavailable().status(), 503);
     }
 }

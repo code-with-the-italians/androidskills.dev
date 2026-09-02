@@ -8,7 +8,10 @@ use std::collections::{BTreeMap, HashMap};
 use serde::{Deserialize, Serialize};
 use worker::{wasm_bindgen::JsValue, D1Database, Error, Result};
 
-use crate::{domain::PageRequest, error::ApiError};
+use crate::{
+    domain::{PageError, PageRequest},
+    error::ApiError,
+};
 
 #[derive(Debug, Clone, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
@@ -599,12 +602,846 @@ struct TokenRow {
     token_ondemand: i64,
 }
 
+pub(crate) const PREVIEW_LIMIT: i64 = 256 * 1024;
+const MAX_TAG_FACETS: usize = 20;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SkillPath<'a> {
+    Detail(&'a str),
+    Files(&'a str),
+    File { slug: &'a str, path: &'a str },
+    Versions(&'a str),
+    Download(&'a str),
+}
+
+impl<'a> SkillPath<'a> {
+    pub fn parse(path: &'a str) -> Option<Self> {
+        let rest = path.strip_prefix("/api/skills/")?;
+        if rest.is_empty() {
+            return None;
+        }
+        let parsed = match rest.split_once('/') {
+            None => Self::Detail(rest),
+            Some((slug, "files")) => Self::Files(slug),
+            Some((slug, rest)) if rest.starts_with("files/") => Self::File {
+                slug,
+                path: &rest["files/".len()..],
+            },
+            Some((slug, "versions")) => Self::Versions(slug),
+            Some((slug, "download")) => Self::Download(slug),
+            _ => return None,
+        };
+        let slug = match parsed {
+            Self::Detail(slug)
+            | Self::Files(slug)
+            | Self::File { slug, .. }
+            | Self::Versions(slug)
+            | Self::Download(slug) => slug,
+        };
+        (!slug.is_empty()).then_some(parsed)
+    }
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct FileEntry {
+    pub path: String,
+    pub name: String,
+    pub dir: String,
+    pub size: i64,
+    pub is_binary: bool,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct TreeNode {
+    pub name: String,
+    pub path: String,
+    #[serde(rename = "type")]
+    pub node_type: String,
+    pub size: i64,
+    pub is_binary: bool,
+    pub children: Option<Vec<TreeNode>>,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+pub struct FileTreeResponse {
+    pub slug: String,
+    pub files: Vec<FileEntry>,
+    pub tree: Vec<TreeNode>,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct FileContentResponse {
+    pub slug: String,
+    pub path: String,
+    pub size: i64,
+    pub is_binary: bool,
+    pub content: Option<String>,
+    pub download_only: bool,
+    pub download_url: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct VersionEntry {
+    pub version: String,
+    pub source_ref: String,
+    pub created_at: String,
+    pub current: bool,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+pub struct VersionsResponse {
+    pub slug: String,
+    pub current: String,
+    pub versions: Vec<VersionEntry>,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct TrendsResponse {
+    pub categories: Vec<FacetCount>,
+    pub tags: Vec<FacetCount>,
+    pub token_mix: Vec<FacetCount>,
+    pub security_pass_rate: Option<f64>,
+    pub submission_funnel: BTreeMap<String, i64>,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct TimelineEvent {
+    #[serde(rename = "type")]
+    pub event_type: String,
+    pub at: String,
+    pub slug: String,
+    pub name: String,
+    pub version: Option<String>,
+    pub author_handle: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct TimelinePage {
+    pub items: Vec<TimelineEvent>,
+    pub page: u32,
+    pub page_size: u32,
+    pub total: i64,
+    pub total_pages: i64,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct BundleSummary {
+    pub id: String,
+    pub kind: String,
+    pub provenance: String,
+    pub owner: AuthorRef,
+    pub source_ref: Option<String>,
+    pub skill_count: i64,
+    pub synced_at: Option<String>,
+    pub created_at: String,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct BundlePage {
+    pub items: Vec<BundleSummary>,
+    pub page: u32,
+    pub page_size: u32,
+    pub total: i64,
+    pub total_pages: i64,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct BundleDetail {
+    pub id: String,
+    pub kind: String,
+    pub provenance: String,
+    pub owner: AuthorRef,
+    pub source_ref: Option<String>,
+    pub synced_at: Option<String>,
+    pub created_at: String,
+    pub skills: Vec<SkillCard>,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct AuthorProfile {
+    pub handle: String,
+    pub name: Option<String>,
+    pub avatar_url: Option<String>,
+    pub skill_count: i64,
+    pub total_installs: i64,
+    pub skills: Vec<SkillCard>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FileContentMeta {
+    pub slug: String,
+    pub path: String,
+    pub size: i64,
+    pub is_binary: bool,
+    pub r2_key: String,
+    pub download_only: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DownloadTarget {
+    pub skill_id: String,
+    pub slug: String,
+    pub version: String,
+    pub r2_zip_key: Option<String>,
+    pub is_current: bool,
+}
+
+#[derive(Deserialize)]
+struct PublishedSkillRow {
+    id: String,
+    slug: String,
+    version: String,
+}
+
+#[derive(Deserialize)]
+struct FileMetaRow {
+    path: String,
+    size: i64,
+    is_binary: i64,
+    r2_key: String,
+}
+
+#[derive(Deserialize)]
+struct VersionRow {
+    version: String,
+    source_ref: String,
+    created_at: String,
+}
+
+#[derive(Deserialize)]
+struct DownloadVersionRow {
+    version: String,
+    r2_zip_key: Option<String>,
+}
+
+#[derive(Deserialize)]
+struct FunnelRow {
+    state: String,
+    count: i64,
+}
+
+#[derive(Deserialize)]
+struct TimelineRow {
+    event_type: String,
+    at: String,
+    slug: String,
+    name: String,
+    version: Option<String>,
+    author_handle: Option<String>,
+}
+
+#[derive(Deserialize)]
+struct BundleListRow {
+    id: String,
+    kind: String,
+    provenance: String,
+    source_ref: Option<String>,
+    synced_at: Option<String>,
+    created_at: String,
+    skill_count: i64,
+    author_handle: String,
+    author_name: Option<String>,
+    author_avatar_url: Option<String>,
+}
+
+#[derive(Deserialize)]
+struct BundleHeadRow {
+    id: String,
+    kind: String,
+    provenance: String,
+    source_ref: Option<String>,
+    synced_at: Option<String>,
+    created_at: String,
+    author_handle: String,
+    author_name: Option<String>,
+    author_avatar_url: Option<String>,
+}
+
+#[derive(Deserialize)]
+struct AuthorHeadRow {
+    handle: String,
+    name: Option<String>,
+    avatar_url: Option<String>,
+}
+
+pub fn page_from_url(url: &worker::Url) -> std::result::Result<(u32, u32), ApiError> {
+    let pairs = url.query_pairs().into_owned().collect::<Vec<_>>();
+    let one = |key: &str| {
+        pairs
+            .iter()
+            .find(|(name, _)| name == key)
+            .map(|(_, value)| value.as_str())
+    };
+    Ok((
+        parse_page_strict(one("page"))?,
+        parse_page_size_strict(one("pageSize"))?,
+    ))
+}
+
+pub fn query_value(url: &worker::Url, key: &str) -> Option<String> {
+    url.query_pairs()
+        .find(|(name, _)| name == key)
+        .map(|(_, value)| value.into_owned())
+}
+
+pub fn is_raw_preview(url: &worker::Url) -> bool {
+    query_value(url, "raw").as_deref() == Some("1")
+}
+
+fn parse_page_strict(raw: Option<&str>) -> std::result::Result<u32, ApiError> {
+    match raw {
+        None => Ok(1),
+        Some(value) => {
+            let parsed = value
+                .parse::<u32>()
+                .map_err(|_| page_error("page", "must be a positive integer", PageError::Page))?;
+            PageRequest {
+                page: parsed,
+                page_size: PageRequest::DEFAULT_PAGE_SIZE,
+            }
+            .validate()
+            .map_err(|error| match error {
+                PageError::Page if parsed == 0 => page_error("page", "must be >= 1", error),
+                PageError::Page => page_error(
+                    "page",
+                    &format!(
+                        "must be <= {} (deep pagination is not supported)",
+                        PageRequest::MAX_PAGE
+                    ),
+                    error,
+                ),
+                PageError::PageSize => page_error(
+                    "pageSize",
+                    &format!("must be 1..{}", PageRequest::MAX_PAGE_SIZE),
+                    error,
+                ),
+            })?;
+            Ok(parsed)
+        }
+    }
+}
+
+fn parse_page_size_strict(raw: Option<&str>) -> std::result::Result<u32, ApiError> {
+    match raw {
+        None => Ok(PageRequest::DEFAULT_PAGE_SIZE),
+        Some(value) => {
+            let parsed = value
+                .parse::<u32>()
+                .map_err(|_| page_error("pageSize", "must be an integer", PageError::PageSize))?;
+            PageRequest {
+                page: 1,
+                page_size: parsed,
+            }
+            .validate()
+            .map_err(|_| {
+                page_error(
+                    "pageSize",
+                    &format!("must be 1..{}", PageRequest::MAX_PAGE_SIZE),
+                    PageError::PageSize,
+                )
+            })?;
+            Ok(parsed)
+        }
+    }
+}
+
+fn page_error(field: &str, message: &str, _kind: PageError) -> ApiError {
+    ApiError::validation(
+        "validation_failed",
+        format!("Invalid '{field}'"),
+        BTreeMap::from([(field.into(), message.into())]),
+    )
+}
+
+fn total_pages(total: i64, page_size: u32) -> i64 {
+    if page_size == 0 {
+        0
+    } else {
+        (total + i64::from(page_size) - 1) / i64::from(page_size)
+    }
+}
+
+async fn published_skill(db: &D1Database, slug: &str) -> Result<Option<PublishedSkillRow>> {
+    db.prepare("SELECT id, slug, version FROM skills WHERE slug = ? AND status = 'published'")
+        .bind(&[JsValue::from_str(slug)])?
+        .first(None)
+        .await
+}
+
+pub async fn file_tree(db: &D1Database, slug: &str) -> Result<Option<FileTreeResponse>> {
+    let Some(skill) = published_skill(db, slug).await? else {
+        return Ok(None);
+    };
+    let rows: Vec<FileMetaRow> = db
+        .prepare(
+            "SELECT path, size, is_binary, r2_key FROM skill_files WHERE skill_id = ? ORDER BY path",
+        )
+        .bind(&[JsValue::from_str(&skill.id)])?
+        .all()
+        .await?
+        .results()?;
+    let files = rows
+        .into_iter()
+        .map(|row| {
+            let (dir, name) = row
+                .path
+                .rsplit_once('/')
+                .map(|(dir, name)| (dir.to_owned(), name.to_owned()))
+                .unwrap_or_else(|| (String::new(), row.path.clone()));
+            FileEntry {
+                path: row.path,
+                name,
+                dir,
+                size: row.size,
+                is_binary: row.is_binary == 1,
+            }
+        })
+        .collect::<Vec<_>>();
+    let tree = build_tree(&files);
+    Ok(Some(FileTreeResponse {
+        slug: skill.slug,
+        files,
+        tree,
+    }))
+}
+
+pub async fn file_content_meta(
+    db: &D1Database,
+    slug: &str,
+    path: &str,
+) -> Result<Option<FileContentMeta>> {
+    let Some(skill) = published_skill(db, slug).await? else {
+        return Ok(None);
+    };
+    let row: Option<FileMetaRow> = db
+        .prepare(
+            "SELECT path, size, is_binary, r2_key FROM skill_files WHERE skill_id = ? AND path = ?",
+        )
+        .bind(&[JsValue::from_str(&skill.id), JsValue::from_str(path)])?
+        .first(None)
+        .await?;
+    Ok(row.map(|row| {
+        let is_binary = row.is_binary == 1;
+        FileContentMeta {
+            slug: skill.slug,
+            path: row.path,
+            size: row.size,
+            is_binary,
+            r2_key: row.r2_key,
+            download_only: is_binary || row.size > PREVIEW_LIMIT,
+        }
+    }))
+}
+
+pub fn file_content_json(meta: FileContentMeta, content: Option<String>) -> FileContentResponse {
+    FileContentResponse {
+        slug: meta.slug,
+        path: meta.path,
+        size: meta.size,
+        is_binary: meta.is_binary,
+        content,
+        download_only: meta.download_only,
+        download_url: None,
+    }
+}
+
+pub async fn versions(db: &D1Database, slug: &str) -> Result<Option<VersionsResponse>> {
+    let Some(skill) = published_skill(db, slug).await? else {
+        return Ok(None);
+    };
+    let rows: Vec<VersionRow> = db
+        .prepare(
+            "SELECT version, source_ref, created_at FROM versions WHERE skill_id = ? ORDER BY created_at DESC",
+        )
+        .bind(&[JsValue::from_str(&skill.id)])?
+        .all()
+        .await?
+        .results()?;
+    Ok(Some(VersionsResponse {
+        slug: skill.slug,
+        current: skill.version.clone(),
+        versions: rows
+            .into_iter()
+            .map(|row| VersionEntry {
+                current: row.version == skill.version,
+                version: row.version,
+                source_ref: row.source_ref,
+                created_at: row.created_at,
+            })
+            .collect(),
+    }))
+}
+
+pub async fn download_target(
+    db: &D1Database,
+    slug: &str,
+    version: Option<&str>,
+) -> Result<Option<DownloadTarget>> {
+    let Some(skill) = published_skill(db, slug).await? else {
+        return Ok(None);
+    };
+    let requested = version.unwrap_or(&skill.version);
+    let row: Option<DownloadVersionRow> = db
+        .prepare("SELECT version, r2_zip_key FROM versions WHERE skill_id = ? AND version = ?")
+        .bind(&[JsValue::from_str(&skill.id), JsValue::from_str(requested)])?
+        .first(None)
+        .await?;
+    Ok(row.map(|row| DownloadTarget {
+        skill_id: skill.id,
+        slug: skill.slug,
+        is_current: row.version == skill.version,
+        version: row.version,
+        r2_zip_key: row.r2_zip_key,
+    }))
+}
+
+pub fn download_filename(slug: &str, version: &str) -> Option<String> {
+    let filename = format!("{slug}-{version}.zip");
+    filename
+        .bytes()
+        .all(|byte| byte >= 0x20 && byte != b'"' && byte != b'\\')
+        .then_some(filename)
+}
+
+pub async fn increment_installs(db: &D1Database, skill_id: &str) -> Result<()> {
+    db.prepare("UPDATE skills SET installs = installs + 1 WHERE id = ?")
+        .bind(&[JsValue::from_str(skill_id)])?
+        .run()
+        .await?;
+    Ok(())
+}
+
+pub async fn trends(db: &D1Database) -> Result<TrendsResponse> {
+    let category_rows: Vec<FacetRow> = db
+        .prepare(
+            "SELECT COALESCE(c.slug, 'uncategorized') AS key, COALESCE(c.name, 'Uncategorized') AS label, COUNT(*) AS count \
+             FROM skills s LEFT JOIN categories c ON c.id = s.category_id \
+             WHERE s.status = 'published' GROUP BY s.category_id ORDER BY count DESC, key ASC",
+        )
+        .all()
+        .await?
+        .results()?;
+    let tag_rows: Vec<TagRow> = db
+        .prepare("SELECT tags FROM skills WHERE status = 'published'")
+        .all()
+        .await?
+        .results()?;
+    let mut tag_counts = HashMap::<String, i64>::new();
+    for row in tag_rows {
+        for tag in serde_json::from_str::<Vec<String>>(&row.tags).unwrap_or_default() {
+            *tag_counts.entry(tag).or_default() += 1;
+        }
+    }
+    let mut tags = tag_counts
+        .into_iter()
+        .map(|(key, count)| FacetCount {
+            key,
+            label: None,
+            count,
+        })
+        .collect::<Vec<_>>();
+    tags.sort_by(|left, right| {
+        right
+            .count
+            .cmp(&left.count)
+            .then_with(|| left.key.cmp(&right.key))
+    });
+    tags.truncate(MAX_TAG_FACETS);
+    let band_rows: Vec<FacetRow> = db
+        .prepare(
+            "SELECT token_band AS key, token_band AS label, COUNT(*) AS count \
+             FROM skills WHERE status = 'published' GROUP BY token_band",
+        )
+        .all()
+        .await?
+        .results()?;
+    let band_counts = band_rows
+        .into_iter()
+        .map(|row| (row.key, row.count))
+        .collect::<HashMap<_, _>>();
+    let funnel_rows: Vec<FunnelRow> = db
+        .prepare("SELECT state, COUNT(*) AS count FROM submissions GROUP BY state")
+        .all()
+        .await?
+        .results()?;
+    Ok(TrendsResponse {
+        categories: category_rows
+            .into_iter()
+            .map(|row| FacetCount {
+                key: row.key,
+                label: Some(row.label),
+                count: row.count,
+            })
+            .collect(),
+        tags,
+        token_mix: ["100s", "1k", "10k", "100k"]
+            .into_iter()
+            .map(|key| FacetCount {
+                key: key.into(),
+                label: None,
+                count: band_counts.get(key).copied().unwrap_or(0),
+            })
+            .collect(),
+        security_pass_rate: None,
+        submission_funnel: funnel_rows
+            .into_iter()
+            .map(|row| (row.state, row.count))
+            .collect(),
+    })
+}
+
+pub async fn timeline(db: &D1Database, page: u32, page_size: u32) -> Result<TimelinePage> {
+    let total: Option<CountRow> = db
+        .prepare(
+            "SELECT (SELECT COUNT(*) FROM skills WHERE status = 'published') \
+                    + (SELECT COUNT(*) FROM versions v INNER JOIN skills s ON s.id = v.skill_id WHERE s.status = 'published') \
+                    AS count",
+        )
+        .first(None)
+        .await?;
+    let total = total.map_or(0, |row| row.count);
+    let rows: Vec<TimelineRow> = db
+        .prepare(
+            "SELECT event_type, at, slug, name, version, author_handle FROM ( \
+                SELECT 'publish' AS event_type, s.created_at AS at, s.slug, s.name, s.version, u.handle AS author_handle \
+                FROM skills s INNER JOIN bundles b ON b.id = s.bundle_id INNER JOIN users u ON u.id = b.owner_user_id \
+                WHERE s.status = 'published' \
+                UNION ALL \
+                SELECT 'version' AS event_type, v.created_at AS at, s.slug, s.name, v.version, u.handle AS author_handle \
+                FROM versions v INNER JOIN skills s ON s.id = v.skill_id \
+                INNER JOIN bundles b ON b.id = s.bundle_id INNER JOIN users u ON u.id = b.owner_user_id \
+                WHERE s.status = 'published' \
+             ) AS events ORDER BY at DESC, event_type ASC, slug ASC LIMIT ? OFFSET ?",
+        )
+        .bind(&[
+            JsValue::from_f64(page_size.into()),
+            JsValue::from_f64(((page - 1) * page_size).into()),
+        ])?
+        .all()
+        .await?
+        .results()?;
+    Ok(TimelinePage {
+        items: rows
+            .into_iter()
+            .map(|row| TimelineEvent {
+                event_type: row.event_type,
+                at: row.at,
+                slug: row.slug,
+                name: row.name,
+                version: row.version,
+                author_handle: row.author_handle,
+            })
+            .collect(),
+        page,
+        page_size,
+        total,
+        total_pages: total_pages(total, page_size),
+    })
+}
+
+pub async fn bundles(db: &D1Database, page: u32, page_size: u32) -> Result<BundlePage> {
+    let total: Option<CountRow> = db
+        .prepare("SELECT COUNT(DISTINCT bundle_id) AS count FROM skills WHERE status = 'published'")
+        .first(None)
+        .await?;
+    let total = total.map_or(0, |row| row.count);
+    let rows: Vec<BundleListRow> = db
+        .prepare(
+            "SELECT b.id, b.kind, b.provenance, b.source_ref, b.synced_at, b.created_at, COUNT(s.id) AS skill_count, \
+                    u.handle AS author_handle, u.name AS author_name, u.avatar_url AS author_avatar_url \
+             FROM bundles b INNER JOIN users u ON u.id = b.owner_user_id \
+             INNER JOIN skills s ON s.bundle_id = b.id AND s.status = 'published' \
+             GROUP BY b.id ORDER BY b.created_at DESC, b.id DESC LIMIT ? OFFSET ?",
+        )
+        .bind(&[
+            JsValue::from_f64(page_size.into()),
+            JsValue::from_f64(((page - 1) * page_size).into()),
+        ])?
+        .all()
+        .await?
+        .results()?;
+    Ok(BundlePage {
+        items: rows
+            .into_iter()
+            .map(|row| BundleSummary {
+                id: row.id,
+                kind: row.kind,
+                provenance: row.provenance,
+                owner: AuthorRef {
+                    handle: row.author_handle,
+                    name: row.author_name,
+                    avatar_url: row.author_avatar_url,
+                },
+                source_ref: row.source_ref,
+                skill_count: row.skill_count,
+                synced_at: row.synced_at,
+                created_at: row.created_at,
+            })
+            .collect(),
+        page,
+        page_size,
+        total,
+        total_pages: total_pages(total, page_size),
+    })
+}
+
+pub async fn bundle_detail(db: &D1Database, id: &str) -> Result<Option<BundleDetail>> {
+    let head: Option<BundleHeadRow> = db
+        .prepare(
+            "SELECT b.id, b.kind, b.provenance, b.source_ref, b.synced_at, b.created_at, \
+                    u.handle AS author_handle, u.name AS author_name, u.avatar_url AS author_avatar_url \
+             FROM bundles b INNER JOIN users u ON u.id = b.owner_user_id WHERE b.id = ?",
+        )
+        .bind(&[JsValue::from_str(id)])?
+        .first(None)
+        .await?;
+    let Some(head) = head else {
+        return Ok(None);
+    };
+    let rows: Vec<CardRow> = db
+        .prepare(format!(
+            "{CARD_SELECT} WHERE s.bundle_id = ? AND s.status = 'published' ORDER BY s.updated_at DESC"
+        ))
+        .bind(&[JsValue::from_str(id)])?
+        .all()
+        .await?
+        .results()?;
+    if rows.is_empty() {
+        return Ok(None);
+    }
+    Ok(Some(BundleDetail {
+        id: head.id,
+        kind: head.kind,
+        provenance: head.provenance,
+        owner: AuthorRef {
+            handle: head.author_handle,
+            name: head.author_name,
+            avatar_url: head.author_avatar_url,
+        },
+        source_ref: head.source_ref,
+        synced_at: head.synced_at,
+        created_at: head.created_at,
+        skills: rows.into_iter().map(card).collect(),
+    }))
+}
+
+pub async fn author(db: &D1Database, handle: &str) -> Result<Option<AuthorProfile>> {
+    let head: Option<AuthorHeadRow> = db
+        .prepare("SELECT handle, name, avatar_url FROM users WHERE handle = ?")
+        .bind(&[JsValue::from_str(handle)])?
+        .first(None)
+        .await?;
+    let Some(head) = head else {
+        return Ok(None);
+    };
+    let rows: Vec<CardRow> = db
+        .prepare(format!(
+            "{CARD_SELECT} WHERE u.handle = ? AND s.status = 'published' ORDER BY s.installs DESC"
+        ))
+        .bind(&[JsValue::from_str(handle)])?
+        .all()
+        .await?
+        .results()?;
+    if rows.is_empty() {
+        return Ok(None);
+    }
+    let total_installs = rows.iter().map(|row| row.installs).sum();
+    Ok(Some(AuthorProfile {
+        handle: head.handle,
+        name: head.name,
+        avatar_url: head.avatar_url,
+        skill_count: rows.len() as i64,
+        total_installs,
+        skills: rows.into_iter().map(card).collect(),
+    }))
+}
+
+fn build_tree(files: &[FileEntry]) -> Vec<TreeNode> {
+    #[derive(Default)]
+    struct MutableNode {
+        name: String,
+        path: String,
+        node_type: String,
+        size: i64,
+        is_binary: bool,
+        kids: Vec<MutableNode>,
+    }
+    fn insert(node: &mut MutableNode, parts: &[&str], file: &FileEntry) {
+        let Some((part, rest)) = parts.split_first() else {
+            return;
+        };
+        let is_leaf = rest.is_empty();
+        let full_path = if node.path.is_empty() {
+            (*part).to_owned()
+        } else {
+            format!("{}/{}", node.path, part)
+        };
+        if let Some(index) = node.kids.iter().position(|kid| kid.name == *part) {
+            if is_leaf {
+                node.kids[index].size = file.size;
+                node.kids[index].is_binary = file.is_binary;
+            } else {
+                insert(&mut node.kids[index], rest, file);
+            }
+            return;
+        }
+        let mut child = MutableNode {
+            name: (*part).to_owned(),
+            path: full_path,
+            node_type: if is_leaf { "file" } else { "dir" }.into(),
+            size: if is_leaf { file.size } else { 0 },
+            is_binary: is_leaf && file.is_binary,
+            kids: Vec::new(),
+        };
+        if !is_leaf {
+            insert(&mut child, rest, file);
+        }
+        node.kids.push(child);
+    }
+    let mut root = MutableNode {
+        node_type: "dir".into(),
+        ..MutableNode::default()
+    };
+    for file in files {
+        let parts = file.path.split('/').collect::<Vec<_>>();
+        insert(&mut root, &parts, file);
+    }
+    fn freeze(node: MutableNode) -> TreeNode {
+        TreeNode {
+            name: node.name,
+            path: node.path,
+            node_type: node.node_type,
+            size: node.size,
+            is_binary: node.is_binary,
+            children: if node.kids.is_empty() {
+                None
+            } else {
+                Some(node.kids.into_iter().map(freeze).collect())
+            },
+        }
+    }
+    root.kids.into_iter().map(freeze).collect()
+}
+
 #[cfg(test)]
 mod tests {
     use super::{
-        AuthorRef, BundleRef, CategoryWithCount, SearchParams, SkillCard, SkillDetail,
-        StatsResponse,
+        build_tree, download_filename, page_from_url, AuthorRef, BundleRef, CategoryWithCount,
+        FileContentResponse, FileEntry, SearchParams, SkillCard, SkillDetail, SkillPath,
+        StatsResponse, TreeNode, TrendsResponse,
     };
+    use std::collections::BTreeMap;
 
     #[test]
     fn public_payloads_keep_the_openapi_camel_case_shape() {
@@ -713,5 +1550,145 @@ mod tests {
                 && DETAIL_SELECT.contains("skill_files")
                 && DETAIL_SELECT.contains("file_count")
         );
+    }
+
+    #[test]
+    fn skill_subroutes_do_not_collapse_into_detail_slugs() {
+        assert_eq!(
+            SkillPath::parse("/api/skills/jetpack-compose-mvi"),
+            Some(SkillPath::Detail("jetpack-compose-mvi"))
+        );
+        assert_eq!(
+            SkillPath::parse("/api/skills/jetpack-compose-mvi/files"),
+            Some(SkillPath::Files("jetpack-compose-mvi"))
+        );
+        assert_eq!(
+            SkillPath::parse("/api/skills/jetpack-compose-mvi/files/references/intent.md"),
+            Some(SkillPath::File {
+                slug: "jetpack-compose-mvi",
+                path: "references/intent.md",
+            })
+        );
+        assert_eq!(
+            SkillPath::parse("/api/skills/jetpack-compose-mvi/versions"),
+            Some(SkillPath::Versions("jetpack-compose-mvi"))
+        );
+        assert_eq!(
+            SkillPath::parse("/api/skills/jetpack-compose-mvi/download"),
+            Some(SkillPath::Download("jetpack-compose-mvi"))
+        );
+        assert_eq!(
+            SkillPath::parse("/api/skills/jetpack-compose-mvi/report"),
+            None
+        );
+        assert_eq!(SkillPath::parse("/api/skills/"), None);
+        assert_eq!(SkillPath::parse("/api/skills"), None);
+    }
+
+    #[test]
+    fn page_parser_matches_ktor_strict_messages() {
+        let ok = page_from_url(
+            &worker::Url::parse("https://example.test/api/timeline?page=2&pageSize=20").unwrap(),
+        )
+        .unwrap();
+        assert_eq!(ok, (2, 20));
+        assert_eq!(
+            page_from_url(&worker::Url::parse("https://example.test/api/timeline").unwrap())
+                .unwrap(),
+            (1, 24)
+        );
+        assert!(page_from_url(
+            &worker::Url::parse("https://example.test/api/timeline?page=0").unwrap()
+        )
+        .is_err());
+        assert!(page_from_url(
+            &worker::Url::parse("https://example.test/api/timeline?page=10001").unwrap()
+        )
+        .is_err());
+        assert!(page_from_url(
+            &worker::Url::parse("https://example.test/api/timeline?pageSize=abc").unwrap()
+        )
+        .is_err());
+    }
+
+    #[test]
+    fn file_tree_preserves_nested_paths_and_required_null_children() {
+        let tree = build_tree(&[
+            FileEntry {
+                path: "references/intent.md".into(),
+                name: "intent.md".into(),
+                dir: "references".into(),
+                size: 12,
+                is_binary: false,
+            },
+            FileEntry {
+                path: "SKILL.md".into(),
+                name: "SKILL.md".into(),
+                dir: String::new(),
+                size: 4,
+                is_binary: false,
+            },
+        ]);
+        assert_eq!(tree[0].path, "references");
+        assert_eq!(tree[0].node_type, "dir");
+        assert_eq!(
+            tree[0].children.as_ref().unwrap()[0].path,
+            "references/intent.md"
+        );
+        assert!(tree[1].children.is_none());
+        let encoded = serde_json::to_value(&tree[1]).unwrap();
+        assert!(encoded.get("children").unwrap().is_null());
+        assert_eq!(encoded["isBinary"], false);
+    }
+
+    #[test]
+    fn file_content_and_trends_keep_required_nullable_fields() {
+        let encoded = serde_json::to_value(FileContentResponse {
+            slug: "slug".into(),
+            path: "SKILL.md".into(),
+            size: 1,
+            is_binary: false,
+            content: None,
+            download_only: true,
+            download_url: None,
+        })
+        .unwrap();
+        assert!(encoded.get("content").unwrap().is_null());
+        assert!(encoded.get("downloadUrl").unwrap().is_null());
+        let trends = serde_json::to_value(TrendsResponse {
+            categories: vec![],
+            tags: vec![],
+            token_mix: vec![],
+            security_pass_rate: None,
+            submission_funnel: BTreeMap::new(),
+        })
+        .unwrap();
+        assert!(trends.get("securityPassRate").unwrap().is_null());
+        assert_eq!(trends["submissionFunnel"], serde_json::json!({}));
+    }
+
+    #[test]
+    fn download_filenames_reject_header_injection() {
+        assert_eq!(
+            download_filename("jetpack-compose-mvi", "1.4.2").as_deref(),
+            Some("jetpack-compose-mvi-1.4.2.zip")
+        );
+        assert!(download_filename("bad\r\nslug", "1.0.0").is_none());
+        assert!(download_filename("slug", "1\".zip").is_none());
+    }
+
+    #[test]
+    fn tree_node_type_is_not_a_rust_keyword_field() {
+        let encoded = serde_json::to_value(TreeNode {
+            name: "SKILL.md".into(),
+            path: "SKILL.md".into(),
+            node_type: "file".into(),
+            size: 1,
+            is_binary: false,
+            children: None,
+        })
+        .unwrap();
+        assert_eq!(encoded["type"], "file");
+        assert!(encoded.get("node_type").is_none());
     }
 }
