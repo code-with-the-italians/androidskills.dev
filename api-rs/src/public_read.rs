@@ -302,13 +302,20 @@ struct CardRow {
     author_handle: String,
     author_name: Option<String>,
     author_avatar_url: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+struct DetailRow {
+    #[serde(flatten)]
+    card: CardRow,
     readme_md: Option<String>,
     security: Option<String>,
     file_count: i64,
     total_size: i64,
 }
 
-const CARD_SELECT: &str = "SELECT s.id, s.slug, s.name, s.description, s.license, s.tags, s.version, s.version_source, s.token_upfront, s.token_ondemand, s.token_band, s.verified, s.status, s.featured, s.installs, s.created_at, s.updated_at, c.slug AS category_slug, c.name AS category_name, b.id AS bundle_id, b.kind AS bundle_kind, b.provenance AS bundle_provenance, u.handle AS author_handle, u.name AS author_name, u.avatar_url AS author_avatar_url, s.readme_md, s.security, COUNT(f.id) AS file_count, COALESCE(SUM(f.size), 0) AS total_size FROM skills s INNER JOIN bundles b ON b.id=s.bundle_id INNER JOIN users u ON u.id=b.owner_user_id LEFT JOIN categories c ON c.id=s.category_id LEFT JOIN skill_files f ON f.skill_id=s.id";
+const CARD_SELECT: &str = "SELECT s.id, s.slug, s.name, s.description, s.license, s.tags, s.version, s.version_source, s.token_upfront, s.token_ondemand, s.token_band, s.verified, s.status, s.featured, s.installs, s.created_at, s.updated_at, c.slug AS category_slug, c.name AS category_name, b.id AS bundle_id, b.kind AS bundle_kind, b.provenance AS bundle_provenance, u.handle AS author_handle, u.name AS author_name, u.avatar_url AS author_avatar_url FROM skills s INNER JOIN bundles b ON b.id=s.bundle_id INNER JOIN users u ON u.id=b.owner_user_id LEFT JOIN categories c ON c.id=s.category_id";
+const DETAIL_SELECT: &str = "SELECT s.id, s.slug, s.name, s.description, s.license, s.tags, s.version, s.version_source, s.token_upfront, s.token_ondemand, s.token_band, s.verified, s.status, s.featured, s.installs, s.created_at, s.updated_at, c.slug AS category_slug, c.name AS category_name, b.id AS bundle_id, b.kind AS bundle_kind, b.provenance AS bundle_provenance, u.handle AS author_handle, u.name AS author_name, u.avatar_url AS author_avatar_url, s.readme_md, s.security, COUNT(f.id) AS file_count, COALESCE(SUM(f.size), 0) AS total_size FROM skills s INNER JOIN bundles b ON b.id=s.bundle_id INNER JOIN users u ON u.id=b.owner_user_id LEFT JOIN categories c ON c.id=s.category_id LEFT JOIN skill_files f ON f.skill_id=s.id";
 
 pub async fn search(db: &D1Database, params: &SearchParams) -> Result<SkillSearchPage> {
     let (where_sql, bindings) = filters(params, false, false, false);
@@ -334,7 +341,7 @@ pub async fn search(db: &D1Database, params: &SearchParams) -> Result<SkillSearc
     ));
     let rows: Vec<CardRow> = db
         .prepare(format!(
-            "{CARD_SELECT} WHERE {where_sql} GROUP BY s.id ORDER BY {order} LIMIT ? OFFSET ?"
+            "{CARD_SELECT} WHERE {where_sql} ORDER BY {order} LIMIT ? OFFSET ?"
         ))
         .bind(&bindings)?
         .all()
@@ -356,16 +363,16 @@ pub async fn search(db: &D1Database, params: &SearchParams) -> Result<SkillSearc
 }
 
 pub async fn skill_detail(db: &D1Database, slug: &str) -> Result<Option<SkillDetail>> {
-    let rows: Vec<CardRow> = db
+    let rows: Vec<DetailRow> = db
         .prepare(format!(
-            "{CARD_SELECT} WHERE s.slug = ? AND s.status = 'published' GROUP BY s.id"
+            "{DETAIL_SELECT} WHERE s.slug = ? AND s.status = 'published' GROUP BY s.id"
         ))
         .bind(&[JsValue::from_str(slug)])?
         .all()
         .await?
         .results()?;
     Ok(rows.into_iter().next().map(|row| SkillDetail {
-        readme_md: row.readme_md.clone(),
+        readme_md: row.readme_md,
         file_count: row.file_count,
         total_size: row.total_size,
         security_notes: row
@@ -373,7 +380,7 @@ pub async fn skill_detail(db: &D1Database, slug: &str) -> Result<Option<SkillDet
             .as_deref()
             .and_then(|raw| serde_json::from_str(raw).ok())
             .unwrap_or_default(),
-        card: card(row),
+        card: card(row.card),
     }))
 }
 
@@ -689,5 +696,22 @@ mod tests {
         assert!(encoded.get("license").unwrap().is_null());
         assert!(encoded.get("category").unwrap().is_null());
         assert!(encoded.get("readmeMd").unwrap().is_null());
+    }
+
+    #[test]
+    fn list_card_select_does_not_over_fetch_detail_columns() {
+        use super::{CARD_SELECT, DETAIL_SELECT};
+        assert!(
+            !CARD_SELECT.contains("readme_md")
+                && !CARD_SELECT.contains("security")
+                && !CARD_SELECT.contains("skill_files")
+                && !CARD_SELECT.contains("file_count")
+        );
+        assert!(
+            DETAIL_SELECT.contains("readme_md")
+                && DETAIL_SELECT.contains("security")
+                && DETAIL_SELECT.contains("skill_files")
+                && DETAIL_SELECT.contains("file_count")
+        );
     }
 }
