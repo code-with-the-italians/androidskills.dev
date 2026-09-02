@@ -88,6 +88,22 @@ pub async fn fetch(request: Request, env: Env, _ctx: Context) -> Result<Response
             Ok(db) => Response::from_json(&public_read::categories(&db).await?),
             Err(_) => error::ApiError::service_unavailable().response(),
         },
+        "/api/skills" => match env.d1("DB") {
+            Ok(db) => match public_read::SearchParams::from_url(&request.url()?) {
+                Ok(params) => Response::from_json(&public_read::search(&db, &params).await?),
+                Err(error) => error.response(),
+            },
+            Err(_) => error::ApiError::service_unavailable().response(),
+        },
+        path if path.starts_with("/api/skills/") => match env.d1("DB") {
+            Ok(db) => match public_read::skill_detail(&db, path.trim_start_matches("/api/skills/"))
+                .await?
+            {
+                Some(skill) => Response::from_json(&skill),
+                None => error::ApiError::not_found().response(),
+            },
+            Err(_) => error::ApiError::service_unavailable().response(),
+        },
         _ => Response::error("Not Found", 404),
     }
 }
